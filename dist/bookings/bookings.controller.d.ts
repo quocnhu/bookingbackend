@@ -1,0 +1,108 @@
+import { BookingsService } from './bookings.service';
+import { CreateBookingDto, QueryBookingDto, UpdateBookingDto } from './dto/booking.dto';
+import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+export declare class BookingsController {
+    private readonly bookingsService;
+    constructor(bookingsService: BookingsService);
+    findAll(query: QueryBookingDto, actor: AuthenticatedUser): Promise<import("../common/dto/pagination.dto").PaginatedResult<any>>;
+    findOne(id: string): Promise<{
+        tour: {
+            id: string;
+            name: string;
+            type: import("@prisma/client").$Enums.TourType;
+            code: string;
+            thumbnailUrl: string | null;
+            durationDays: number | null;
+            adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+            childPrice: import("@prisma/client/runtime/library").Decimal | null;
+            infantPrice: import("@prisma/client/runtime/library").Decimal | null;
+            currency: string;
+        } | null;
+        rawData: {
+            payload: import("@prisma/client/runtime/library").JsonValue;
+        } | null;
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import("@prisma/client").$Enums.BookingStatus;
+        tourId: string | null;
+        bookingRef: string;
+        channel: import("@prisma/client").$Enums.BookingProvider;
+        address: string | null;
+        latitude: number | null;
+        longitude: number | null;
+        startingDate: Date | null;
+        customerName: string | null;
+        hotelName: string | null;
+        phone: string | null;
+        mail: string | null;
+        totalPax: number;
+        paxDetail: string | null;
+        tourType: import("@prisma/client").$Enums.TourType | null;
+        tourName: string | null;
+        payment: import("@prisma/client").$Enums.PaymentStatus | null;
+        isNoShow: boolean;
+        noShowReason: string | null;
+        assignmentId: string | null;
+        rawDataId: string | null;
+        paxSequence: number;
+    }>;
+    create(dto: CreateBookingDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import("@prisma/client").$Enums.BookingStatus;
+        tourId: string | null;
+        bookingRef: string;
+        channel: import("@prisma/client").$Enums.BookingProvider;
+        address: string | null;
+        latitude: number | null;
+        longitude: number | null;
+        startingDate: Date | null;
+        customerName: string | null;
+        hotelName: string | null;
+        phone: string | null;
+        mail: string | null;
+        totalPax: number;
+        paxDetail: string | null;
+        tourType: import("@prisma/client").$Enums.TourType | null;
+        tourName: string | null;
+        payment: import("@prisma/client").$Enums.PaymentStatus | null;
+        isNoShow: boolean;
+        noShowReason: string | null;
+        assignmentId: string | null;
+        rawDataId: string | null;
+        paxSequence: number;
+    }>;
+    update(id: string, dto: UpdateBookingDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import("@prisma/client").$Enums.BookingStatus;
+        tourId: string | null;
+        bookingRef: string;
+        channel: import("@prisma/client").$Enums.BookingProvider;
+        address: string | null;
+        latitude: number | null;
+        longitude: number | null;
+        startingDate: Date | null;
+        customerName: string | null;
+        hotelName: string | null;
+        phone: string | null;
+        mail: string | null;
+        totalPax: number;
+        paxDetail: string | null;
+        tourType: import("@prisma/client").$Enums.TourType | null;
+        tourName: string | null;
+        payment: import("@prisma/client").$Enums.PaymentStatus | null;
+        isNoShow: boolean;
+        noShowReason: string | null;
+        assignmentId: string | null;
+        rawDataId: string | null;
+        paxSequence: number;
+    }>;
+    remove(id: string): Promise<{
+        message: string;
+    }>;
+}

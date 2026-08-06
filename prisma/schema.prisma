@@ -1,0 +1,527 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum RoleType {
+  ADMIN
+  OFFICE
+  TOUR_GUIDE
+  DRIVER
+  TRANSPORT_PROVIDER
+  CUSTOMER
+}
+
+enum TourType {
+  PRIVATE_TOUR
+  GROUP_TOUR
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+enum BookingStatus {
+  PENDING   // Mới tạo / Chờ xếp xe
+  ASSIGNED  // Đã xếp vào Chuyến xe (Assignment)
+  CANCELED  // Hủy đơn
+}
+
+enum AssignmentStatus {
+  PENDING    // Đã có xe & danh sách khách - CHƯA/Đang gán Driver & Guide
+  DISPATCHED // Đã gán đủ Driver + Guide + Xe - Xe xuất bến
+  COMPLETED  // Tour hoàn tất -> Kích hoạt Settlement
+  CANCELED   // Hủy vận hành
+}
+
+enum GuideType {
+  OFFICIAL   // HDV Nội bộ (Tính lương kỳ)
+  FREELANCE  // HDV Tự do (Quyết toán theo tour)
+}
+
+enum PayeeType {
+  V_PROVIDER       // Vendor/Transportation Provider (B2B Invoice & Bank Transfer)
+  FREELANCE_GUIDE  // HDV Tự do (Quyết toán theo tour)
+  OFFICIAL_GUIDE   // HDV Nội bộ (Phụ cấp / Phí Tour)
+}
+
+enum SettlementStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+enum BookingProvider {
+  TRIPADVISOR  // Tự động từ webhook / mail TripAdvisor
+  WEBSITE      // Tự động từ Pub/Sub Gmail cho đơn Website
+  MANUAL       // Admin/Office tạo thủ công trên dashboard
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─── RBAC — ROLES & PERMISSIONS (mục 2.3 PROCESS_FLOW) ────────────────
+model Role {
+  id          String         @id @default(uuid())
+  name        String         @unique
+  description String?
+  isSystem    Boolean        @default(false) // ADMIN = system, không thể xóa
+  permissions RolePermission[]
+  users       UserRole[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model Permission {
+  id          String         @id @default(uuid())
+  code        String         @unique // VD "booking.update", "user.delete"
+  name        String
+  group       String?        // Nhóm hiển thị checkbox
+  roleLinks   RolePermission[]
+  userLinks   UserPermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  @@id([userId, roleId])
+}
+
+model UserPermission {
+  userId       String
+  permissionId String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  @@id([userId, permissionId])
+}
+
+// ─── AUTH, USERS, LEAVES & SESSIONS ──────────────────────────────────
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  name         String?
+  avatarUrl    String?
+  passwordHash String?
+  authProvider AuthProvider  @default(LOCAL)
+  role         RoleType      @default(OFFICE)
+  isActive     Boolean       @default(true)
+  lastLogin    DateTime?
+
+  // Bảo mật: khóa tài khoản khi đăng nhập sai quá nhiều lần
+  failedLoginAttempts Int       @default(0)
+  lockoutUntil        DateTime?
+
+  // RBAC (mục 2.3): roles + permissions riêng + phân loại bổ sung
+  roles       UserRole[]
+  permissions UserPermission[]
+  userType    String?
+
+  // Drive: giới hạn dung lượng (MB). ADMIN = unlimited.
+  storageQuotaMb Int @default(3072)
+
+  providerId   String?
+  provider     TransportationProvider? @relation(fields: [providerId], references: [id])
+
+  driverProfile DriverProfile?
+  guideProfile  GuideProfile?
+
+  // Quan hệ phân công & tài chính
+  driverAssignments Assignment[] @relation("DriverAssignment")
+  guidedAssignments Assignment[] @relation("GuideAssignment")
+  settlements       Settlement[] @relation("PayeeUser")
+
+  // Quản lý lịch nghỉ & Session
+  leaves          UserLeave[]
+  sessions        UserSession[]
+  auditLogs       AuditLog[]
+  authActivities  AuthActivity[]
+
+  // Drive (lưu trữ cá nhân kiểu Google Drive)
+  driveFolders DriveFolder[] @relation("UserDriveFolders")
+  driveFiles   DriveFile[]   @relation("UserDriveFiles")
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model UserLeave {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+  status    LeaveStatus @default(APPROVED)
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId, startDate, endDate])
+}
+
+model UserSession {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token        String?   @unique
+  ipAddress    String?
+  userAgent    String?
+
+  loggedInAt   DateTime  @default(now())
+  loggedOutAt  DateTime?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([loggedInAt])
+}
+
+model DriverProfile {
+  id            String @id @default(uuid())
+  userId        String @unique
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber String
+  rating        Float  @default(5.0)
+}
+
+model GuideProfile {
+  id        String    @id @default(uuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      GuideType @default(FREELANCE)
+  languages String[]
+  rating    Float     @default(5.0)
+}
+
+// ─── TOUR & LOGISTICS ────────────────────────────────────────────────
+model Tour {
+  id           String       @id @default(uuid())
+  code         String       @unique // e.g. TOUR-0001
+  name         String       @unique
+  type         TourType
+  thumbnailUrl String?      // e.g. cover image shown on cards
+
+  adultPrice   Decimal?     @default(0)
+  childPrice  Decimal?     @default(0)
+  infantPrice Decimal?     @default(0)
+  currency    String       @default("USD")
+  durationDays Int?        @default(1) // Half-day tours = 1; otherwise number of days
+
+  // Thông tin trang chi tiết tour (layout kiểu "Chương trình Tour")
+  departureLocation String? // Nơi khởi hành
+  transportation    String? // Phương tiện
+  overview          String?  @db.Text // Tổng quan (HTML bullets)
+  includedServices  String?  @db.Text // Dịch vụ bao gồm (HTML list)
+  excludedServices  String?  @db.Text // Dịch vụ không bao gồm (HTML list)
+  childrenPolicy    String?  @db.Text // Giá trẻ em (HTML list)
+  regulations       String?  @db.Text // Hướng dẫn / Thông quy định (HTML)
+
+  itineraries TourItinerary[]
+  departures  TourDeparture[]
+  prices      RoutePrice[]
+  bookings    Booking[]
+}
+
+model TourDeparture {
+  id            String   @id @default(uuid())
+  tourId        String
+  tour          Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  departureDate DateTime
+  adultPrice    Decimal  @default(0)
+  childPrice    Decimal  @default(0)
+  infantPrice   Decimal  @default(0)
+
+  createdAt     DateTime @default(now())
+
+  @@index([tourId, departureDate])
+}
+
+model TourItinerary {
+  id          String   @id @default(uuid())
+  tourId      String
+  tour        Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  dayNumber   Int      @default(1) // Day 1, Day 2, etc.
+  orderIndex  Int      @default(0) // Sequence within the day
+  title       String              // e.g., "Visit Marble Mountain"
+  description String?  @db.Text
+  timeSlot    String?             // e.g., "08:30 AM - 10:00 AM"
+  location    String?             // Destination name
+  imageUrl    String?             // Ảnh đại diện của item (chọn từ backend uploads)
+  mapQuery    String?             // Địa điểm / query cho Google Maps embed
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tourId, dayNumber, orderIndex])
+}
+
+model TransportationProvider {
+  id          String       @id @default(uuid())
+  name        String
+  users       User[]
+  vehicles    Vehicle[]
+  routePrices RoutePrice[]
+  assignments Assignment[]
+  settlements Settlement[] @relation("PayeeProvider")
+}
+
+model Vehicle {
+  id          String                 @id @default(uuid())
+  plateNumber String
+  capacity    Int?                   @default(29)
+  providerId  String
+  provider    TransportationProvider @relation(fields: [providerId], references: [id])
+  assignments Assignment[]
+}
+
+model RoutePrice {
+  id         String                 @id @default(uuid())
+  tourId     String
+  tour       Tour                   @relation(fields: [tourId], references: [id])
+  providerId String
+  provider   TransportationProvider @relation(fields: [providerId], references: [id])
+  price      Decimal
+
+  @@unique([tourId, providerId])
+}
+
+// ─── BOOKING & ASSIGNMENT ────────────────────────────────────────────
+model Booking {
+  id           String          @id @default(uuid())
+  bookingRef   String          @unique
+
+  channel      BookingProvider @default(MANUAL)
+  status       BookingStatus   @default(PENDING)
+  tourId       String?
+  tour         Tour?           @relation(fields: [tourId], references: [id])
+
+  address      String?
+  latitude     Float?
+  longitude    Float?
+  startingDate DateTime?
+
+  customerName String?
+  hotelName    String?
+  phone        String?
+  mail         String?
+  totalPax     Int             @default(0)
+  paxDetail    String?
+  tourType     TourType?
+  tourName     String?
+  payment      PaymentStatus?  @default(PENDING)
+
+  isNoShow     Boolean         @default(false)
+  noShowReason String?
+
+  rawDataId    String?         @unique
+  rawData      RawData?        @relation(fields: [rawDataId], references: [id])
+
+  assignmentId String?
+  assignment   Assignment?     @relation(fields: [assignmentId], references: [id])
+  paxSequence  Int             @default(0) // Phục vụ Drag-and-Drop xếp vị trí khách trong xe
+
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([assignmentId, paxSequence])
+}
+
+model Assignment {
+  id            String                  @id @default(uuid())
+  code          String?                 // Tên bus/xe hiển thị (VD: "Bus 01", "Xe 29 chỗ")
+  bookings      Booking[]
+
+  // Thời gian bắt đầu và kết thúc của Chuyến (Hỗ trợ Tour 1 ngày hoặc Nhiều ngày)
+  startDate     DateTime
+  endDate       DateTime
+
+  vehicleId     String?
+  vehicle       Vehicle?                @relation(fields: [vehicleId], references: [id])
+  providerId    String?
+  provider      TransportationProvider? @relation(fields: [providerId], references: [id])
+
+  driverId      String?
+  driver        User?                   @relation("DriverAssignment", fields: [driverId], references: [id])
+  guideId       String?
+  guide         User?                   @relation("GuideAssignment", fields: [guideId], references: [id])
+
+  status        AssignmentStatus        @default(PENDING)
+  sequenceIndex Int                     @default(0)
+  priceOverride Decimal?
+  tripNotes     String?                 @db.Text
+
+  settlement    Settlement?
+
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@index([status, sequenceIndex])
+  @@index([startDate, endDate]) // Tối ưu query lọc khả dụng theo khoảng thời gian
+}
+
+// ─── FINANCIAL SETTLEMENT ────────────────────────────────────────────
+model Settlement {
+  id           String           @id @default(uuid())
+  assignmentId String           @unique
+  assignment   Assignment       @relation(fields: [assignmentId], references: [id])
+
+  payeeType    PayeeType
+  providerId   String?
+  provider     TransportationProvider? @relation("PayeeProvider", fields: [providerId], references: [id])
+  userId       String?
+  user         User?                   @relation("PayeeUser", fields: [userId], references: [id])
+
+  baseAmount   Decimal
+  allowance    Decimal          @default(0)
+  deduction    Decimal          @default(0)
+  finalAmount  Decimal
+
+  status       SettlementStatus @default(PENDING)
+  periodName   String?
+  notes        String?
+
+  expenseItems ExpenseItem[]
+
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model ExpenseItem {
+  id           String     @id @default(uuid())
+  settlementId String
+  settlement   Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  category     String
+  description  String?
+  amount       Decimal
+  receiptUrl   String?
+}
+
+// ─── UTILS & PUB/SUB MAILBOX ──────────────────────────────────────────
+model GmailAccount {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  lastHistoryId   String
+  watchExpiration DateTime
+  refreshToken    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model RawData {
+  id        String   @id @default(uuid())
+  sourceId  String   @unique
+  payload   Json
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  booking   Booking?
+}
+
+model Coordinate {
+  id         String   @id @default(uuid())
+  hotelName  String
+  starRating String?
+  address    String   @unique
+  coordinate String?
+  latitude   Float
+  longitude  Float
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([latitude, longitude])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  action     String
+  beforeData Json?
+  afterData  Json?
+  changedBy  String?
+  user       User?    @relation(fields: [changedBy], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ─── AUTH ACTIVITY ──────────────────────────────────────────────────
+// Ghi lại sự kiện xác thực (đăng nhập/đăng xuất/thất bại) tách riêng khỏi audit log.
+model AuthActivity {
+  id           String        @id @default(uuid())
+  userId       String?
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  eventType    String
+  authProvider AuthProvider?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime      @default(now())
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// ─── DRIVE (lưu trữ cá nhân kiểu Google Drive) ──────────────────────
+// userId nullable + SetNull: khi xoá user, drive & avatar folder được giữ lại (không bị xoá).
+model DriveFolder {
+  id        String        @id @default(uuid())
+  userId    String?
+  user      User?         @relation("UserDriveFolders", fields: [userId], references: [id], onDelete: SetNull)
+  parentId  String?
+  parent    DriveFolder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  DriveFolder[] @relation("FolderTree")
+  files     DriveFile[]
+  name      String
+  kind      String        @default("folder") // "root" | "avatar" | "folder"
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([userId, parentId])
+}
+
+model DriveFile {
+  id         String       @id @default(uuid())
+  userId     String?
+  user       User?        @relation("UserDriveFiles", fields: [userId], references: [id], onDelete: SetNull)
+  folderId   String
+  folder     DriveFolder  @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  name       String
+  mimeType   String?
+  size       Int
+  storageKey String       @unique // đường dẫn tương đối dưới backend/uploads/drive
+  createdAt  DateTime     @default(now())
+
+  @@index([userId, folderId])
+}
