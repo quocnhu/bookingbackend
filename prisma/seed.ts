@@ -1,8 +1,44 @@
 import 'dotenv/config';
 import { PrismaClient, AuthProvider, RoleType, TourType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as path from 'path';
+import * as fs from 'fs';
+import sharp from 'sharp';
 
 const prisma = new PrismaClient();
+
+const UPLOADS_ROOT = path.join(process.cwd(), 'uploads');
+const GALLERY_SHOTS = 3;
+
+/**
+ * Folder-based gallery: ghi các ảnh placeholder cục bộ vào thư mục ảnh của tour
+ * (uploads/tours/{tourId}/gallery). Không cần bản ghi DB — frontend đọc thẳng folder.
+ */
+async function seedGalleryImages(tourId: string, code: string, count = GALLERY_SHOTS) {
+  const folder = path.join(UPLOADS_ROOT, 'tours', tourId, 'gallery');
+  await fs.promises.mkdir(folder, { recursive: true });
+  const palettes = [
+    { from: '#22d3ee', to: '#3b82f6' },
+    { from: '#8b5cf6', to: '#ec4899' },
+    { from: '#10b981', to: '#22d3ee' },
+  ];
+  for (let i = 0; i < count; i++) {
+    const { from, to } = palettes[i % palettes.length];
+    const svg =
+      `<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">` +
+      `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+      `<stop offset="0%" stop-color="${from}"/><stop offset="100%" stop-color="${to}"/>` +
+      `</linearGradient></defs>` +
+      `<rect width="1200" height="800" fill="url(#g)"/>` +
+      `<circle cx="950" cy="180" r="160" fill="rgba(255,255,255,0.12)"/>` +
+      `<circle cx="180" cy="640" r="220" fill="rgba(255,255,255,0.10)"/>` +
+      `<text x="600" y="400" font-family="Arial, sans-serif" font-size="76" font-weight="700" fill="#ffffff" text-anchor="middle">${code}</text>` +
+      `<text x="600" y="462" font-family="Arial, sans-serif" font-size="30" fill="rgba(255,255,255,0.85)" text-anchor="middle">Photo ${i + 1}</text>` +
+      `</svg>`;
+    const file = path.join(folder, `${String(i).padStart(3, '0')}-seed-${i}.webp`);
+    await sharp(Buffer.from(svg)).webp({ quality: 90 }).toFile(file);
+  }
+}
 
 const DEFAULT_PERMISSIONS: Array<{ code: string; name: string; group: string }> = [
   { code: 'dashboard.read', name: 'Xem dashboard', group: 'Dashboard' },
@@ -27,6 +63,7 @@ const DEFAULT_PERMISSIONS: Array<{ code: string; name: string; group: string }> 
   { code: 'user.create', name: 'Tạo user', group: 'User' },
   { code: 'user.update', name: 'Sửa user', group: 'User' },
   { code: 'user.delete', name: 'Xoá user', group: 'User' },
+  { code: 'gmail.manage', name: 'Quản lý mailbox Gmail', group: 'System' },
   { code: 'role.manage', name: 'Quản lý role/permission', group: 'System' },
   { code: 'audit.read', name: 'Xem audit log', group: 'System' },
   { code: 'auth.read', name: 'Xem lịch sử đăng nhập', group: 'System' },
@@ -49,6 +86,10 @@ interface TourSeed {
   excludedServices?: string;
   childrenPolicy?: string;
   regulations?: string;
+  highlights?: string;
+  insurancePolicy?: string;
+  mapQuery?: string;
+  gallery?: Array<{ url: string }>;
   departures?: Array<{
     departureDate: string;
     adultPrice: number;
@@ -69,6 +110,24 @@ interface TourSeed {
 const IMG = (file: string, alt: string) =>
   `<img src="http://localhost:4000/uploads/seeds/${file}.jpg" alt="${alt}" />`;
 
+const UL = (items: string[]) => `<ul>${items.map((i) => `<li>${i}</li>`).join('')}</ul>`;
+const P = (text: string) => `<p>${text}</p>`;
+const INSURANCE = () =>
+  `<p>All guests are covered by <strong>travel insurance</strong> during the tour itinerary. Personal belongings are the guest's own responsibility.</p>` +
+  UL([
+    'Medical assistance & emergency transport during the tour',
+    'Coverage for the full duration listed on this itinerary',
+    'Excludes pre-existing conditions and optional activities not listed',
+  ]);
+const REGULATIONS = () =>
+  `<p>Please read these instructions carefully before joining the tour.</p>` +
+  UL([
+    'Arrive at the pickup point 15 minutes before departure',
+    'Bring a valid ID; children must be accompanied by an adult',
+    'Comfortable walking shoes and weather-appropriate clothing recommended',
+    'Smoking and drinking alcohol on the vehicle are not allowed',
+  ]);
+
 const VIETNAM_TOURS: TourSeed[] = [
   {
     code: 'TOUR-0001',
@@ -80,6 +139,35 @@ const VIETNAM_TOURS: TourSeed[] = [
     childPrice: 25,
     infantPrice: 0,
     currency: 'USD',
+    departureLocation: 'Hotel pickup — Old Quarter, Hanoi',
+    transportation: 'AC private car + walking',
+    mapQuery: 'Hoan Kiem Lake, Hanoi',
+    overview:
+      P('Step into more than 1,000 years of Hanoi history on this private half-day walk through the city’s soul.') +
+      UL([
+        'Guided tour of the 36 ancient streets of the Old Quarter',
+        'Hoan Kiem Lake, Ngoc Son Temple and the iconic red Huc Bridge',
+        'Temple of Literature — Vietnam’s first national university',
+        'Traditional water puppet show to close the day',
+      ]),
+    highlights:
+      UL([
+        'Private guide dedicated to your group only',
+        'Skip the crowds with a carefully paced itinerary',
+        'Local street-food recommendation list included',
+        'All entrance fees covered',
+      ]),
+    includedServices:
+      UL(['Private licensed guide', 'All entrance tickets', 'Bottled water', 'Hotel pickup & drop-off in the Old Quarter']),
+    excludedServices:
+      UL(['Meals & beverages', 'Personal expenses', 'Gratuities (optional)']),
+    regulations: REGULATIONS(),
+    insurancePolicy: INSURANCE(),
+    gallery: [
+      { url: 'https://picsum.photos/seed/hanoi-1/1200/800' },
+      { url: 'https://picsum.photos/seed/hanoi-2/1200/800' },
+      { url: 'https://picsum.photos/seed/hanoi-3/1200/800' },
+    ],
     itineraries: [
       {
         dayNumber: 1,
@@ -129,6 +217,35 @@ const VIETNAM_TOURS: TourSeed[] = [
     childPrice: 40,
     infantPrice: 10,
     currency: 'USD',
+    departureLocation: 'Hotel pickup — Hanoi Old Quarter / Hoan Kiem',
+    transportation: 'Air-conditioned shuttle bus + deluxe cruise',
+    mapQuery: 'Tuan Chau Marina, Ha Long',
+    overview:
+      P('Sail through thousands of limestone karsts on a full-day cruise around UNESCO-listed Ha Long Bay.') +
+      UL([
+        'Deluxe cruise with welcome drink and sun deck',
+        'Sung Sot Cave and Ti Top Island',
+        'Kayaking among the karsts',
+        'Buffet lunch and sunset party on board',
+      ]),
+    highlights:
+      UL([
+        'Cave exploration at Sung Sot (Surprise Cave)',
+        'Panoramic view from Ti Top Island',
+        'Kayaking session included',
+        'Full safety briefing before every activity',
+      ]),
+    includedServices:
+      UL(['Hotel shuttle transfer', 'Deluxe cruise with lunch', 'All entrance fees', 'Kayaking equipment', 'English-speaking guide']),
+    excludedServices:
+      UL(['Personal expenses', 'Drinks on board (pay locally)', 'Gratuities']),
+    regulations: REGULATIONS(),
+    insurancePolicy: INSURANCE(),
+    gallery: [
+      { url: 'https://picsum.photos/seed/halong-1/1200/800' },
+      { url: 'https://picsum.photos/seed/halong-2/1200/800' },
+      { url: 'https://picsum.photos/seed/halong-3/1200/800' },
+    ],
     itineraries: [
       {
         dayNumber: 1,
@@ -178,6 +295,35 @@ const VIETNAM_TOURS: TourSeed[] = [
     childPrice: 30,
     infantPrice: 0,
     currency: 'USD',
+    departureLocation: 'Central pickup — No. 1 Ba Trieu Street, Hanoi',
+    transportation: 'AC coach + rowing boat',
+    mapQuery: 'Tam Coc, Ninh Binh',
+    overview:
+      P('Two days through the ancient capital and the breathtaking waterways of the “Ha Long Bay on land”.') +
+      UL([
+        'Hoa Lu ancient capital and Trang An boat complex',
+        'Tam Coc sampan ride through three caves',
+        'Mua Cave viewpoint with 360° panorama',
+        'Homestay-style overnight in the countryside',
+      ]),
+    highlights:
+      UL([
+        'Trang An — UNESCO World Heritage boat complex',
+        '500 steps to the Mua Cave dragon viewpoint',
+        'Bicycle ride through rice paddies',
+        'Small group of max 12 travellers',
+      ]),
+    includedServices:
+      UL(['2-day AC coach transfer', 'Overnight accommodation', 'All boat & entrance tickets', 'Breakfast, lunch & dinner (Day 2 lunch)', 'Bicycle rental']),
+    excludedServices:
+      UL(['Personal expenses', 'Drinks', 'Gratuities']),
+    regulations: REGULATIONS(),
+    insurancePolicy: INSURANCE(),
+    gallery: [
+      { url: 'https://picsum.photos/seed/ninhbinh-1/1200/800' },
+      { url: 'https://picsum.photos/seed/ninhbinh-2/1200/800' },
+      { url: 'https://picsum.photos/seed/ninhbinh-3/1200/800' },
+    ],
     itineraries: [
       {
         dayNumber: 1,
@@ -245,6 +391,33 @@ const VIETNAM_TOURS: TourSeed[] = [
     childPrice: 20,
     infantPrice: 0,
     currency: 'USD',
+    departureLocation: 'Hotel pickup — Hoi An Old Town area',
+    transportation: 'Walking tour + private car',
+    mapQuery: 'Hoi An Ancient Town',
+    overview:
+      P('Wander the lantern-lit streets of the 400-year-old UNESCO trading port of Hoi An.') +
+      UL([
+        'Japanese Covered Bridge and historic shophouses',
+        'Hands-on silk lantern making workshop',
+        'Night market and river lantern release',
+      ]),
+    highlights:
+      UL([
+        'Private evening tour when the town glows',
+        'Make your own silk lantern to keep',
+        'Sample local cao lầu noodles',
+      ]),
+    includedServices:
+      UL(['Private guide', 'Lantern workshop materials', 'Entrance to Old Town attractions']),
+    excludedServices:
+      UL(['Dinner', 'Personal expenses', 'Gratuities']),
+    regulations: REGULATIONS(),
+    insurancePolicy: INSURANCE(),
+    gallery: [
+      { url: 'https://picsum.photos/seed/hoian-1/1200/800' },
+      { url: 'https://picsum.photos/seed/hoian-2/1200/800' },
+      { url: 'https://picsum.photos/seed/hoian-3/1200/800' },
+    ],
     itineraries: [
       {
         dayNumber: 1,
@@ -285,6 +458,35 @@ const VIETNAM_TOURS: TourSeed[] = [
     childPrice: 35,
     infantPrice: 8,
     currency: 'USD',
+    departureLocation: 'Hotel pickup — Da Nang city center',
+    transportation: 'AC minivan + cable car',
+    mapQuery: 'Golden Bridge, Ba Na Hills, Da Nang',
+    overview:
+      P('Ride the world’s longest non-stop cable car to the French village and walk the famous Golden Bridge.') +
+      UL([
+        'Ba Na Hills cable car & French village',
+        'Golden Bridge (Cau Vang) held by giant stone hands',
+        'Marble Mountains & My Khe Beach',
+        'Son Tra Peninsula & the Lady Buddha',
+      ]),
+    highlights:
+      UL([
+        'Golden Bridge photo at the “hands of God”',
+        'Fantasy Park free-entrance zone',
+        'Ocean views from Son Tra Peninsula',
+        'Two full days with a professional guide',
+      ]),
+    includedServices:
+      UL(['AC minivan transfers', 'Ba Na Hills cable car tickets', 'Accommodation (1 night)', 'Breakfast', 'English-speaking guide']),
+    excludedServices:
+      UL(['Lunches & dinners', 'Personal expenses', 'Gratuities']),
+    regulations: REGULATIONS(),
+    insurancePolicy: INSURANCE(),
+    gallery: [
+      { url: 'https://picsum.photos/seed/danang-1/1200/800' },
+      { url: 'https://picsum.photos/seed/danang-2/1200/800' },
+      { url: 'https://picsum.photos/seed/danang-3/1200/800' },
+    ],
     itineraries: [
       {
         dayNumber: 1,
@@ -531,6 +733,15 @@ async function main() {
         infantPrice: t.infantPrice,
         currency: t.currency,
         durationDays: t.durationDays,
+        departureLocation: t.departureLocation ?? null,
+        transportation: t.transportation ?? null,
+        overview: t.overview ?? null,
+        highlights: t.highlights ?? null,
+        includedServices: t.includedServices ?? null,
+        excludedServices: t.excludedServices ?? null,
+        regulations: t.regulations ?? null,
+        insurancePolicy: t.insurancePolicy ?? null,
+        mapQuery: t.mapQuery ?? null,
       },
       create: {
         code: t.code,
@@ -542,6 +753,15 @@ async function main() {
         infantPrice: t.infantPrice,
         currency: t.currency,
         durationDays: t.durationDays,
+        departureLocation: t.departureLocation ?? null,
+        transportation: t.transportation ?? null,
+        overview: t.overview ?? null,
+        highlights: t.highlights ?? null,
+        includedServices: t.includedServices ?? null,
+        excludedServices: t.excludedServices ?? null,
+        regulations: t.regulations ?? null,
+        insurancePolicy: t.insurancePolicy ?? null,
+        mapQuery: t.mapQuery ?? null,
       },
     });
     await prisma.tourItinerary.deleteMany({ where: { tourId: tour.id } });
@@ -550,6 +770,8 @@ async function main() {
         data: t.itineraries.map((it) => ({ ...it, tourId: tour.id })),
       });
     }
+    await prisma.tourGallery.deleteMany({ where: { tourId: tour.id } });
+    await seedGalleryImages(tour.id, t.code);
     console.log(`✅ Seeded tour ${t.code} — ${t.name}`);
   }
 }

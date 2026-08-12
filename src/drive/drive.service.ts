@@ -227,27 +227,25 @@ export class DriveService {
       .pop()!
       .replace(/[^\w.\- ]/g, '_');
     const finalName = isAvatar ? `avatar.${finalExt}` : baseName;
-    const storedName = isAvatar
-      ? finalName
-      : `${Date.now()}-${finalName}`;
+    const storedName = isAvatar ? finalName : `${Date.now()}-${finalName}`;
 
     const storageKey = `drive/${userDir}/${targetId}/${storedName}`;
-    await this.storage.save(storageKey, buffer, {
-      contentType: mime || undefined,
-    });
 
     if (isAvatar) {
-      // chỉ giữ 1 ảnh avatar
-      const old = await this.prisma.driveFile.findMany({
-        where: { userId, folderId: targetId },
-      });
-      for (const o of old) {
-        await this.storage.remove(o.storageKey);
+      // folder-based: xoá mọi ảnh avatar cũ trong folder trước khi ghi ảnh mới.
+      // Vì ảnh mới luôn trùng tên avatar.{ext}, xoá sau khi save sẽ xoá cả ảnh mới.
+      const oldFiles = await this.storage.list(`drive/${userDir}/${targetId}/`);
+      for (const f of oldFiles) {
+        await this.storage.remove(f.key);
       }
       await this.prisma.driveFile.deleteMany({
         where: { userId, folderId: targetId },
       });
     }
+
+    await this.storage.save(storageKey, buffer, {
+      contentType: mime || undefined,
+    });
 
     const saved = await this.prisma.driveFile.create({
       data: {

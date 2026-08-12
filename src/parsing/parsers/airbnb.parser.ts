@@ -1,0 +1,118 @@
+import { Injectable } from '@nestjs/common';
+import type { BookingFields, TemplateParser } from './parser.interface';
+
+const DATE_RE =
+  /\b(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\.?\s+\d{4})\b/i;
+const REF_RE =
+  /(?:confirmation|reservation|booking|reservation code|confirmation code|itinerary)\s*[#:]?\s*([A-Z0-9][A-Z0-9-]{4,19})/i;
+
+/** Ép mọi value thành string an toàn (tránh '[object Object]'). */
+const asString = (value: unknown): string =>
+  typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+
+/**
+ * Airbnb confirmation email parser (heuristic trên headers + body plain text).
+ */
+@Injectable()
+export class AirbnbParser implements TemplateParser {
+  readonly templateTag = 'airbnb';
+
+  canParse(payload: Record<string, unknown>): boolean {
+    const from = asString(payload.from).toLowerCase();
+    const subject = asString(payload.subject).toLowerCase();
+    return (
+      from.includes('airbnb.com') ||
+      subject.includes('airbnb') ||
+      subject.includes('trip to') ||
+      subject.includes('reservation confirmed')
+    );
+  }
+
+  extract(payload: Record<string, unknown>): BookingFields | null {
+    const body = `${asString(payload.subject)}\n${asString(payload.body)}\n${asString(payload.snippet)}`;
+
+    const ref = this.matchRef(body);
+    if (!ref) return null;
+
+    const start = this.matchStartDate(body);
+    const end = this.matchEndDate(body);
+    if (!start && !end) return null;
+
+    return {
+      action: this.isCancellation(body) ? 'CANCEL' : 'CREATE',
+      bookingRef: ref,
+      source: 'airbnb',
+      customerName: this.matchGuest(body),
+      startingDate: start ?? end,
+      totalPax: this.matchPax(body),
+      address: this.matchAddress(body),
+      mail: asString(payload.emailAddress) || undefined,
+      phone: this.matchPhone(body),
+    };
+  }
+
+  private matchRef(body: string): string | null {
+    const m = REF_RE.exec(body);
+    if (m) return this.cleanRef(m[1]);
+    const hm = /(?:HM|RT)[A-Z0-9]{6,8}/i.exec(body);
+    return hm ? hm[0].toUpperCase() : null;
+  }
+
+  private cleanRef(ref: string): string {
+    return ref
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 20);
+  }
+
+  private isCancellation(body: string): boolean {
+    return /\b(cancel(?:led|lation)?|refund(?:ed)?|you won'?t be going)\b/i.test(
+      body,
+    );
+  }
+
+  private matchGuest(body: string): string | undefined {
+    const m =
+      /\b(?:guest|lead guest|traveler)\s*[:#-]\s*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)/.exec(
+        body,
+      ) ?? /Hi\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?),/.exec(body);
+    return m ? m[1].trim() : undefined;
+  }
+
+  private matchStartDate(body: string): string | undefined {
+    const m =
+      /\bcheck[- ]?in\b[:\s]*([A-Z][a-z]+ \d{1,2},? \d{4})/i.exec(body) ??
+      DATE_RE.exec(body);
+    return m ? this.normalizeDate(m[1]) : undefined;
+  }
+
+  private matchEndDate(body: string): string | undefined {
+    const m = /\bcheck[- ]?out\b[:\s]*([A-Z][a-z]+ \d{1,2},? \d{4})/i.exec(
+      body,
+    );
+    return m ? this.normalizeDate(m[1]) : undefined;
+  }
+
+  private matchPax(body: string): number | undefined {
+    const m = /(\d+)\s*(?:adult|guest|traveler|traveller)s?\b/i.exec(body);
+    return m ? Number(m[1]) : undefined;
+  }
+
+  private matchAddress(body: string): string | undefined {
+    const m =
+      /\b(?:where you'?ll be|address|location)\b[:\s]*\n?\s*(.{5,90})/.exec(
+        body,
+      );
+    return m ? m[1].replace(/\s+/g, ' ').trim() : undefined;
+  }
+
+  private matchPhone(body: string): string | undefined {
+    const m = /\b(\+?\d[\d\s().-]{8,17}\d)\b/.exec(body);
+    return m ? m[1].replace(/[\s().-]/g, '') : undefined;
+  }
+
+  private normalizeDate(raw: string): string {
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? raw : d.toISOString();
+  }
+}

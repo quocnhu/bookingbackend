@@ -23,7 +23,9 @@ async function bootstrap() {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-    app.use((0, helmet_1.default)());
+    app.use((0, helmet_1.default)({
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }));
     app.use((0, cookie_parser_1.default)());
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
     app.enableCors({

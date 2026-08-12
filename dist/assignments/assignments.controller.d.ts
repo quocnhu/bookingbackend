@@ -5,6 +5,91 @@ export declare class AssignmentsController {
     private readonly assignmentsService;
     constructor(assignmentsService: AssignmentsService);
     findAll(query: QueryAssignmentDto, actor: AuthenticatedUser): Promise<import("../common/dto/pagination.dto").PaginatedResult<any>>;
+    findBoard(actor: AuthenticatedUser): Promise<{
+        totalPax: number;
+        tourType: import("@prisma/client").$Enums.TourType | null;
+        tourName: string;
+        durationDays: number;
+        vehicle: {
+            id: string;
+            providerId: string;
+            plateNumber: string;
+            capacity: number | null;
+        } | null;
+        settlement: {
+            id: string;
+            createdAt: Date;
+            userId: string | null;
+            providerId: string | null;
+            updatedAt: Date;
+            status: import("@prisma/client").$Enums.SettlementStatus;
+            assignmentId: string;
+            payeeType: import("@prisma/client").$Enums.PayeeType;
+            baseAmount: import("@prisma/client/runtime/library").Decimal;
+            allowance: import("@prisma/client/runtime/library").Decimal;
+            deduction: import("@prisma/client/runtime/library").Decimal;
+            finalAmount: import("@prisma/client/runtime/library").Decimal;
+            periodName: string | null;
+            notes: string | null;
+        } | null;
+        provider: {
+            id: string;
+            name: string;
+        } | null;
+        bookings: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import("@prisma/client").$Enums.BookingStatus;
+            tourId: string | null;
+            bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
+            channel: import("@prisma/client").$Enums.BookingProvider;
+            customerName: string | null;
+            hotelName: string | null;
+            phone: string | null;
+            mail: string | null;
+            startingDate: Date | null;
+            totalPax: number;
+            paxDetail: string | null;
+            tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
+            payment: import("@prisma/client").$Enums.PaymentStatus | null;
+            isNoShow: boolean;
+            noShowReason: string | null;
+            assignmentId: string | null;
+            rawDataId: string | null;
+            paxSequence: number;
+        }[];
+        driver: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        guide: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        id: string;
+        createdAt: Date;
+        providerId: string | null;
+        updatedAt: Date;
+        code: string | null;
+        status: import("@prisma/client").$Enums.AssignmentStatus;
+        guideId: string | null;
+        driverId: string | null;
+        startDate: Date;
+        endDate: Date;
+        sequenceIndex: number;
+        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        tripNotes: string | null;
+        vehicleId: string | null;
+    }[]>;
     findOne(id: string): Promise<{
         vehicle: {
             id: string;
@@ -39,19 +124,21 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
             bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
-            latitude: number | null;
-            longitude: number | null;
-            startingDate: Date | null;
             customerName: string | null;
             hotelName: string | null;
             phone: string | null;
             mail: string | null;
+            startingDate: Date | null;
             totalPax: number;
             paxDetail: string | null;
-            tourType: import("@prisma/client").$Enums.TourType | null;
             tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
@@ -59,12 +146,12 @@ export declare class AssignmentsController {
             rawDataId: string | null;
             paxSequence: number;
         }[];
-        guide: {
+        driver: {
             id: string;
             name: string | null;
             email: string;
         } | null;
-        driver: {
+        guide: {
             id: string;
             name: string | null;
             email: string;
@@ -80,10 +167,10 @@ export declare class AssignmentsController {
         driverId: string | null;
         startDate: Date;
         endDate: Date;
-        vehicleId: string | null;
         sequenceIndex: number;
         priceOverride: import("@prisma/client/runtime/library").Decimal | null;
         tripNotes: string | null;
+        vehicleId: string | null;
     }>;
     create(dto: CreateAssignmentDto): Promise<{
         vehicle: {
@@ -119,19 +206,21 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
             bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
-            latitude: number | null;
-            longitude: number | null;
-            startingDate: Date | null;
             customerName: string | null;
             hotelName: string | null;
             phone: string | null;
             mail: string | null;
+            startingDate: Date | null;
             totalPax: number;
             paxDetail: string | null;
-            tourType: import("@prisma/client").$Enums.TourType | null;
             tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
@@ -139,12 +228,12 @@ export declare class AssignmentsController {
             rawDataId: string | null;
             paxSequence: number;
         }[];
-        guide: {
+        driver: {
             id: string;
             name: string | null;
             email: string;
         } | null;
-        driver: {
+        guide: {
             id: string;
             name: string | null;
             email: string;
@@ -160,10 +249,10 @@ export declare class AssignmentsController {
         driverId: string | null;
         startDate: Date;
         endDate: Date;
-        vehicleId: string | null;
         sequenceIndex: number;
         priceOverride: import("@prisma/client/runtime/library").Decimal | null;
         tripNotes: string | null;
+        vehicleId: string | null;
     }>;
     update(id: string, dto: UpdateAssignmentDto): Promise<{
         vehicle: {
@@ -199,19 +288,21 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
             bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
-            latitude: number | null;
-            longitude: number | null;
-            startingDate: Date | null;
             customerName: string | null;
             hotelName: string | null;
             phone: string | null;
             mail: string | null;
+            startingDate: Date | null;
             totalPax: number;
             paxDetail: string | null;
-            tourType: import("@prisma/client").$Enums.TourType | null;
             tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
@@ -219,12 +310,12 @@ export declare class AssignmentsController {
             rawDataId: string | null;
             paxSequence: number;
         }[];
-        guide: {
+        driver: {
             id: string;
             name: string | null;
             email: string;
         } | null;
-        driver: {
+        guide: {
             id: string;
             name: string | null;
             email: string;
@@ -240,10 +331,10 @@ export declare class AssignmentsController {
         driverId: string | null;
         startDate: Date;
         endDate: Date;
-        vehicleId: string | null;
         sequenceIndex: number;
         priceOverride: import("@prisma/client/runtime/library").Decimal | null;
         tripNotes: string | null;
+        vehicleId: string | null;
     }>;
     updateStatus(id: string, dto: UpdateAssignmentStatusDto): Promise<{
         vehicle: {
@@ -279,19 +370,21 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
             bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
-            latitude: number | null;
-            longitude: number | null;
-            startingDate: Date | null;
             customerName: string | null;
             hotelName: string | null;
             phone: string | null;
             mail: string | null;
+            startingDate: Date | null;
             totalPax: number;
             paxDetail: string | null;
-            tourType: import("@prisma/client").$Enums.TourType | null;
             tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
@@ -299,12 +392,12 @@ export declare class AssignmentsController {
             rawDataId: string | null;
             paxSequence: number;
         }[];
-        guide: {
+        driver: {
             id: string;
             name: string | null;
             email: string;
         } | null;
-        driver: {
+        guide: {
             id: string;
             name: string | null;
             email: string;
@@ -320,10 +413,10 @@ export declare class AssignmentsController {
         driverId: string | null;
         startDate: Date;
         endDate: Date;
-        vehicleId: string | null;
         sequenceIndex: number;
         priceOverride: import("@prisma/client/runtime/library").Decimal | null;
         tripNotes: string | null;
+        vehicleId: string | null;
     }>;
     assignBookings(id: string, dto: AssignBookingsDto): Promise<{
         vehicle: {
@@ -359,19 +452,21 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
             bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
-            latitude: number | null;
-            longitude: number | null;
-            startingDate: Date | null;
             customerName: string | null;
             hotelName: string | null;
             phone: string | null;
             mail: string | null;
+            startingDate: Date | null;
             totalPax: number;
             paxDetail: string | null;
-            tourType: import("@prisma/client").$Enums.TourType | null;
             tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
@@ -379,12 +474,12 @@ export declare class AssignmentsController {
             rawDataId: string | null;
             paxSequence: number;
         }[];
-        guide: {
+        driver: {
             id: string;
             name: string | null;
             email: string;
         } | null;
-        driver: {
+        guide: {
             id: string;
             name: string | null;
             email: string;
@@ -400,10 +495,10 @@ export declare class AssignmentsController {
         driverId: string | null;
         startDate: Date;
         endDate: Date;
-        vehicleId: string | null;
         sequenceIndex: number;
         priceOverride: import("@prisma/client/runtime/library").Decimal | null;
         tripNotes: string | null;
+        vehicleId: string | null;
     }>;
     removeBooking(id: string, bookingId: string): Promise<{
         vehicle: {
@@ -439,19 +534,21 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
             bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
-            latitude: number | null;
-            longitude: number | null;
-            startingDate: Date | null;
             customerName: string | null;
             hotelName: string | null;
             phone: string | null;
             mail: string | null;
+            startingDate: Date | null;
             totalPax: number;
             paxDetail: string | null;
-            tourType: import("@prisma/client").$Enums.TourType | null;
             tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
@@ -459,12 +556,12 @@ export declare class AssignmentsController {
             rawDataId: string | null;
             paxSequence: number;
         }[];
-        guide: {
+        driver: {
             id: string;
             name: string | null;
             email: string;
         } | null;
-        driver: {
+        guide: {
             id: string;
             name: string | null;
             email: string;
@@ -480,10 +577,10 @@ export declare class AssignmentsController {
         driverId: string | null;
         startDate: Date;
         endDate: Date;
-        vehicleId: string | null;
         sequenceIndex: number;
         priceOverride: import("@prisma/client/runtime/library").Decimal | null;
         tripNotes: string | null;
+        vehicleId: string | null;
     }>;
     remove(id: string): Promise<{
         message: string;

@@ -29,6 +29,31 @@ let AssignmentsService = class AssignmentsService {
         guide: { select: { id: true, name: true, email: true } },
         settlement: true,
     };
+    async findBoard(actor) {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const where = {
+            status: { not: client_1.AssignmentStatus.CANCELED },
+            endDate: { gte: startOfToday },
+        };
+        if (actor.role !== client_1.RoleType.ADMIN) {
+            where.OR = [{ driverId: actor.id }, { guideId: actor.id }];
+        }
+        const items = await this.prisma.assignment.findMany({
+            where,
+            include: this.include,
+            orderBy: [{ startDate: 'asc' }],
+        });
+        return items.map((a) => {
+            const totalPax = a.bookings.reduce((sum, b) => sum + (b.totalPax ?? 0), 0);
+            const type = a.bookings.find((b) => b.tourType)?.tourType ?? null;
+            const tourName = a.bookings.find((b) => b.tourName)?.tourName ?? a.code ?? 'Tour';
+            const durationDays = a.endDate && a.startDate
+                ? Math.max(1, Math.round((a.endDate.getTime() - a.startDate.getTime()) / 86400000) + 1)
+                : 1;
+            return { ...a, totalPax, tourType: type, tourName, durationDays };
+        });
+    }
     async findAll(query, actor) {
         const { page, limit, q, status, vehicleId, driverId, guideId } = query;
         const where = {};
@@ -172,7 +197,7 @@ let AssignmentsService = class AssignmentsService {
                 },
             });
         }
-        if (assignment.guideId) {
+        else if (assignment.guideId) {
             await this.prisma.settlement.create({
                 data: {
                     assignmentId: assignment.id,

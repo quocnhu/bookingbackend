@@ -181,24 +181,20 @@ let DriveService = class DriveService {
             .pop()
             .replace(/[^\w.\- ]/g, '_');
         const finalName = isAvatar ? `avatar.${finalExt}` : baseName;
-        const storedName = isAvatar
-            ? finalName
-            : `${Date.now()}-${finalName}`;
+        const storedName = isAvatar ? finalName : `${Date.now()}-${finalName}`;
         const storageKey = `drive/${userDir}/${targetId}/${storedName}`;
-        await this.storage.save(storageKey, buffer, {
-            contentType: mime || undefined,
-        });
         if (isAvatar) {
-            const old = await this.prisma.driveFile.findMany({
-                where: { userId, folderId: targetId },
-            });
-            for (const o of old) {
-                await this.storage.remove(o.storageKey);
+            const oldFiles = await this.storage.list(`drive/${userDir}/${targetId}/`);
+            for (const f of oldFiles) {
+                await this.storage.remove(f.key);
             }
             await this.prisma.driveFile.deleteMany({
                 where: { userId, folderId: targetId },
             });
         }
+        await this.storage.save(storageKey, buffer, {
+            contentType: mime || undefined,
+        });
         const saved = await this.prisma.driveFile.create({
             data: {
                 userId,

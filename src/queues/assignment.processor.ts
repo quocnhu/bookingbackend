@@ -32,12 +32,19 @@ export class AssignmentProcessor extends WorkerHost {
       include: { tour: true },
     });
     if (!booking) return { skipped: true, reason: 'BOOKING_NOT_FOUND' };
-    if (booking.assignmentId) return { skipped: true, reason: 'ALREADY_ASSIGNED' };
-    if (booking.status === BookingStatus.CANCELED) return { skipped: true, reason: 'CANCELED' };
-    if (!booking.startingDate) return { skipped: true, reason: 'NO_START_DATE' };
+    if (booking.assignmentId)
+      return { skipped: true, reason: 'ALREADY_ASSIGNED' };
+    if (booking.status === BookingStatus.CANCELED)
+      return { skipped: true, reason: 'CANCELED' };
+    if (!booking.startingDate)
+      return { skipped: true, reason: 'NO_START_DATE' };
 
     const start = booking.startingDate;
-    const dayStart = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const dayStart = new Date(
+      start.getFullYear(),
+      start.getMonth(),
+      start.getDate(),
+    );
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
     const candidates = await this.prisma.assignment.findMany({
@@ -55,7 +62,10 @@ export class AssignmentProcessor extends WorkerHost {
 
     let assignmentId: string | null = null;
     for (const candidate of candidates) {
-      const used = candidate.bookings.reduce((sum, b) => sum + (b.totalPax ?? 0), 0);
+      const used = candidate.bookings.reduce(
+        (sum, b) => sum + (b.totalPax ?? 0),
+        0,
+      );
       const capacity = candidate.vehicle?.capacity ?? DEFAULT_CAPACITY;
       if ((booking.totalPax ?? 0) + used <= capacity) {
         assignmentId = candidate.id;
@@ -102,7 +112,9 @@ export class AssignmentProcessor extends WorkerHost {
       afterData: { assignmentId, paxSequence: updated.paxSequence },
     });
 
-    this.logger.log(`Assigned booking ${booking.bookingRef} -> assignment ${assignmentId}`);
+    this.logger.log(
+      `Assigned booking ${booking.bookingRef} -> assignment ${assignmentId}`,
+    );
     return { assigned: true, assignmentId, paxSequence: updated.paxSequence };
   }
 }

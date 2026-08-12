@@ -1,6 +1,14 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Inject,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
+import { STORAGE } from '@/storage';
+import type { FileStorage } from '@/storage';
 import {
   CreateTourDto,
   ItineraryItemDto,
@@ -9,12 +17,17 @@ import {
   UpdateTourDto,
 } from './dto/tour.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
+import sharp from 'sharp';
+
+const MAX_GALLERY_IMAGE_BYTES = 15 * 1024 * 1024;
+const ALLOWED_GALLERY_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 @Injectable()
 export class ToursService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    @Inject(STORAGE) private readonly storage: FileStorage,
   ) {}
 
   async findAll(query: QueryTourDto): Promise<PaginatedResult<any>> {
@@ -52,11 +65,13 @@ export class ToursService {
       },
     });
     if (!tour) throw new NotFoundException('Tour not found');
-    return tour;
+    return { ...tour, gallery: await this.listGallery(id) };
   }
 
   async create(dto: CreateTourDto) {
-    const existing = await this.prisma.tour.findUnique({ where: { name: dto.name } });
+    const existing = await this.prisma.tour.findUnique({
+      where: { name: dto.name },
+    });
     if (existing) throw new ConflictException('Tour name already exists');
     let code = dto.code;
     if (code) {
@@ -75,10 +90,14 @@ export class ToursService {
     return tour;
   }
 
-  private async generateTourCode(name: string, durationDays: number): Promise<string> {
+  private async generateTourCode(
+    name: string,
+    durationDays: number,
+  ): Promise<string> {
     const words = name.split(/\s+/).filter((w) => /[a-zA-Z0-9]/.test(w));
     const initials =
-      (words[0]?.[0] ?? 'X').toUpperCase() + (words[1]?.[0] ?? 'X').toUpperCase();
+      (words[0]?.[0] ?? 'X').toUpperCase() +
+      (words[1]?.[0] ?? 'X').toUpperCase();
     const base = `TOUR-${initials}${durationDays}`;
     let code = base;
     let i = 2;
@@ -107,7 +126,11 @@ export class ToursService {
     return tour;
   }
 
-  async updateItinerary(id: string, dto: UpdateItineraryDto, changedBy: string) {
+  async updateItinerary(
+    id: string,
+    dto: UpdateItineraryDto,
+    changedBy: string,
+  ) {
     const before = await this.findOne(id);
     const items: ItineraryItemDto[] = dto.items ?? [];
 
@@ -122,6 +145,8 @@ export class ToursService {
           description: item.description ?? null,
           timeSlot: item.timeSlot ?? null,
           location: item.location ?? null,
+          imageUrl: item.imageUrl ?? null,
+          mapQuery: item.mapQuery ?? null,
         })),
       }),
     ]);
@@ -138,8 +163,119 @@ export class ToursService {
     return after;
   }
 
+  private galleryPrefix(tourId: string) {
+    return `tours/${tourId}/gallery`;
+  }
+
+  /**
+   * Thư mục ảnh của tour là nguồn dữ liệu: liệt kê mọi file trong
+   * tours/{tourId}/gallery, không cần bản ghi DB nào.
+   */
+  private async listGallery(tourId: string) {
+    const files = await this.storage.list(this.galleryPrefix(tourId));
+    files.sort((a, b) => a.key.localeCompare(b.key));
+    return files.map((f, index) => ({
+      id: f.key.split('/').pop()!, // filename = id
+      url: f.url,
+      storageKey: f.key,
+      sortIndex: index,
+    }));
+  }
+
+  /**
+   * Upload ảnh vào "thư mục ảnh" của tour (storage prefix tours/{tourId}/gallery).
+   * Tên file mang tiền tố thứ tự (000-, 001-...) để sắp xếp theo folder.
+   */
+  async uploadGallery(
+    tourId: string,
+    file: Express.Multer.File,
+    changedBy: string,
+  ) {
+    await this.findOne(tourId);
+    if (!file?.buffer) {
+      throw new BadRequestException('No file uploaded');
+    }
+    const mime = (file.mimetype || '').toLowerCase();
+    if (!ALLOWED_GALLERY_TYPES.includes(mime)) {
+      throw new BadRequestException(
+        'Gallery only accepts JPG, PNG or WEBP images',
+      );
+    }
+    if (file.size > MAX_GALLERY_IMAGE_BYTES) {
+      throw new BadRequestException('Max image size is 15MB');
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await sharp(file.buffer, { failOn: 'none' })
+        .rotate()
+        .resize(1920, 1440, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 85 })
+        .toBuffer();
+    } catch {
+      throw new BadRequestException(
+        'Could not process the image. Please upload a valid picture.',
+      );
+    }
+
+    const folder = this.galleryPrefix(tourId);
+    const existing = await this.storage.list(folder);
+    const padded = String(existing.length).padStart(3, '0');
+    const baseName = (file.originalname || 'photo')
+      .split('/')
+      .pop()!
+      .replace(/[^\w.\- ]/g, '_')
+      .replace(/\.[^.]+$/, '');
+    const storageKey = `${folder}/${padded}-${Date.now()}-${baseName}.webp`;
+    await this.storage.save(storageKey, buffer, { contentType: 'image/webp' });
+
+    await this.auditService.log({
+      entityType: 'Tour',
+      entityId: tourId,
+      action: 'GALLERY_UPLOAD',
+      afterData: { url: this.storage.url(storageKey) },
+      changedBy,
+    });
+    return this.findOne(tourId);
+  }
+
+  async deleteGallery(tourId: string, file: string, changedBy: string) {
+    const base = file.split('/').pop()!;
+    if (base !== file) throw new BadRequestException('Invalid file name');
+    await this.storage.remove(`${this.galleryPrefix(tourId)}/${base}`);
+    await this.auditService.log({
+      entityType: 'Tour',
+      entityId: tourId,
+      action: 'GALLERY_DELETE',
+      afterData: { file: base },
+      changedBy,
+    });
+    return this.findOne(tourId);
+  }
+
+  async reorderGallery(tourId: string, files: string[]) {
+    await this.findOne(tourId);
+    const folder = this.galleryPrefix(tourId);
+    const entries = await this.storage.list(folder);
+    const byName = new Map(
+      entries.map((e) => [e.key.split('/').pop()!, e.key]),
+    );
+    for (const f of files) {
+      if (!byName.has(f)) throw new BadRequestException(`Unknown file: ${f}`);
+    }
+    for (let i = 0; i < files.length; i++) {
+      const fromKey = byName.get(files[i])!;
+      const random = files[i].replace(/^\d+-/, '');
+      const toKey = `${folder}/${String(i).padStart(3, '0')}-${random}`;
+      if (fromKey !== toKey) await this.storage.rename(fromKey, toKey);
+    }
+    return this.findOne(tourId);
+  }
+
   async remove(id: string, changedBy: string) {
     await this.findOne(id);
+    const files = await this.storage.list(this.galleryPrefix(id));
+    await Promise.all(files.map((f) => this.storage.remove(f.key)));
     await this.prisma.tour.delete({ where: { id } });
     await this.auditService.log({
       entityType: 'Tour',

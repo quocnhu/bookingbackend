@@ -1,4 +1,4 @@
-import { FileStorage } from './storage.types';
+import { FileStorage, StorageEntry } from './storage.types';
 export interface S3StorageConfig {
     bucket: string;
     region?: string;
@@ -22,5 +22,7 @@ export declare class S3Storage implements FileStorage {
         url: string;
     }>;
     remove(key: string): Promise<void>;
+    list(prefix: string): Promise<StorageEntry[]>;
+    rename(fromKey: string, toKey: string): Promise<void>;
     url(key: string): string;
 }

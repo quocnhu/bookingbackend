@@ -25,7 +25,13 @@ async function bootstrap() {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      // Cho phép trình duyệt tải ảnh từ /uploads khi trang nằm ở origin khác
+      // (frontend :3000 ← backend :4000). Mặc định CORP=same-origin chặn ảnh.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
   app.use(cookieParser());
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.enableCors({

@@ -14,6 +14,8 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToursController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
 const tours_service_1 = require("./tours.service");
 const tour_dto_1 = require("./dto/tour.dto");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
@@ -38,6 +40,15 @@ let ToursController = class ToursController {
     }
     updateItinerary(id, dto, user) {
         return this.toursService.updateItinerary(id, dto, user.id);
+    }
+    uploadMedia(id, file, user) {
+        return this.toursService.uploadGallery(id, file, user.id);
+    }
+    reorderGallery(id, dto) {
+        return this.toursService.reorderGallery(id, dto.files);
+    }
+    deleteMedia(id, file, user) {
+        return this.toursService.deleteGallery(id, file, user.id);
     }
     remove(id, user) {
         return this.toursService.remove(id, user.id);
@@ -87,6 +98,39 @@ __decorate([
     __metadata("design:paramtypes", [String, tour_dto_1.UpdateItineraryDto, Object]),
     __metadata("design:returntype", void 0)
 ], ToursController.prototype, "updateItinerary", null);
+__decorate([
+    (0, common_1.Post)(':id/media'),
+    (0, permissions_decorator_1.Permissions)('tour.itinerary.edit'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
+        storage: (0, multer_1.memoryStorage)(),
+        limits: { fileSize: 15 * 1024 * 1024 },
+    })),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", void 0)
+], ToursController.prototype, "uploadMedia", null);
+__decorate([
+    (0, common_1.Put)(':id/gallery/reorder'),
+    (0, permissions_decorator_1.Permissions)('tour.itinerary.edit'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, tour_dto_1.ReorderGalleryDto]),
+    __metadata("design:returntype", void 0)
+], ToursController.prototype, "reorderGallery", null);
+__decorate([
+    (0, common_1.Delete)(':id/gallery/:file'),
+    (0, permissions_decorator_1.Permissions)('tour.itinerary.edit'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('file')),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", void 0)
+], ToursController.prototype, "deleteMedia", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, permissions_decorator_1.Permissions)('tour.delete'),

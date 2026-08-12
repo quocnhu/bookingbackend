@@ -11,13 +11,9 @@ const common_1 = require("@nestjs/common");
 const bullmq_1 = require("@nestjs/bullmq");
 const config_1 = require("@nestjs/config");
 const audit_module_1 = require("../audit/audit.module");
-const raw_data_processor_1 = require("./raw-data.processor");
-const booking_ingest_processor_1 = require("./booking-ingest.processor");
-const booking_manual_processor_1 = require("./booking-manual.processor");
 const assignment_processor_1 = require("./assignment.processor");
-const booking_normalizer_service_1 = require("./booking-normalizer.service");
-const booking_writer_service_1 = require("./booking-writer.service");
 const queue_constants_1 = require("./queue.constants");
+const parsing_queue_1 = require("../parsing/parsing.queue");
 let QueuesModule = class QueuesModule {
 };
 exports.QueuesModule = QueuesModule;
@@ -40,17 +36,10 @@ exports.QueuesModule = QueuesModule = __decorate([
                     },
                 }),
             }),
-            bullmq_1.BullModule.registerQueue({ name: queue_constants_1.RAW_DATA_QUEUE }, { name: queue_constants_1.BOOKING_INGEST_QUEUE }, { name: queue_constants_1.BOOKING_MANUAL_QUEUE }, { name: queue_constants_1.ASSIGNMENT_QUEUE }),
+            bullmq_1.BullModule.registerQueue({ name: queue_constants_1.ASSIGNMENT_QUEUE }, { name: queue_constants_1.BOOKING_MANUAL_QUEUE }, { name: parsing_queue_1.PARSE_QUEUE }),
         ],
-        providers: [
-            raw_data_processor_1.RawDataProcessor,
-            booking_ingest_processor_1.BookingIngestProcessor,
-            booking_manual_processor_1.BookingManualProcessor,
-            assignment_processor_1.AssignmentProcessor,
-            booking_normalizer_service_1.BookingNormalizerService,
-            booking_writer_service_1.BookingWriterService,
-        ],
-        exports: [bullmq_1.BullModule, booking_writer_service_1.BookingWriterService, booking_normalizer_service_1.BookingNormalizerService],
+        providers: [assignment_processor_1.AssignmentProcessor],
+        exports: [bullmq_1.BullModule],
     })
 ], QueuesModule);
 //# sourceMappingURL=queues.module.js.map

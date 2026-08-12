@@ -65,6 +65,8 @@ enum SettlementStatus {
 
 enum BookingProvider {
   TRIPADVISOR  // Tự động từ webhook / mail TripAdvisor
+  AIRBNB       // Tự động từ Pub/Sub Gmail cho đơn Airbnb
+  BOOKING_COM  // Tự động từ Pub/Sub Gmail cho đơn Booking.com
   WEBSITE      // Tự động từ Pub/Sub Gmail cho đơn Website
   MANUAL       // Admin/Office tạo thủ công trên dashboard
 }
@@ -234,6 +236,11 @@ model Tour {
   currency    String       @default("USD")
   durationDays Int?        @default(1) // Half-day tours = 1; otherwise number of days
 
+  // Promotion / discount
+  discountPercent  Int?       @default(0) // % off during the promotion window
+  promotionStartsAt DateTime?
+  promotionEndsAt   DateTime?
+
   // Thông tin trang chi tiết tour (layout kiểu "Chương trình Tour")
   departureLocation String? // Nơi khởi hành
   transportation    String? // Phương tiện
@@ -242,8 +249,12 @@ model Tour {
   excludedServices  String?  @db.Text // Dịch vụ không bao gồm (HTML list)
   childrenPolicy    String?  @db.Text // Giá trẻ em (HTML list)
   regulations       String?  @db.Text // Hướng dẫn / Thông quy định (HTML)
+  highlights        String?  @db.Text // Điểm nổi bật (HTML)
+  insurancePolicy   String?  @db.Text // Chính sách bảo hiểm (HTML)
+  mapQuery          String? // Trung tâm bản đồ Google Maps embed
 
   itineraries TourItinerary[]
+  gallery     TourGallery[]
   departures  TourDeparture[]
   prices      RoutePrice[]
   bookings    Booking[]
@@ -284,6 +295,19 @@ model TourItinerary {
   @@index([tourId, dayNumber, orderIndex])
 }
 
+// Thư mục ảnh slideshow của tour — được sinh tự động khi tour được tạo.
+model TourGallery {
+  id         String   @id @default(uuid())
+  tourId     String
+  tour       Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  url        String
+  storageKey String   @unique
+  sortIndex  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([tourId, sortIndex])
+}
+
 model TransportationProvider {
   id          String       @id @default(uuid())
   name        String
@@ -297,7 +321,7 @@ model TransportationProvider {
 model Vehicle {
   id          String                 @id @default(uuid())
   plateNumber String
-  capacity    Int?                   @default(29)
+  capacity    Int?                   @default(12)
   providerId  String
   provider    TransportationProvider @relation(fields: [providerId], references: [id])
   assignments Assignment[]
@@ -323,6 +347,10 @@ model Booking {
   status       BookingStatus   @default(PENDING)
   tourId       String?
   tour         Tour?           @relation(fields: [tourId], references: [id])
+
+  // Nguồn gốc / mã xác nhận (upsert key theo .md: source + confirmationCode)
+  source           String?
+  confirmationCode String?
 
   address      String?
   latitude     Float?
@@ -352,6 +380,7 @@ model Booking {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
+  @@unique([source, confirmationCode])
   @@index([assignmentId, paxSequence])
 }
 
@@ -438,13 +467,18 @@ model GmailAccount {
 }
 
 model RawData {
-  id        String   @id @default(uuid())
-  sourceId  String   @unique
-  payload   Json
-  status    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  booking   Booking?
+  id          String   @id @default(uuid())
+  sourceId    String   @unique
+  payload     Json
+  status      String
+  payloadHash String?
+  email       String?
+  templateTag String?  // 'airbnb' | 'booking-com' | 'tripadvisor' | 'website' | 'unknown' — tag từ bước nhận (header match)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  booking     Booking?
+
+  @@index([payloadHash])
 }
 
 model Coordinate {

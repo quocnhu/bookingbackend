@@ -5,6 +5,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
+import { CacheModule } from './cache/cache.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthActivitiesModule } from './auth-activities/auth-activities.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -14,12 +15,14 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ToursModule } from './tours/tours.module';
-import { BookingsModule } from './bookings/bookings.module';
+import { BookingModule } from './booking/booking.module';
 import { AssignmentsModule } from './assignments/assignments.module';
 import { SettlementsModule } from './settlements/settlements.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
-import { GmailModule } from './gmail/gmail.module';
+import { IngestionModule } from './ingestion/ingestion.module';
+import { RawDataModule } from './raw-data/raw-data.module';
+import { ParsingModule } from './parsing/parsing.module';
 import { QueuesModule } from './queues/queues.module';
 import { DriveModule } from './drive/drive.module';
 import { StorageModule } from './storage';
@@ -30,6 +33,7 @@ import { StorageModule } from './storage';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     PrismaModule,
     StorageModule,
+    CacheModule,
     AuditModule,
     AuthActivitiesModule,
     AuthModule,
@@ -37,12 +41,14 @@ import { StorageModule } from './storage';
     RolesModule,
     PermissionsModule,
     ToursModule,
-    BookingsModule,
+    BookingModule,
     AssignmentsModule,
     SettlementsModule,
     AuditLogsModule,
     DashboardModule,
-    GmailModule,
+    IngestionModule,
+    RawDataModule,
+    ParsingModule,
     QueuesModule,
     DriveModule,
     ServeStaticModule.forRoot({

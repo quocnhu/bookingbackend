@@ -61,19 +61,21 @@ export declare class DashboardController {
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
             bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
-            latitude: number | null;
-            longitude: number | null;
-            startingDate: Date | null;
             customerName: string | null;
             hotelName: string | null;
             phone: string | null;
             mail: string | null;
+            startingDate: Date | null;
             totalPax: number;
             paxDetail: string | null;
-            tourType: import("@prisma/client").$Enums.TourType | null;
             tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
@@ -98,10 +100,10 @@ export declare class DashboardController {
             driverId: string | null;
             startDate: Date;
             endDate: Date;
-            vehicleId: string | null;
             sequenceIndex: number;
             priceOverride: import("@prisma/client/runtime/library").Decimal | null;
             tripNotes: string | null;
+            vehicleId: string | null;
         }[];
         recentAuthActivity: ({
             user: {

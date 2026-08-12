@@ -21,6 +21,12 @@ export class AssignmentsController {
     return this.assignmentsService.findAll(query, actor);
   }
 
+  @Get('board')
+  @Permissions('assignment.read')
+  findBoard(@CurrentUser() actor: AuthenticatedUser) {
+    return this.assignmentsService.findBoard(actor);
+  }
+
   @Get(':id')
   @Permissions('assignment.read')
   findOne(@Param('id') id: string) {

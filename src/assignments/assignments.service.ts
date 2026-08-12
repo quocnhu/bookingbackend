@@ -28,6 +28,37 @@ export class AssignmentsService {
     settlement: true,
   };
 
+  async findBoard(actor: AuthenticatedUser) {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const where: any = {
+      status: { not: AssignmentStatus.CANCELED },
+      endDate: { gte: startOfToday },
+    };
+    if (actor.role !== RoleType.ADMIN) {
+      where.OR = [{ driverId: actor.id }, { guideId: actor.id }];
+    }
+
+    const items = await this.prisma.assignment.findMany({
+      where,
+      include: this.include,
+      orderBy: [{ startDate: 'asc' }],
+    });
+
+    return items.map((a) => {
+      const totalPax = a.bookings.reduce((sum, b) => sum + (b.totalPax ?? 0), 0);
+      const type = a.bookings.find((b) => b.tourType)?.tourType ?? null;
+      const tourName =
+        a.bookings.find((b) => b.tourName)?.tourName ?? a.code ?? 'Tour';
+      const durationDays =
+        a.endDate && a.startDate
+          ? Math.max(1, Math.round((a.endDate.getTime() - a.startDate.getTime()) / 86400000) + 1)
+          : 1;
+      return { ...a, totalPax, tourType: type, tourName, durationDays };
+    });
+  }
+
   async findAll(query: QueryAssignmentDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>> {
     const { page, limit, q, status, vehicleId, driverId, guideId } = query;
     const where: any = {};
@@ -164,7 +195,7 @@ export class AssignmentsService {
   private async ensureSettlement(assignment: any) {
     if (assignment.settlement) return;
 
-    // Settlement cho nhà xe (V_PROVIDER).
+    // Settlement cho nhà xe (V_PROVIDER); nếu không có nhà xe thì cho HDV.
     if (assignment.providerId) {
       await this.prisma.settlement.create({
         data: {
@@ -176,9 +207,7 @@ export class AssignmentsService {
           status: SettlementStatus.PENDING,
         },
       });
-    }
-    // Settlement cho HDV (nếu có guideId).
-    if (assignment.guideId) {
+    } else if (assignment.guideId) {
       await this.prisma.settlement.create({
         data: {
           assignmentId: assignment.id,

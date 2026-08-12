@@ -26,6 +26,9 @@ let AssignmentsController = class AssignmentsController {
     findAll(query, actor) {
         return this.assignmentsService.findAll(query, actor);
     }
+    findBoard(actor) {
+        return this.assignmentsService.findBoard(actor);
+    }
     findOne(id) {
         return this.assignmentsService.findOne(id);
     }
@@ -58,6 +61,14 @@ __decorate([
     __metadata("design:paramtypes", [assignment_dto_1.QueryAssignmentDto, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('board'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "findBoard", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('assignment.read'),

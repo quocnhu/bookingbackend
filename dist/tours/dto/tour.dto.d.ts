@@ -10,6 +10,9 @@ export declare class CreateTourDto {
     childPrice?: number;
     infantPrice?: number;
     currency?: string;
+    discountPercent?: number;
+    promotionStartsAt?: string;
+    promotionEndsAt?: string;
 }
 export declare class UpdateTourDto {
     name?: string;
@@ -17,10 +20,23 @@ export declare class UpdateTourDto {
     type?: TourType;
     thumbnailUrl?: string;
     durationDays?: number;
+    departureLocation?: string;
+    transportation?: string;
+    overview?: string;
+    highlights?: string;
+    includedServices?: string;
+    excludedServices?: string;
+    childrenPolicy?: string;
+    regulations?: string;
+    insurancePolicy?: string;
+    mapQuery?: string;
     adultPrice?: number;
     childPrice?: number;
     infantPrice?: number;
     currency?: string;
+    discountPercent?: number;
+    promotionStartsAt?: string;
+    promotionEndsAt?: string;
 }
 export declare class ItineraryItemDto {
     id?: string;
@@ -30,9 +46,14 @@ export declare class ItineraryItemDto {
     description?: string;
     timeSlot?: string;
     location?: string;
+    imageUrl?: string;
+    mapQuery?: string;
 }
 export declare class UpdateItineraryDto {
     items: ItineraryItemDto[];
+}
+export declare class ReorderGalleryDto {
+    files: string[];
 }
 export declare class QueryTourDto extends PaginationDto {
     q?: string;

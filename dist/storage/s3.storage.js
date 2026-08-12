@@ -38,6 +38,32 @@ class S3Storage {
     async remove(key) {
         await this.client.send(new client_s3_1.DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
     }
+    async list(prefix) {
+        const out = [];
+        let token;
+        do {
+            const res = await this.client.send(new client_s3_1.ListObjectsV2Command({
+                Bucket: this.bucket,
+                Prefix: prefix,
+                ContinuationToken: token,
+            }));
+            for (const obj of res.Contents ?? []) {
+                if (!obj.Key || obj.Key.endsWith('/'))
+                    continue;
+                out.push({ key: obj.Key, url: this.url(obj.Key) });
+            }
+            token = res.IsTruncated ? res.NextContinuationToken : undefined;
+        } while (token);
+        return out;
+    }
+    async rename(fromKey, toKey) {
+        await this.client.send(new client_s3_1.CopyObjectCommand({
+            Bucket: this.bucket,
+            Key: toKey,
+            CopySource: `/${this.bucket}/${fromKey}`,
+        }));
+        await this.client.send(new client_s3_1.DeleteObjectCommand({ Bucket: this.bucket, Key: fromKey }));
+    }
     url(key) {
         if (this.publicBase)
             return `${this.publicBase}/${key}`;

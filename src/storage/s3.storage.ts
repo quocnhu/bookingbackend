@@ -1,9 +1,11 @@
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { FileStorage } from './storage.types';
+import { FileStorage, StorageEntry } from './storage.types';
 
 export interface S3StorageConfig {
   bucket: string;
@@ -63,6 +65,39 @@ export class S3Storage implements FileStorage {
   async remove(key: string) {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+  }
+
+  async list(prefix: string): Promise<StorageEntry[]> {
+    const out: StorageEntry[] = [];
+    let token: string | undefined;
+    do {
+      const res = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          ContinuationToken: token,
+        }),
+      );
+      for (const obj of res.Contents ?? []) {
+        if (!obj.Key || obj.Key.endsWith('/')) continue;
+        out.push({ key: obj.Key, url: this.url(obj.Key) });
+      }
+      token = res.IsTruncated ? res.NextContinuationToken : undefined;
+    } while (token);
+    return out;
+  }
+
+  async rename(fromKey: string, toKey: string) {
+    await this.client.send(
+      new CopyObjectCommand({
+        Bucket: this.bucket,
+        Key: toKey,
+        CopySource: `/${this.bucket}/${fromKey}`,
+      }),
+    );
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: fromKey }),
     );
   }
 

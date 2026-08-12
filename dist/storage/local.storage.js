@@ -53,6 +53,30 @@ class LocalStorage {
         catch {
         }
     }
+    async list(prefix) {
+        const dir = path.join(this.root, prefix);
+        let entries;
+        try {
+            entries = await fsp.readdir(dir, { withFileTypes: true });
+        }
+        catch {
+            return [];
+        }
+        const files = [];
+        for (const entry of entries) {
+            if (!entry.isFile())
+                continue;
+            const key = path.join(prefix, entry.name).split(path.sep).join('/');
+            files.push({ key, url: this.url(key) });
+        }
+        return files;
+    }
+    async rename(fromKey, toKey) {
+        const from = path.join(this.root, fromKey);
+        const to = path.join(this.root, toKey);
+        await fsp.mkdir(path.dirname(to), { recursive: true });
+        await fsp.rename(from, to);
+    }
     url(key) {
         return `${this.publicBase}/${key}`;
     }

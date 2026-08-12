@@ -27,10 +27,10 @@ export declare class SettlementsService {
             driverId: string | null;
             startDate: Date;
             endDate: Date;
-            vehicleId: string | null;
             sequenceIndex: number;
             priceOverride: import("@prisma/client/runtime/library").Decimal | null;
             tripNotes: string | null;
+            vehicleId: string | null;
         };
         provider: {
             id: string;
@@ -77,10 +77,10 @@ export declare class SettlementsService {
             driverId: string | null;
             startDate: Date;
             endDate: Date;
-            vehicleId: string | null;
             sequenceIndex: number;
             priceOverride: import("@prisma/client/runtime/library").Decimal | null;
             tripNotes: string | null;
+            vehicleId: string | null;
         };
         provider: {
             id: string;
@@ -127,10 +127,10 @@ export declare class SettlementsService {
             driverId: string | null;
             startDate: Date;
             endDate: Date;
-            vehicleId: string | null;
             sequenceIndex: number;
             priceOverride: import("@prisma/client/runtime/library").Decimal | null;
             tripNotes: string | null;
+            vehicleId: string | null;
         };
         provider: {
             id: string;
@@ -177,10 +177,10 @@ export declare class SettlementsService {
             driverId: string | null;
             startDate: Date;
             endDate: Date;
-            vehicleId: string | null;
             sequenceIndex: number;
             priceOverride: import("@prisma/client/runtime/library").Decimal | null;
             tripNotes: string | null;
+            vehicleId: string | null;
         };
         provider: {
             id: string;
