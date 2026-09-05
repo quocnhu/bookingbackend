@@ -82,9 +82,11 @@ export declare class DashboardService {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            assignmentId: string | null;
             rawDataId: string | null;
+            assignmentId: string | null;
             paxSequence: number;
+            movedFromBusId: string | null;
+            createdWho: string | null;
         })[];
         recentRawData: {
             id: string;
@@ -99,14 +101,24 @@ export declare class DashboardService {
             updatedAt: Date;
             code: string | null;
             status: import("@prisma/client").$Enums.AssignmentStatus;
-            guideId: string | null;
-            driverId: string | null;
+            durationDays: number | null;
+            vehicleId: string | null;
+            totalPax: number;
+            tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            latitude: number | null;
+            longitude: number | null;
+            createdWho: string | null;
             startDate: Date;
             endDate: Date;
+            pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+            driverId: string | null;
+            guideId: string | null;
+            reportVerifierId: string | null;
+            origin: import("@prisma/client").$Enums.AssignmentOrigin;
             sequenceIndex: number;
             priceOverride: import("@prisma/client/runtime/library").Decimal | null;
             tripNotes: string | null;
-            vehicleId: string | null;
         }[];
         recentAuthActivity: ({
             user: {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { BookingStatus, AssignmentStatus, SettlementStatus, PaymentStatus } from '@prisma/client';
+import { BookingStatus, AssignmentStatus, FeeFlowType, PaymentStatus } from '@prisma/client';
 
 export type RangeKey = 'day' | 'week' | 'month';
 
@@ -76,7 +76,7 @@ export class DashboardService {
       this.prisma.assignment.count({
         where: { status: AssignmentStatus.DISPATCHED, startDate: { gte: todayStart, lte: todayEnd } },
       }),
-      this.prisma.settlement.count({ where: { status: SettlementStatus.PENDING } }),
+      this.prisma.assignment.count({ where: { status: AssignmentStatus.VERIFYING } }),
       this.prisma.tour.count(),
       this.prisma.user.count(),
       this.prisma.role.count(),
@@ -109,14 +109,15 @@ export class DashboardService {
   }
 
   private async sumSettlementRevenue(from: Date, to: Date): Promise<number> {
-    const agg = await this.prisma.settlement.aggregate({
-      _sum: { finalAmount: true },
+    // Doanh thu = tổng các khoản THU (COLLECT_MONEY) trong khoảng thời gian.
+    const rows = await this.prisma.settlement.findMany({
       where: {
         createdAt: { gte: from, lte: to },
-        status: { in: [SettlementStatus.APPROVED, SettlementStatus.PAID] },
+        category: { is: { flowType: FeeFlowType.COLLECT_MONEY } },
       },
+      select: { amount: true },
     });
-    return Number(agg._sum.finalAmount ?? 0);
+    return rows.reduce((sum, s) => sum + Number(s.amount ?? 0), 0);
   }
 
   async charts(range: RangeKey) {
@@ -128,9 +129,9 @@ export class DashboardService {
       this.prisma.settlement.findMany({
         where: {
           createdAt: { gte: new Date(startTime), lte: new Date(endTime) },
-          status: { in: [SettlementStatus.APPROVED, SettlementStatus.PAID] },
+          category: { is: { flowType: FeeFlowType.COLLECT_MONEY } },
         },
-        select: { finalAmount: true, createdAt: true, status: true },
+        select: { amount: true, createdAt: true },
       }),
       this.prisma.booking.findMany({
         where: { createdAt: { gte: new Date(startTime), lte: new Date(endTime) } },
@@ -151,8 +152,8 @@ export class DashboardService {
       let collected = 0;
       for (const s of settlements) {
         if (this.bucketIndex(buckets, s.createdAt.getTime()) === buckets.indexOf(b)) {
-          revenue += Number(s.finalAmount);
-          if (s.status === SettlementStatus.PAID) collected += Number(s.finalAmount);
+          revenue += Number(s.amount ?? 0);
+          collected += Number(s.amount ?? 0);
         }
       }
       return { label: b.label, revenue, collected };

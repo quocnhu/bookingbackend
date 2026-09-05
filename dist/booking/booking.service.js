@@ -8,33 +8,28 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 var BookingService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BookingService = void 0;
 const common_1 = require("@nestjs/common");
-const bullmq_1 = require("@nestjs/bullmq");
-const bullmq_2 = require("bullmq");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const booking_normalizer_service_1 = require("../parsing/booking-normalizer.service");
-const queue_constants_1 = require("../queues/queue.constants");
+const assignment_board_service_1 = require("../queues/assignment-board.service");
 let BookingService = BookingService_1 = class BookingService {
     prisma;
     auditService;
     normalizer;
-    assignmentQueue;
+    board;
     logger = new common_1.Logger(BookingService_1.name);
-    constructor(prisma, auditService, normalizer, assignmentQueue) {
+    constructor(prisma, auditService, normalizer, board) {
         this.prisma = prisma;
         this.auditService = auditService;
         this.normalizer = normalizer;
-        this.assignmentQueue = assignmentQueue;
+        this.board = board;
     }
-    async upsert(data, rawDataId, actorId) {
+    async upsert(data, rawDataId, actorId, createdWho) {
         const bookingRef = data.bookingRef;
         const existing = await this.findExisting(data.source, bookingRef);
         const bookingData = {
@@ -65,6 +60,7 @@ let BookingService = BookingService_1 = class BookingService {
             noShowReason: data.noShowReason,
             rawDataId: existing?.rawDataId ?? rawDataId,
         };
+        const _createdWho = createdWho ?? (actorId ? undefined : 'Pub-Sub System');
         if (existing) {
             const booking = await this.prisma.booking.update({
                 where: { id: existing.id },
@@ -81,9 +77,10 @@ let BookingService = BookingService_1 = class BookingService {
                 afterData: booking,
                 changedBy: actorId ?? null,
             });
+            await this.postWrite(booking);
             return booking;
         }
-        const booking = await this.prisma.booking.create({ data: bookingData });
+        const booking = await this.prisma.booking.create({ data: { ...bookingData, createdWho: _createdWho } });
         await this.auditService.log({
             entityType: 'Booking',
             entityId: booking.id,
@@ -92,7 +89,13 @@ let BookingService = BookingService_1 = class BookingService {
             changedBy: actorId ?? null,
         });
         this.logger.log(`Upserted booking ${booking.bookingRef} (${data.source})`);
+        await this.postWrite(booking);
         return booking;
+    }
+    async postWrite(booking) {
+        if (booking.status === client_1.BookingStatus.CANCELED) {
+            await this.board.unassign(booking.id);
+        }
     }
     async createManual(data, actorId) {
         const bookingRef = data.bookingRef ?? data.confirmationCode;
@@ -127,8 +130,7 @@ let BookingService = BookingService_1 = class BookingService {
             isNoShow: data.isNoShow,
             noShowReason: data.noShowReason,
         };
-        const booking = await this.upsert(clean, undefined, actorId);
-        await this.enqueueAssignment(booking.id);
+        const booking = await this.upsert(clean, undefined, actorId, data.createdWho ?? 'Manual Entry');
         return booking;
     }
     async findExisting(source, bookingRef) {
@@ -143,15 +145,6 @@ let BookingService = BookingService_1 = class BookingService {
         }
         return this.prisma.booking.findUnique({ where: { bookingRef } });
     }
-    async enqueueAssignment(bookingId) {
-        await this.assignmentQueue.add(queue_constants_1.ASSIGNMENT_JOB, { bookingId }, {
-            jobId: `assign-${bookingId}`,
-            removeOnComplete: 1000,
-            removeOnFail: 5000,
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 1000 },
-        });
-    }
     async findAll(query, actor) {
         const { page, limit, q, status, channel, payment, tourId, assignmentId } = query;
         const where = {};
@@ -163,6 +156,9 @@ let BookingService = BookingService_1 = class BookingService {
                 { mail: { contains: q, mode: 'insensitive' } },
                 { phone: { contains: q, mode: 'insensitive' } },
                 { tourName: { contains: q, mode: 'insensitive' } },
+                { status: { contains: q, mode: 'insensitive' } },
+                { channel: { contains: q, mode: 'insensitive' } },
+                { payment: { contains: q, mode: 'insensitive' } },
             ];
         }
         if (status)
@@ -183,7 +179,9 @@ let BookingService = BookingService_1 = class BookingService {
         const [items, total] = await Promise.all([
             this.prisma.booking.findMany({
                 where,
-                include: { tour: { select: { id: true, name: true } } },
+                include: {
+                    tour: { select: { id: true, name: true, type: true, durationDays: true } },
+                },
                 orderBy: { createdAt: 'desc' },
                 skip: (page - 1) * limit,
                 take: limit,
@@ -201,7 +199,7 @@ let BookingService = BookingService_1 = class BookingService {
             throw new common_1.NotFoundException('Booking not found');
         return booking;
     }
-    async create(dto) {
+    async create(dto, actor) {
         const existing = await this.prisma.booking.findUnique({
             where: { bookingRef: dto.bookingRef },
         });
@@ -210,6 +208,7 @@ let BookingService = BookingService_1 = class BookingService {
         const data = { ...dto };
         if (dto.startingDate)
             data.startingDate = new Date(dto.startingDate);
+        data.createdWho = actor?.name ?? actor?.email ?? 'System';
         const booking = await this.prisma.booking.create({ data });
         await this.auditService.log({
             entityType: 'Booking',
@@ -217,6 +216,7 @@ let BookingService = BookingService_1 = class BookingService {
             action: 'CREATE',
             afterData: booking,
         });
+        await this.postWrite(booking);
         return booking;
     }
     async update(id, dto) {
@@ -232,6 +232,7 @@ let BookingService = BookingService_1 = class BookingService {
             beforeData: before,
             afterData: booking,
         });
+        await this.postWrite(booking);
         return booking;
     }
     async remove(id) {
@@ -248,10 +249,9 @@ let BookingService = BookingService_1 = class BookingService {
 exports.BookingService = BookingService;
 exports.BookingService = BookingService = BookingService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __param(3, (0, bullmq_1.InjectQueue)(queue_constants_1.ASSIGNMENT_QUEUE)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_service_1.AuditService,
         booking_normalizer_service_1.BookingNormalizerService,
-        bullmq_2.Queue])
+        assignment_board_service_1.AssignmentBoardService])
 ], BookingService);
 //# sourceMappingURL=booking.service.js.map

@@ -7,6 +7,9 @@ export declare class TripAdvisorParser implements TemplateParser {
     private isKnownLabel;
     private setRow;
     private buildFromRows;
+    private extractViatorAmount;
+    private extractInclusions;
+    private extractBookingLanguages;
     private buildFromJson;
     private splitPickUp;
     private sumPax;

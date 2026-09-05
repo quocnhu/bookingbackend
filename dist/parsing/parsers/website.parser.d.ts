@@ -6,4 +6,13 @@ export declare class WebsiteParser implements TemplateParser {
     constructor(normalizer: BookingNormalizerService);
     canParse(payload: Record<string, unknown>): boolean;
     extract(payload: Record<string, unknown>): BookingFields | null;
+    private parseHtml;
+    private captureRow;
+    private resolveBookingRef;
+    private toFields;
+    private detectTourType;
+    private splitPickUp;
+    private parseDollar;
+    private parseNumber;
+    private normalizeDate;
 }

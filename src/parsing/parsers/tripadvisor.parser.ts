@@ -57,7 +57,11 @@ export class TripAdvisorParser implements TemplateParser {
     return null;
   }
 
-  /** Đọc bảng: mỗi `tr` → [label, value]. Fallback regex khi không có cheerio. */
+  /**
+   * Đọc bảng: mỗi `tr` → [label, value]. Fallback regex khi không có cheerio.
+   * Giá trị được collapse whitespace (nhiều dòng/indent trong cell → 1 dòng);
+   * riêng cell `Notes` giữ cấu trúc dòng (join các <div>) để regex notes chạy được.
+   */
   private parseRows(raw: string): Map<string, string> {
     const rows = new Map<string, string>();
     const text = raw.replace(/<br\s*\/?>/gi, '\n');
@@ -70,8 +74,30 @@ export class TripAdvisorParser implements TemplateParser {
             .find('td, th')
             .map((_, td) => $(td).text().trim())
             .get();
-          if (cells.length >= 2)
-            this.setRow(rows, cells[0], cells.slice(1).join(' '));
+          if (cells.length < 2) return;
+          const label = cells[0].replace(/\s+/g, ' ').trim();
+          if (/^notes$/i.test(label)) {
+            const lines: string[] = [];
+            $(tr)
+              .find('td, th')
+              .eq(1)
+              .find('div')
+              .each((_, div) => {
+                const line = $(div).text().trim();
+                if (line) lines.push(line);
+              });
+            const value =
+              lines.length > 0
+                ? lines.join('\n')
+                : cells.slice(1).join(' ').replace(/\s+/g, ' ').trim();
+            this.setRow(rows, label, value);
+          } else {
+            this.setRow(
+              rows,
+              label,
+              cells.slice(1).join(' ').replace(/\s+/g, ' ').trim(),
+            );
+          }
         });
         if (rows.size > 0) return rows;
       }
@@ -83,8 +109,8 @@ export class TripAdvisorParser implements TemplateParser {
     const re = /([A-Za-z][A-Za-z .-]{2,40}?):\s*(.*)$/gm;
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
-      const label = m[1].trim();
-      const value = m[2].trim();
+      const label = m[1].replace(/\s+/g, ' ').trim();
+      const value = m[2].replace(/\s+/g, ' ').trim();
       if (label && value && this.isKnownLabel(label))
         this.setRow(rows, label, value);
     }
@@ -118,7 +144,11 @@ export class TripAdvisorParser implements TemplateParser {
   }
 
   private setRow(rows: Map<string, string>, label: string, value: string) {
-    const normalized = label.toLowerCase().replace(/\.+$/, '').trim();
+    const normalized = label
+      .toLowerCase()
+      .replace(/\./g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     const keys: Array<[string, string]> = [
       ['booking ref', 'bookingRef'],
       ['product booking ref', 'productBookingRef'],
@@ -159,10 +189,15 @@ export class TripAdvisorParser implements TemplateParser {
     const rate = rows.get('rate') ?? '';
     const product = rows.get('product') ?? '';
     const pickUp = this.splitPickUp(rows.get('pickUp'));
-
     const subject = asString(payload.subject);
 
-    return {
+    const notes = rows.get('notes') ?? '';
+    const totalcost = this.extractViatorAmount(notes);
+    const inclusions = this.extractInclusions(notes);
+    const bookingLanguages = this.extractBookingLanguages(notes);
+    const guidedLanguages = rows.get('guidedLanguages') || undefined;
+
+    const fields: BookingFields = {
       action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
         ? 'CANCEL'
         : 'CREATE',
@@ -183,6 +218,73 @@ export class TripAdvisorParser implements TemplateParser {
       hotelName: pickUp.hotel,
       address: pickUp.address,
     };
+
+    // Lưu toàn bộ field của template vào payload.booking (→ rawData.payload),
+    // giữ các field giàu không nằm trong Booking (supplier, inclusions, totalcost...).
+    payload.booking = {
+      provider: 'tripadvisor',
+      bookingRef,
+      productBookingRef: rows.get('productBookingRef') || null,
+      extBookingRef: rows.get('extBookingRef') || null,
+      tourName: product || null,
+      supplier: rows.get('supplier') || null,
+      soldBy: rows.get('soldBy') || null,
+      bookingChannel: rows.get('bookingChannel') || null,
+      customer: rows.get('customer') || null,
+      customerEmail: rows.get('customerEmail') || null,
+      customerPhone: rows.get('customerPhone') || null,
+      date: fields.startingDate ?? null,
+      rate: rate || null,
+      pax: rows.get('pax') || null,
+      paxTotal: fields.totalPax ?? null,
+      tourType: fields.tourType ?? 'UNKNOWN',
+      pickUp: pickUp.hotel ?? null,
+      pickUpAddress: pickUp.address ?? null,
+      guidedLanguages: guidedLanguages ?? null,
+      extras: rows.get('extras') || null,
+      inclusions,
+      bookingLanguages,
+      totalcost,
+      createdAt: rows.get('created') || null,
+    };
+
+    return fields;
+  }
+
+  /** "Viator amount: USD 39.96" nằm trong Notes → trả "USD 39.96". */
+  private extractViatorAmount(notes: string): string | null {
+    const m = /Viator amount:\s*([A-Za-z0-9.$ ]+)/i.exec(notes);
+    return m ? m[1].replace(/\s+/g, ' ').trim() : null;
+  }
+
+  /** Khối "--- Inclusions: --- ..." trong Notes → danh sách cách nhau dấu phẩy. */
+  private extractInclusions(notes: string): string | null {
+    if (!notes) return null;
+    const m =
+      /---\s*Inclusions:\s*---([\s\S]*?)(?:---\s*Booking languages:\s*---|Viator amount:|$)/i.exec(
+        notes,
+      );
+    if (!m || !m[1]) return null;
+    const items = m[1]
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('---'));
+    return items.length > 0 ? items.join(', ') : null;
+  }
+
+  /** Khối "--- Booking languages: --- ..." trong Notes → bỏ tiền tố "GUIDE :". */
+  private extractBookingLanguages(notes: string): string | null {
+    if (!notes) return null;
+    const m =
+      /---\s*Booking languages:\s*---([\s\S]*?)(?:Viator amount:|$)/i.exec(
+        notes,
+      );
+    if (!m || !m[1]) return null;
+    const items = m[1]
+      .split('\n')
+      .map((line) => line.replace(/GUIDE\s*:/i, '').trim())
+      .filter((line) => line && !line.startsWith('---'));
+    return items.length > 0 ? items.join(', ') : null;
   }
 
   private buildFromJson(

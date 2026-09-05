@@ -45,7 +45,6 @@ export class ToursService {
     const [items, total] = await Promise.all([
       this.prisma.tour.findMany({
         where,
-        include: { _count: { select: { bookings: true } } },
         orderBy: { name: 'asc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -61,7 +60,6 @@ export class ToursService {
       include: {
         itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
         prices: { include: { provider: true } },
-        _count: { select: { bookings: true } },
       },
     });
     if (!tour) throw new NotFoundException('Tour not found');

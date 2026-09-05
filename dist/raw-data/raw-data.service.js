@@ -46,6 +46,9 @@ let RawDataService = RawDataService_1 = class RawDataService {
     async markParsed(id, bookingId) {
         await this.repository.markParsed(id, bookingId);
     }
+    async updatePayload(id, payload) {
+        await this.repository.updatePayload(id, payload);
+    }
     async appendReason(id, reason) {
         const raw = await this.repository.findById(id);
         if (!raw)

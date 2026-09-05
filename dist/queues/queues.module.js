@@ -11,7 +11,7 @@ const common_1 = require("@nestjs/common");
 const bullmq_1 = require("@nestjs/bullmq");
 const config_1 = require("@nestjs/config");
 const audit_module_1 = require("../audit/audit.module");
-const assignment_processor_1 = require("./assignment.processor");
+const assignment_board_service_1 = require("./assignment-board.service");
 const queue_constants_1 = require("./queue.constants");
 const parsing_queue_1 = require("../parsing/parsing.queue");
 let QueuesModule = class QueuesModule {
@@ -36,10 +36,10 @@ exports.QueuesModule = QueuesModule = __decorate([
                     },
                 }),
             }),
-            bullmq_1.BullModule.registerQueue({ name: queue_constants_1.ASSIGNMENT_QUEUE }, { name: queue_constants_1.BOOKING_MANUAL_QUEUE }, { name: parsing_queue_1.PARSE_QUEUE }),
+            bullmq_1.BullModule.registerQueue({ name: queue_constants_1.BOOKING_MANUAL_QUEUE }, { name: parsing_queue_1.PARSE_QUEUE }),
         ],
-        providers: [assignment_processor_1.AssignmentProcessor],
-        exports: [bullmq_1.BullModule],
+        providers: [assignment_board_service_1.AssignmentBoardService],
+        exports: [bullmq_1.BullModule, assignment_board_service_1.AssignmentBoardService],
     })
 ], QueuesModule);
 //# sourceMappingURL=queues.module.js.map

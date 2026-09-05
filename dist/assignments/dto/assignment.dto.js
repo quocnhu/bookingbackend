@@ -9,13 +9,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QueryAssignmentDto = exports.AssignBookingsDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
+exports.FinalizeAssignmentDto = exports.FinalizeServiceDto = exports.VerifyTourReportDto = exports.SubmitTourReportDto = exports.QueryAssignmentDto = exports.MoveBookingDto = exports.ReorderBookingsDto = exports.AssignBookingsDto = exports.SetBoardOriginDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const client_1 = require("@prisma/client");
 class CreateAssignmentDto {
     code;
+    tourName;
     startDate;
     endDate;
     vehicleId;
@@ -33,6 +34,11 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateAssignmentDto.prototype, "code", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateAssignmentDto.prototype, "tourName", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", Object)
@@ -84,6 +90,7 @@ __decorate([
 ], CreateAssignmentDto.prototype, "tripNotes", void 0);
 class UpdateAssignmentDto {
     code;
+    tourName;
     startDate;
     endDate;
     vehicleId;
@@ -101,6 +108,11 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateAssignmentDto.prototype, "code", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateAssignmentDto.prototype, "tourName", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Object)
@@ -158,6 +170,14 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.AssignmentStatus),
     __metadata("design:type", String)
 ], UpdateAssignmentStatusDto.prototype, "status", void 0);
+class SetBoardOriginDto {
+    origin;
+}
+exports.SetBoardOriginDto = SetBoardOriginDto;
+__decorate([
+    (0, class_validator_1.IsEnum)(client_1.AssignmentOrigin),
+    __metadata("design:type", String)
+], SetBoardOriginDto.prototype, "origin", void 0);
 class AssignBookingsDto {
     bookingIds;
 }
@@ -167,12 +187,30 @@ __decorate([
     (0, class_validator_1.IsString)({ each: true }),
     __metadata("design:type", Array)
 ], AssignBookingsDto.prototype, "bookingIds", void 0);
+class ReorderBookingsDto {
+    bookingIds;
+}
+exports.ReorderBookingsDto = ReorderBookingsDto;
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], ReorderBookingsDto.prototype, "bookingIds", void 0);
+class MoveBookingDto {
+    toAssignmentId;
+}
+exports.MoveBookingDto = MoveBookingDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], MoveBookingDto.prototype, "toAssignmentId", void 0);
 class QueryAssignmentDto extends pagination_dto_1.PaginationDto {
     q;
     status;
     vehicleId;
     driverId;
     guideId;
+    sortOrder;
 }
 exports.QueryAssignmentDto = QueryAssignmentDto;
 __decorate([
@@ -200,4 +238,101 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], QueryAssignmentDto.prototype, "guideId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(['asc', 'desc']),
+    __metadata("design:type", String)
+], QueryAssignmentDto.prototype, "sortOrder", void 0);
+class SubmitTourReportDto {
+    actualPax;
+    pickupNotes;
+    distanceKm;
+    fuelCost;
+    tollParking;
+    notes;
+}
+exports.SubmitTourReportDto = SubmitTourReportDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], SubmitTourReportDto.prototype, "actualPax", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SubmitTourReportDto.prototype, "pickupNotes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], SubmitTourReportDto.prototype, "distanceKm", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    __metadata("design:type", Number)
+], SubmitTourReportDto.prototype, "fuelCost", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    __metadata("design:type", Number)
+], SubmitTourReportDto.prototype, "tollParking", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SubmitTourReportDto.prototype, "notes", void 0);
+class VerifyTourReportDto {
+    status;
+    verificationNotes;
+}
+exports.VerifyTourReportDto = VerifyTourReportDto;
+__decorate([
+    (0, class_validator_1.IsIn)(['VERIFIED', 'REJECTED']),
+    __metadata("design:type", String)
+], VerifyTourReportDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], VerifyTourReportDto.prototype, "verificationNotes", void 0);
+class FinalizeServiceDto {
+    categoryId;
+    name;
+    amount;
+}
+exports.FinalizeServiceDto = FinalizeServiceDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], FinalizeServiceDto.prototype, "categoryId", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], FinalizeServiceDto.prototype, "name", void 0);
+__decorate([
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], FinalizeServiceDto.prototype, "amount", void 0);
+class FinalizeAssignmentDto {
+    collectedAmount;
+    services;
+}
+exports.FinalizeAssignmentDto = FinalizeAssignmentDto;
+__decorate([
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], FinalizeAssignmentDto.prototype, "collectedAmount", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => FinalizeServiceDto),
+    __metadata("design:type", Array)
+], FinalizeAssignmentDto.prototype, "services", void 0);
 //# sourceMappingURL=assignment.dto.js.map

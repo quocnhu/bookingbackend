@@ -1,216 +1,171 @@
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
-import { CreateSettlementDto, QuerySettlementDto, UpdateSettlementDto } from './dto/settlement.dto';
+import { CreateSettlementCategoryDto, CreateSettlementDto, QuerySettlementDto, UpdateSettlementDto } from './dto/settlement.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
-import { SettlementStatus } from '@prisma/client';
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 export declare class SettlementsService {
     private readonly prisma;
     private readonly auditService;
     constructor(prisma: PrismaService, auditService: AuditService);
     private include;
+    listCategories(): Promise<{
+        id: string;
+        createdAt: Date;
+        name: string;
+        updatedAt: Date;
+        isSystem: boolean;
+        code: string;
+        flowType: import("@prisma/client").$Enums.FeeFlowType;
+    }[]>;
+    createCategory(dto: CreateSettlementCategoryDto): Promise<{
+        id: string;
+        createdAt: Date;
+        name: string;
+        updatedAt: Date;
+        isSystem: boolean;
+        code: string;
+        flowType: import("@prisma/client").$Enums.FeeFlowType;
+    }>;
+    removeCategory(id: string): Promise<{
+        message: string;
+    }>;
     findAll(query: QuerySettlementDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     findOne(id: string): Promise<{
-        user: {
+        booking: {
             id: string;
-            name: string | null;
-            email: string;
+            bookingRef: string;
+            customerName: string | null;
+            totalPax: number;
+            payment: import("@prisma/client").$Enums.PaymentStatus | null;
         } | null;
         assignment: {
             id: string;
-            createdAt: Date;
-            providerId: string | null;
-            updatedAt: Date;
             code: string | null;
             status: import("@prisma/client").$Enums.AssignmentStatus;
-            guideId: string | null;
-            driverId: string | null;
-            startDate: Date;
-            endDate: Date;
-            sequenceIndex: number;
-            priceOverride: import("@prisma/client/runtime/library").Decimal | null;
-            tripNotes: string | null;
-            vehicleId: string | null;
-        };
-        provider: {
-            id: string;
-            name: string;
+            tourName: string | null;
         } | null;
-        expenseItems: {
+        category: {
             id: string;
-            description: string | null;
-            category: string;
-            amount: import("@prisma/client/runtime/library").Decimal;
-            receiptUrl: string | null;
-            settlementId: string;
-        }[];
+            createdAt: Date;
+            name: string;
+            updatedAt: Date;
+            isSystem: boolean;
+            code: string;
+            flowType: import("@prisma/client").$Enums.FeeFlowType;
+        } | null;
+        createdBy: {
+            id: string;
+            name: string | null;
+            email: string;
+        };
     } & {
         id: string;
         createdAt: Date;
-        userId: string | null;
-        providerId: string | null;
         updatedAt: Date;
-        status: import("@prisma/client").$Enums.SettlementStatus;
-        assignmentId: string;
-        payeeType: import("@prisma/client").$Enums.PayeeType;
-        baseAmount: import("@prisma/client/runtime/library").Decimal;
-        allowance: import("@prisma/client/runtime/library").Decimal;
-        deduction: import("@prisma/client/runtime/library").Decimal;
-        finalAmount: import("@prisma/client/runtime/library").Decimal;
-        periodName: string | null;
-        notes: string | null;
+        imageUrl: string | null;
+        assignmentId: string | null;
+        categoryId: string | null;
+        amount: number;
+        note: string | null;
+        customCategoryName: string | null;
+        createdById: string;
+        bookingId: string | null;
     }>;
-    create(dto: CreateSettlementDto): Promise<{
-        user: {
+    create(dto: CreateSettlementDto, actor: AuthenticatedUser): Promise<{
+        booking: {
             id: string;
-            name: string | null;
-            email: string;
+            bookingRef: string;
+            customerName: string | null;
+            totalPax: number;
+            payment: import("@prisma/client").$Enums.PaymentStatus | null;
         } | null;
         assignment: {
             id: string;
-            createdAt: Date;
-            providerId: string | null;
-            updatedAt: Date;
             code: string | null;
             status: import("@prisma/client").$Enums.AssignmentStatus;
-            guideId: string | null;
-            driverId: string | null;
-            startDate: Date;
-            endDate: Date;
-            sequenceIndex: number;
-            priceOverride: import("@prisma/client/runtime/library").Decimal | null;
-            tripNotes: string | null;
-            vehicleId: string | null;
-        };
-        provider: {
-            id: string;
-            name: string;
+            tourName: string | null;
         } | null;
-        expenseItems: {
+        category: {
             id: string;
-            description: string | null;
-            category: string;
-            amount: import("@prisma/client/runtime/library").Decimal;
-            receiptUrl: string | null;
-            settlementId: string;
-        }[];
+            createdAt: Date;
+            name: string;
+            updatedAt: Date;
+            isSystem: boolean;
+            code: string;
+            flowType: import("@prisma/client").$Enums.FeeFlowType;
+        } | null;
+        createdBy: {
+            id: string;
+            name: string | null;
+            email: string;
+        };
     } & {
         id: string;
         createdAt: Date;
-        userId: string | null;
-        providerId: string | null;
         updatedAt: Date;
-        status: import("@prisma/client").$Enums.SettlementStatus;
-        assignmentId: string;
-        payeeType: import("@prisma/client").$Enums.PayeeType;
-        baseAmount: import("@prisma/client/runtime/library").Decimal;
-        allowance: import("@prisma/client/runtime/library").Decimal;
-        deduction: import("@prisma/client/runtime/library").Decimal;
-        finalAmount: import("@prisma/client/runtime/library").Decimal;
-        periodName: string | null;
-        notes: string | null;
+        imageUrl: string | null;
+        assignmentId: string | null;
+        categoryId: string | null;
+        amount: number;
+        note: string | null;
+        customCategoryName: string | null;
+        createdById: string;
+        bookingId: string | null;
     }>;
     update(id: string, dto: UpdateSettlementDto): Promise<{
-        user: {
+        booking: {
             id: string;
-            name: string | null;
-            email: string;
+            bookingRef: string;
+            customerName: string | null;
+            totalPax: number;
+            payment: import("@prisma/client").$Enums.PaymentStatus | null;
         } | null;
         assignment: {
             id: string;
-            createdAt: Date;
-            providerId: string | null;
-            updatedAt: Date;
             code: string | null;
             status: import("@prisma/client").$Enums.AssignmentStatus;
-            guideId: string | null;
-            driverId: string | null;
-            startDate: Date;
-            endDate: Date;
-            sequenceIndex: number;
-            priceOverride: import("@prisma/client/runtime/library").Decimal | null;
-            tripNotes: string | null;
-            vehicleId: string | null;
-        };
-        provider: {
-            id: string;
-            name: string;
+            tourName: string | null;
         } | null;
-        expenseItems: {
+        category: {
             id: string;
-            description: string | null;
-            category: string;
-            amount: import("@prisma/client/runtime/library").Decimal;
-            receiptUrl: string | null;
-            settlementId: string;
-        }[];
-    } & {
-        id: string;
-        createdAt: Date;
-        userId: string | null;
-        providerId: string | null;
-        updatedAt: Date;
-        status: import("@prisma/client").$Enums.SettlementStatus;
-        assignmentId: string;
-        payeeType: import("@prisma/client").$Enums.PayeeType;
-        baseAmount: import("@prisma/client/runtime/library").Decimal;
-        allowance: import("@prisma/client/runtime/library").Decimal;
-        deduction: import("@prisma/client/runtime/library").Decimal;
-        finalAmount: import("@prisma/client/runtime/library").Decimal;
-        periodName: string | null;
-        notes: string | null;
-    }>;
-    updateStatus(id: string, status: SettlementStatus): Promise<{
-        user: {
+            createdAt: Date;
+            name: string;
+            updatedAt: Date;
+            isSystem: boolean;
+            code: string;
+            flowType: import("@prisma/client").$Enums.FeeFlowType;
+        } | null;
+        createdBy: {
             id: string;
             name: string | null;
             email: string;
-        } | null;
-        assignment: {
-            id: string;
-            createdAt: Date;
-            providerId: string | null;
-            updatedAt: Date;
-            code: string | null;
-            status: import("@prisma/client").$Enums.AssignmentStatus;
-            guideId: string | null;
-            driverId: string | null;
-            startDate: Date;
-            endDate: Date;
-            sequenceIndex: number;
-            priceOverride: import("@prisma/client/runtime/library").Decimal | null;
-            tripNotes: string | null;
-            vehicleId: string | null;
         };
-        provider: {
-            id: string;
-            name: string;
-        } | null;
-        expenseItems: {
-            id: string;
-            description: string | null;
-            category: string;
-            amount: import("@prisma/client/runtime/library").Decimal;
-            receiptUrl: string | null;
-            settlementId: string;
-        }[];
     } & {
         id: string;
         createdAt: Date;
-        userId: string | null;
-        providerId: string | null;
         updatedAt: Date;
-        status: import("@prisma/client").$Enums.SettlementStatus;
-        assignmentId: string;
-        payeeType: import("@prisma/client").$Enums.PayeeType;
-        baseAmount: import("@prisma/client/runtime/library").Decimal;
-        allowance: import("@prisma/client/runtime/library").Decimal;
-        deduction: import("@prisma/client/runtime/library").Decimal;
-        finalAmount: import("@prisma/client/runtime/library").Decimal;
-        periodName: string | null;
-        notes: string | null;
+        imageUrl: string | null;
+        assignmentId: string | null;
+        categoryId: string | null;
+        amount: number;
+        note: string | null;
+        customCategoryName: string | null;
+        createdById: string;
+        bookingId: string | null;
     }>;
     remove(id: string): Promise<{
         message: string;
+    }>;
+    exportByProvider(providerId: string, startDate?: string, endDate?: string): Promise<{
+        provider: {
+            id: string;
+            name: string;
+        } | null;
+        period: {
+            startDate: string | undefined;
+            endDate: string | undefined;
+        };
+        drivers: any[];
+        totalAmount: number;
     }>;
 }

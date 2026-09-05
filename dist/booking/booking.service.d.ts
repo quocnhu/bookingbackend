@@ -1,8 +1,8 @@
-import { Queue } from 'bullmq';
 import { Booking } from '@prisma/client';
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { BookingNormalizerService, CleanBookingData } from "../parsing/booking-normalizer.service";
+import { AssignmentBoardService } from "../queues/assignment-board.service";
 import { CreateBookingDto, QueryBookingDto, UpdateBookingDto } from './dto/booking.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
@@ -18,13 +18,13 @@ export declare class BookingService {
     private readonly prisma;
     private readonly auditService;
     private readonly normalizer;
-    private readonly assignmentQueue;
+    private readonly board;
     private readonly logger;
-    constructor(prisma: PrismaService, auditService: AuditService, normalizer: BookingNormalizerService, assignmentQueue: Queue);
-    upsert(data: CleanBookingData, rawDataId?: string, actorId?: string): Promise<Booking>;
+    constructor(prisma: PrismaService, auditService: AuditService, normalizer: BookingNormalizerService, board: AssignmentBoardService);
+    upsert(data: CleanBookingData, rawDataId?: string, actorId?: string, createdWho?: string): Promise<Booking>;
+    private postWrite;
     createManual(data: Record<string, any>, actorId?: string): Promise<Booking>;
     private findExisting;
-    private enqueueAssignment;
     findAll(query: QueryBookingDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     findOne(id: string): Promise<{
         tour: {
@@ -80,11 +80,13 @@ export declare class BookingService {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        assignmentId: string | null;
         rawDataId: string | null;
+        assignmentId: string | null;
         paxSequence: number;
+        movedFromBusId: string | null;
+        createdWho: string | null;
     }>;
-    create(dto: CreateBookingDto): Promise<{
+    create(dto: CreateBookingDto, actor?: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -109,9 +111,11 @@ export declare class BookingService {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        assignmentId: string | null;
         rawDataId: string | null;
+        assignmentId: string | null;
         paxSequence: number;
+        movedFromBusId: string | null;
+        createdWho: string | null;
     }>;
     update(id: string, dto: UpdateBookingDto): Promise<{
         id: string;
@@ -138,9 +142,11 @@ export declare class BookingService {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        assignmentId: string | null;
         rawDataId: string | null;
+        assignmentId: string | null;
         paxSequence: number;
+        movedFromBusId: string | null;
+        createdWho: string | null;
     }>;
     remove(id: string): Promise<{
         message: string;

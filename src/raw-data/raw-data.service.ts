@@ -50,6 +50,11 @@ export class RawDataService {
     await this.repository.markParsed(id, bookingId);
   }
 
+  /** Lưu payload sau khi parser làm giàu (payload.booking). */
+  async updatePayload(id: string, payload: Record<string, unknown>) {
+    await this.repository.updatePayload(id, payload as Prisma.InputJsonValue);
+  }
+
   private async appendReason(id: string, reason: string) {
     const raw = await this.repository.findById(id);
     if (!raw) return;

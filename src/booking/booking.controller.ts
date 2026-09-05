@@ -39,8 +39,8 @@ export class BookingController {
 
   @Post()
   @Permissions('booking.create')
-  create(@Body() dto: CreateBookingDto) {
-    return this.bookingService.create(dto);
+  create(@Body() dto: CreateBookingDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.bookingService.create(dto, actor);
   }
 
   @Put(':id')

@@ -13,6 +13,7 @@ const config_1 = require("@nestjs/config");
 const serve_static_1 = require("@nestjs/serve-static");
 const path_1 = require("path");
 const throttler_1 = require("@nestjs/throttler");
+const schedule_1 = require("@nestjs/schedule");
 const prisma_module_1 = require("./prisma/prisma.module");
 const cache_module_1 = require("./cache/cache.module");
 const audit_module_1 = require("./audit/audit.module");
@@ -27,6 +28,7 @@ const tours_module_1 = require("./tours/tours.module");
 const booking_module_1 = require("./booking/booking.module");
 const assignments_module_1 = require("./assignments/assignments.module");
 const settlements_module_1 = require("./settlements/settlements.module");
+const company_profile_module_1 = require("./company-profile/company-profile.module");
 const audit_logs_module_1 = require("./audit-logs/audit-logs.module");
 const dashboard_module_1 = require("./dashboard/dashboard.module");
 const ingestion_module_1 = require("./ingestion/ingestion.module");
@@ -35,6 +37,10 @@ const parsing_module_1 = require("./parsing/parsing.module");
 const queues_module_1 = require("./queues/queues.module");
 const drive_module_1 = require("./drive/drive.module");
 const storage_1 = require("./storage");
+const notifications_module_1 = require("./notifications/notifications.module");
+const coordinates_module_1 = require("./coordinates/coordinates.module");
+const route_prices_module_1 = require("./route-prices/route-prices.module");
+const transportation_providers_module_1 = require("./transportation-providers/transportation-providers.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -43,6 +49,7 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             config_1.ConfigModule.forRoot({ isGlobal: true }),
             throttler_1.ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+            schedule_1.ScheduleModule.forRoot(),
             prisma_module_1.PrismaModule,
             storage_1.StorageModule,
             cache_module_1.CacheModule,
@@ -56,6 +63,7 @@ exports.AppModule = AppModule = __decorate([
             booking_module_1.BookingModule,
             assignments_module_1.AssignmentsModule,
             settlements_module_1.SettlementsModule,
+            company_profile_module_1.CompanyProfileModule,
             audit_logs_module_1.AuditLogsModule,
             dashboard_module_1.DashboardModule,
             ingestion_module_1.IngestionModule,
@@ -63,6 +71,10 @@ exports.AppModule = AppModule = __decorate([
             parsing_module_1.ParsingModule,
             queues_module_1.QueuesModule,
             drive_module_1.DriveModule,
+            notifications_module_1.NotificationsModule,
+            coordinates_module_1.CoordinatesModule,
+            route_prices_module_1.RoutePricesModule,
+            transportation_providers_module_1.TransportationProvidersModule,
             serve_static_1.ServeStaticModule.forRoot({
                 rootPath: (0, path_1.join)(process.cwd(), 'uploads'),
                 serveRoot: '/uploads',

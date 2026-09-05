@@ -51,8 +51,28 @@ let TripAdvisorParser = class TripAdvisorParser {
                         .find('td, th')
                         .map((_, td) => $(td).text().trim())
                         .get();
-                    if (cells.length >= 2)
-                        this.setRow(rows, cells[0], cells.slice(1).join(' '));
+                    if (cells.length < 2)
+                        return;
+                    const label = cells[0].replace(/\s+/g, ' ').trim();
+                    if (/^notes$/i.test(label)) {
+                        const lines = [];
+                        $(tr)
+                            .find('td, th')
+                            .eq(1)
+                            .find('div')
+                            .each((_, div) => {
+                            const line = $(div).text().trim();
+                            if (line)
+                                lines.push(line);
+                        });
+                        const value = lines.length > 0
+                            ? lines.join('\n')
+                            : cells.slice(1).join(' ').replace(/\s+/g, ' ').trim();
+                        this.setRow(rows, label, value);
+                    }
+                    else {
+                        this.setRow(rows, label, cells.slice(1).join(' ').replace(/\s+/g, ' ').trim());
+                    }
                 });
                 if (rows.size > 0)
                     return rows;
@@ -63,8 +83,8 @@ let TripAdvisorParser = class TripAdvisorParser {
         const re = /([A-Za-z][A-Za-z .-]{2,40}?):\s*(.*)$/gm;
         let m;
         while ((m = re.exec(text)) !== null) {
-            const label = m[1].trim();
-            const value = m[2].trim();
+            const label = m[1].replace(/\s+/g, ' ').trim();
+            const value = m[2].replace(/\s+/g, ' ').trim();
             if (label && value && this.isKnownLabel(label))
                 this.setRow(rows, label, value);
         }
@@ -95,7 +115,11 @@ let TripAdvisorParser = class TripAdvisorParser {
         return known.some((k) => normalized.includes(k));
     }
     setRow(rows, label, value) {
-        const normalized = label.toLowerCase().replace(/\.+$/, '').trim();
+        const normalized = label
+            .toLowerCase()
+            .replace(/\./g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
         const keys = [
             ['booking ref', 'bookingRef'],
             ['product booking ref', 'productBookingRef'],
@@ -133,7 +157,12 @@ let TripAdvisorParser = class TripAdvisorParser {
         const product = rows.get('product') ?? '';
         const pickUp = this.splitPickUp(rows.get('pickUp'));
         const subject = asString(payload.subject);
-        return {
+        const notes = rows.get('notes') ?? '';
+        const totalcost = this.extractViatorAmount(notes);
+        const inclusions = this.extractInclusions(notes);
+        const bookingLanguages = this.extractBookingLanguages(notes);
+        const guidedLanguages = rows.get('guidedLanguages') || undefined;
+        const fields = {
             action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
                 ? 'CANCEL'
                 : 'CREATE',
@@ -153,6 +182,61 @@ let TripAdvisorParser = class TripAdvisorParser {
             hotelName: pickUp.hotel,
             address: pickUp.address,
         };
+        payload.booking = {
+            provider: 'tripadvisor',
+            bookingRef,
+            productBookingRef: rows.get('productBookingRef') || null,
+            extBookingRef: rows.get('extBookingRef') || null,
+            tourName: product || null,
+            supplier: rows.get('supplier') || null,
+            soldBy: rows.get('soldBy') || null,
+            bookingChannel: rows.get('bookingChannel') || null,
+            customer: rows.get('customer') || null,
+            customerEmail: rows.get('customerEmail') || null,
+            customerPhone: rows.get('customerPhone') || null,
+            date: fields.startingDate ?? null,
+            rate: rate || null,
+            pax: rows.get('pax') || null,
+            paxTotal: fields.totalPax ?? null,
+            tourType: fields.tourType ?? 'UNKNOWN',
+            pickUp: pickUp.hotel ?? null,
+            pickUpAddress: pickUp.address ?? null,
+            guidedLanguages: guidedLanguages ?? null,
+            extras: rows.get('extras') || null,
+            inclusions,
+            bookingLanguages,
+            totalcost,
+            createdAt: rows.get('created') || null,
+        };
+        return fields;
+    }
+    extractViatorAmount(notes) {
+        const m = /Viator amount:\s*([A-Za-z0-9.$ ]+)/i.exec(notes);
+        return m ? m[1].replace(/\s+/g, ' ').trim() : null;
+    }
+    extractInclusions(notes) {
+        if (!notes)
+            return null;
+        const m = /---\s*Inclusions:\s*---([\s\S]*?)(?:---\s*Booking languages:\s*---|Viator amount:|$)/i.exec(notes);
+        if (!m || !m[1])
+            return null;
+        const items = m[1]
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line && !line.startsWith('---'));
+        return items.length > 0 ? items.join(', ') : null;
+    }
+    extractBookingLanguages(notes) {
+        if (!notes)
+            return null;
+        const m = /---\s*Booking languages:\s*---([\s\S]*?)(?:Viator amount:|$)/i.exec(notes);
+        if (!m || !m[1])
+            return null;
+        const items = m[1]
+            .split('\n')
+            .map((line) => line.replace(/GUIDE\s*:/i, '').trim())
+            .filter((line) => line && !line.startsWith('---'));
+        return items.length > 0 ? items.join(', ') : null;
     }
     buildFromJson(payload) {
         const b = (payload.booking ?? payload.parsedBooking ?? {});

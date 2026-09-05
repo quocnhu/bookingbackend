@@ -5,8 +5,6 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import {
   Booking,
   BookingProvider,
@@ -21,7 +19,7 @@ import {
   BookingNormalizerService,
   CleanBookingData,
 } from '@/parsing/booking-normalizer.service';
-import { ASSIGNMENT_JOB, ASSIGNMENT_QUEUE } from '@/queues/queue.constants';
+import { AssignmentBoardService } from '@/queues/assignment-board.service';
 import {
   CreateBookingDto,
   QueryBookingDto,
@@ -47,7 +45,7 @@ export class BookingService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly normalizer: BookingNormalizerService,
-    @InjectQueue(ASSIGNMENT_QUEUE) private readonly assignmentQueue: Queue,
+    private readonly board: AssignmentBoardService,
   ) {}
 
   // ─── Pipeline upsert (Stage 2) ──────────────────────────────────────────
@@ -55,6 +53,7 @@ export class BookingService {
     data: CleanBookingData,
     rawDataId?: string,
     actorId?: string,
+    createdWho?: string,
   ): Promise<Booking> {
     const bookingRef = data.bookingRef;
     const existing = await this.findExisting(data.source, bookingRef);
@@ -82,6 +81,7 @@ export class BookingService {
       isNoShow?: boolean;
       noShowReason?: string;
       rawDataId?: string;
+      createdWho?: string;
     } = {
       bookingRef,
       confirmationCode: data.bookingRef,
@@ -113,6 +113,8 @@ export class BookingService {
       rawDataId: existing?.rawDataId ?? rawDataId,
     };
 
+    const _createdWho = createdWho ?? (actorId ? undefined : 'Pub-Sub System');
+
     if (existing) {
       const booking = await this.prisma.booking.update({
         where: { id: existing.id },
@@ -129,10 +131,11 @@ export class BookingService {
         afterData: booking,
         changedBy: actorId ?? null,
       });
+      await this.postWrite(booking);
       return booking;
     }
 
-    const booking = await this.prisma.booking.create({ data: bookingData });
+    const booking = await this.prisma.booking.create({ data: { ...bookingData, createdWho: _createdWho } });
     await this.auditService.log({
       entityType: 'Booking',
       entityId: booking.id,
@@ -141,7 +144,19 @@ export class BookingService {
       changedBy: actorId ?? null,
     });
     this.logger.log(`Upserted booking ${booking.bookingRef} (${data.source})`);
+    await this.postWrite(booking);
     return booking;
+  }
+
+  /**
+   * Sau khi ghi booking (tạo mới / cập nhật từ pipeline):
+   * - đơn CANCELLED → rút khỏi chuyến hiện tại (nếu có).
+   * Không còn enqueue auto-assign — xếp chuyến chỉ thao tác tay trên Dispatch Board.
+   */
+  private async postWrite(booking: Booking) {
+    if (booking.status === BookingStatus.CANCELED) {
+      await this.board.unassign(booking.id);
+    }
   }
 
   /** Tạo booking thủ công (queue `booking-manual`), vẫn đẩy sang assignment. */
@@ -185,8 +200,7 @@ export class BookingService {
       isNoShow: data.isNoShow,
       noShowReason: data.noShowReason,
     };
-    const booking = await this.upsert(clean, undefined, actorId);
-    await this.enqueueAssignment(booking.id);
+    const booking = await this.upsert(clean, undefined, actorId, data.createdWho ?? 'Manual Entry');
     return booking;
   }
 
@@ -200,20 +214,6 @@ export class BookingService {
       if (byKey) return byKey;
     }
     return this.prisma.booking.findUnique({ where: { bookingRef } });
-  }
-
-  private async enqueueAssignment(bookingId: string) {
-    await this.assignmentQueue.add(
-      ASSIGNMENT_JOB,
-      { bookingId },
-      {
-        jobId: `assign-${bookingId}`,
-        removeOnComplete: 1000,
-        removeOnFail: 5000,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-      },
-    );
   }
 
   // ─── CRUD (dashboard) ───────────────────────────────────────────────────
@@ -232,6 +232,9 @@ export class BookingService {
         { mail: { contains: q, mode: 'insensitive' } },
         { phone: { contains: q, mode: 'insensitive' } },
         { tourName: { contains: q, mode: 'insensitive' } },
+        { status: { contains: q, mode: 'insensitive' } },
+        { channel: { contains: q, mode: 'insensitive' } },
+        { payment: { contains: q, mode: 'insensitive' } },
       ];
     }
     if (status) where.status = status;
@@ -269,7 +272,7 @@ export class BookingService {
     return booking;
   }
 
-  async create(dto: CreateBookingDto) {
+  async create(dto: CreateBookingDto, actor?: AuthenticatedUser) {
     const existing = await this.prisma.booking.findUnique({
       where: { bookingRef: dto.bookingRef },
     });
@@ -277,6 +280,7 @@ export class BookingService {
       throw new ConflictException('Booking reference already exists');
     const data: any = { ...dto };
     if (dto.startingDate) data.startingDate = new Date(dto.startingDate);
+    data.createdWho = actor?.name ?? actor?.email ?? 'System';
     const booking = await this.prisma.booking.create({ data });
     await this.auditService.log({
       entityType: 'Booking',
@@ -284,6 +288,7 @@ export class BookingService {
       action: 'CREATE',
       afterData: booking,
     });
+    await this.postWrite(booking);
     return booking;
   }
 
@@ -299,6 +304,7 @@ export class BookingService {
       beforeData: before,
       afterData: booking,
     });
+    await this.postWrite(booking);
     return booking;
   }
 

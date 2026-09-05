@@ -53,6 +53,17 @@ export declare class RawDataRepository {
         payload: Prisma.JsonValue;
         payloadHash: string | null;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
+    updatePayload(id: string, payload: Prisma.InputJsonValue): Prisma.Prisma__RawDataClient<{
+        id: string;
+        createdAt: Date;
+        email: string | null;
+        updatedAt: Date;
+        status: string;
+        templateTag: string | null;
+        sourceId: string;
+        payload: Prisma.JsonValue;
+        payloadHash: string | null;
+    }, never, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
     markParsed(id: string, bookingId: string): Prisma.Prisma__RawDataClient<{
         id: string;
         createdAt: Date;

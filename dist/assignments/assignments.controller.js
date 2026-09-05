@@ -29,17 +29,38 @@ let AssignmentsController = class AssignmentsController {
     findBoard(actor) {
         return this.assignmentsService.findBoard(actor);
     }
+    setBoardOrigin(dto) {
+        return this.assignmentsService.setBoardOrigin(dto.origin);
+    }
+    dispatchAllBoard() {
+        return this.assignmentsService.dispatchAllBoard();
+    }
+    findMyAssignments(actor) {
+        return this.assignmentsService.findMyAssignments(actor);
+    }
+    findMyCalendar(actor, year, month) {
+        return this.assignmentsService.findMyCalendar(actor, year ? +year : undefined, month ? +month : undefined);
+    }
+    findMyPayments(actor, startDate, endDate) {
+        return this.assignmentsService.findMyPayments(actor, startDate, endDate);
+    }
     findOne(id) {
         return this.assignmentsService.findOne(id);
     }
-    create(dto) {
-        return this.assignmentsService.create(dto);
+    create(dto, actor) {
+        return this.assignmentsService.create(dto, actor);
     }
     update(id, dto) {
         return this.assignmentsService.update(id, dto);
     }
     updateStatus(id, dto) {
         return this.assignmentsService.updateStatus(id, dto);
+    }
+    reorderBookings(id, dto) {
+        return this.assignmentsService.reorderBookings(id, dto.bookingIds);
+    }
+    moveBooking(id, bookingId, dto) {
+        return this.assignmentsService.moveBooking(id, bookingId, dto.toAssignmentId);
     }
     assignBookings(id, dto) {
         return this.assignmentsService.assignBookings(id, dto);
@@ -49,6 +70,15 @@ let AssignmentsController = class AssignmentsController {
     }
     remove(id) {
         return this.assignmentsService.remove(id);
+    }
+    submitTourReport(id, dto, actor) {
+        return this.assignmentsService.submitTourReport(id, dto, actor);
+    }
+    verifyTourReport(id, dto, actor) {
+        return this.assignmentsService.verifyTourReport(id, dto, actor);
+    }
+    finalize(id, dto, actor) {
+        return this.assignmentsService.finalize(id, dto, actor);
     }
 };
 exports.AssignmentsController = AssignmentsController;
@@ -70,6 +100,46 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "findBoard", null);
 __decorate([
+    (0, common_1.Put)('board/origin'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [assignment_dto_1.SetBoardOriginDto]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "setBoardOrigin", null);
+__decorate([
+    (0, common_1.Post)('board/dispatch-all'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "dispatchAllBoard", null);
+__decorate([
+    (0, common_1.Get)('my-assignments'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "findMyAssignments", null);
+__decorate([
+    (0, common_1.Get)('my-calendar'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('year')),
+    __param(2, (0, common_1.Query)('month')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "findMyCalendar", null);
+__decorate([
+    (0, common_1.Get)('my-payments'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('startDate')),
+    __param(2, (0, common_1.Query)('endDate')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "findMyPayments", null);
+__decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('assignment.read'),
     __param(0, (0, common_1.Param)('id')),
@@ -81,8 +151,9 @@ __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('assignment.create'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [assignment_dto_1.CreateAssignmentDto]),
+    __metadata("design:paramtypes", [assignment_dto_1.CreateAssignmentDto, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "create", null);
 __decorate([
@@ -103,6 +174,25 @@ __decorate([
     __metadata("design:paramtypes", [String, assignment_dto_1.UpdateAssignmentStatusDto]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "updateStatus", null);
+__decorate([
+    (0, common_1.Post)(':id/bookings/reorder'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, assignment_dto_1.ReorderBookingsDto]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "reorderBookings", null);
+__decorate([
+    (0, common_1.Put)(':id/bookings/:bookingId/move'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('bookingId')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, assignment_dto_1.MoveBookingDto]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "moveBooking", null);
 __decorate([
     (0, common_1.Post)(':id/bookings'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),
@@ -129,6 +219,36 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Post)(':id/tour-report'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, assignment_dto_1.SubmitTourReportDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "submitTourReport", null);
+__decorate([
+    (0, common_1.Put)(':id/tour-report/verify'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, assignment_dto_1.VerifyTourReportDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "verifyTourReport", null);
+__decorate([
+    (0, common_1.Put)(':id/finalize'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, assignment_dto_1.FinalizeAssignmentDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "finalize", null);
 exports.AssignmentsController = AssignmentsController = __decorate([
     (0, common_1.Controller)('assignments'),
     __metadata("design:paramtypes", [assignments_service_1.AssignmentsService])

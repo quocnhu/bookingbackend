@@ -11,6 +11,37 @@ const UPLOADS_ROOT = path.join(process.cwd(), 'uploads');
 const GALLERY_SHOTS = 3;
 
 /**
+ * Generate a local thumbnail image for a tour and return the public URL.
+ * Stored at uploads/tours/{tourId}/thumbnail.webp, served by backend at /uploads.
+ */
+async function seedThumbnail(tourId: string, code: string, name: string, accent: { from: string; to: string }): Promise<string> {
+  const folder = path.join(UPLOADS_ROOT, 'tours', tourId);
+  await fs.promises.mkdir(folder, { recursive: true });
+  const escapeXml = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  const svg =
+    `<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0%" stop-color="${accent.from}"/><stop offset="100%" stop-color="${accent.to}"/>` +
+    `</linearGradient></defs>` +
+    `<rect width="800" height="600" fill="url(#g)"/>` +
+    `<circle cx="680" cy="120" r="140" fill="rgba(255,255,255,0.10)"/>` +
+    `<circle cx="120" cy="500" r="180" fill="rgba(255,255,255,0.08)"/>` +
+    `<text x="400" y="280" font-family="Arial, sans-serif" font-size="48" font-weight="700" fill="#ffffff" text-anchor="middle">${escapeXml(code)}</text>` +
+    `<text x="400" y="340" font-family="Arial, sans-serif" font-size="22" fill="rgba(255,255,255,0.9)" text-anchor="middle">${escapeXml(name)}</text>` +
+    `</svg>`;
+  const file = path.join(folder, 'thumbnail.webp');
+  await sharp(Buffer.from(svg)).resize(800, 600).webp({ quality: 85 }).toFile(file);
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+  return `${backendUrl}/uploads/tours/${tourId}/thumbnail.webp`;
+}
+
+/**
  * Folder-based gallery: ghi các ảnh placeholder cục bộ vào thư mục ảnh của tour
  * (uploads/tours/{tourId}/gallery). Không cần bản ghi DB — frontend đọc thẳng folder.
  */
@@ -55,6 +86,8 @@ const DEFAULT_PERMISSIONS: Array<{ code: string; name: string; group: string }> 
   { code: 'settlement.update', name: 'Sửa settlement', group: 'Settlement' },
   { code: 'settlement.approve', name: 'Duyệt settlement', group: 'Settlement' },
   { code: 'settlement.delete', name: 'Xoá settlement', group: 'Settlement' },
+  { code: 'company.read', name: 'Xem hồ sơ công ty', group: 'Company' },
+  { code: 'company.update', name: 'Cập nhật hồ sơ công ty', group: 'Company' },
   { code: 'tour.create', name: 'Tạo tour', group: 'Tour' },
   { code: 'tour.update', name: 'Sửa tour', group: 'Tour' },
   { code: 'tour.delete', name: 'Xoá tour', group: 'Tour' },
@@ -67,13 +100,25 @@ const DEFAULT_PERMISSIONS: Array<{ code: string; name: string; group: string }> 
   { code: 'role.manage', name: 'Quản lý role/permission', group: 'System' },
   { code: 'audit.read', name: 'Xem audit log', group: 'System' },
   { code: 'auth.read', name: 'Xem lịch sử đăng nhập', group: 'System' },
+  { code: 'coordinate.create', name: 'Tạo coordinate', group: 'Coordinate' },
+  { code: 'coordinate.update', name: 'Sửa coordinate', group: 'Coordinate' },
+  { code: 'coordinate.delete', name: 'Xoá coordinate', group: 'Coordinate' },
+  { code: 'route-price.create', name: 'Tạo route price', group: 'Route Price' },
+  { code: 'route-price.update', name: 'Sửa route price', group: 'Route Price' },
+  { code: 'route-price.delete', name: 'Xoá route price', group: 'Route Price' },
+  { code: 'vehicle.create', name: 'Tạo xe (provider)', group: 'Vehicle' },
+  { code: 'vehicle.update', name: 'Sửa xe (provider)', group: 'Vehicle' },
+  { code: 'vehicle.delete', name: 'Xoá xe (provider)', group: 'Vehicle' },
+  { code: 'provider.create', name: 'Tạo transportation provider', group: 'Provider' },
+  { code: 'provider-driver.assign', name: 'Gán tài xế vào provider', group: 'Provider Driver' },
+  { code: 'provider-driver.unassign', name: 'Gỡ tài xế khỏi provider', group: 'Provider Driver' },
 ];
 
 interface TourSeed {
   code: string;
   name: string;
   type: TourType;
-  thumbnailUrl?: string;
+  accent: { from: string; to: string };
   adultPrice: number;
   childPrice: number;
   infantPrice: number;
@@ -132,8 +177,8 @@ const VIETNAM_TOURS: TourSeed[] = [
   {
     code: 'TOUR-0001',
     name: 'Ha Noi City Heritage Half Day',
-    thumbnailUrl: 'https://picsum.photos/seed/hanoi-oldquarter/800/600',
     type: TourType.PRIVATE_TOUR,
+    accent: { from: '#e74c3c', to: '#f39c12' },
     durationDays: 1,
     adultPrice: 49,
     childPrice: 25,
@@ -210,8 +255,8 @@ const VIETNAM_TOURS: TourSeed[] = [
   {
     code: 'TOUR-0002',
     name: 'Ha Long Bay Full Day Cruise',
-    thumbnailUrl: 'https://picsum.photos/seed/halong-bay/800/600',
     type: TourType.GROUP_TOUR,
+    accent: { from: '#0ea5e9', to: '#06b6d4' },
     durationDays: 1,
     adultPrice: 79,
     childPrice: 40,
@@ -288,8 +333,8 @@ const VIETNAM_TOURS: TourSeed[] = [
   {
     code: 'TOUR-0003',
     name: 'Ninh Binh Countryside Day Trip',
-    thumbnailUrl: 'https://picsum.photos/seed/ninhbinh-tamcoc/800/600',
     type: TourType.GROUP_TOUR,
+    accent: { from: '#22c55e', to: '#16a34a' },
     durationDays: 2,
     adultPrice: 59,
     childPrice: 30,
@@ -384,8 +429,8 @@ const VIETNAM_TOURS: TourSeed[] = [
   {
     code: 'TOUR-0004',
     name: 'Hoi An Ancient Town & Lantern Night',
-    thumbnailUrl: 'https://picsum.photos/seed/hoian-lantern/800/600',
     type: TourType.PRIVATE_TOUR,
+    accent: { from: '#a855f7', to: '#ec4899' },
     durationDays: 1,
     adultPrice: 39,
     childPrice: 20,
@@ -451,8 +496,8 @@ const VIETNAM_TOURS: TourSeed[] = [
   {
     code: 'TOUR-0005',
     name: 'Da Nang & Ba Na Hills Golden Bridge',
-    thumbnailUrl: 'https://picsum.photos/seed/danang-goldenbridge/800/600',
     type: TourType.GROUP_TOUR,
+    accent: { from: '#f59e0b', to: '#ef4444' },
     durationDays: 2,
     adultPrice: 69,
     childPrice: 35,
@@ -547,8 +592,8 @@ const VIETNAM_TOURS: TourSeed[] = [
   {
     code: 'TOUR-0006',
     name: 'Ho Chi Minh City & Cu Chi Tunnels',
-    thumbnailUrl: 'https://picsum.photos/seed/hcmc-cuchi/800/600',
     type: TourType.GROUP_TOUR,
+    accent: { from: '#6366f1', to: '#8b5cf6' },
     durationDays: 3,
     adultPrice: 45,
     childPrice: 23,
@@ -685,7 +730,8 @@ async function main() {
           'assignment.read',
           'assignment.create',
           'assignment.update',
-          'settlement.read',
+'settlement.read',
+          'company.read',
           'tour.update',
           'tour.itinerary.edit',
         ]
@@ -720,6 +766,22 @@ async function main() {
   }
   console.log(`✅ Seeded admin user: ${adminEmail} (password: admin123)`);
 
+  // 4.5 Hồ sơ công ty (bảng singleton — chỉ có 1 dòng cho phiếu quyết toán)
+  await prisma.companyProfile.upsert({
+    where: { id: 'default-company' },
+    update: {},
+    create: {
+      id: 'default-company',
+      name: 'SunShine Travel & Transportation Co., Ltd.',
+      address: '88 Bach Dang Street, Hai Chau District, Da Nang, Vietnam',
+      phone: '+84 236 3888 999',
+      email: 'hello@sunshine-travel.vn',
+      taxId: '0317412086',
+      website: 'https://sunshine-travel.vn',
+    },
+  });
+  console.log(`✅ Seeded company profile`);
+
   // 5. Vietnam tours with structured itineraries (idempotent by code)
   for (const t of VIETNAM_TOURS) {
     const tour = await prisma.tour.upsert({
@@ -727,7 +789,6 @@ async function main() {
       update: {
         name: t.name,
         type: t.type,
-        thumbnailUrl: t.thumbnailUrl ?? null,
         adultPrice: t.adultPrice,
         childPrice: t.childPrice,
         infantPrice: t.infantPrice,
@@ -747,7 +808,6 @@ async function main() {
         code: t.code,
         name: t.name,
         type: t.type,
-        thumbnailUrl: t.thumbnailUrl ?? null,
         adultPrice: t.adultPrice,
         childPrice: t.childPrice,
         infantPrice: t.infantPrice,
@@ -764,6 +824,10 @@ async function main() {
         mapQuery: t.mapQuery ?? null,
       },
     });
+
+    const thumbnailUrl = await seedThumbnail(tour.id, t.code, t.name, t.accent);
+    await prisma.tour.update({ where: { id: tour.id }, data: { thumbnailUrl } });
+
     await prisma.tourItinerary.deleteMany({ where: { tourId: tour.id } });
     if (t.itineraries.length > 0) {
       await prisma.tourItinerary.createMany({

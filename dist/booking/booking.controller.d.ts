@@ -59,11 +59,13 @@ export declare class BookingController {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        assignmentId: string | null;
         rawDataId: string | null;
+        assignmentId: string | null;
         paxSequence: number;
+        movedFromBusId: string | null;
+        createdWho: string | null;
     }>;
-    create(dto: CreateBookingDto): Promise<{
+    create(dto: CreateBookingDto, actor: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -88,9 +90,11 @@ export declare class BookingController {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        assignmentId: string | null;
         rawDataId: string | null;
+        assignmentId: string | null;
         paxSequence: number;
+        movedFromBusId: string | null;
+        createdWho: string | null;
     }>;
     update(id: string, dto: UpdateBookingDto): Promise<{
         id: string;
@@ -117,9 +121,11 @@ export declare class BookingController {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        assignmentId: string | null;
         rawDataId: string | null;
+        assignmentId: string | null;
         paxSequence: number;
+        movedFromBusId: string | null;
+        createdWho: string | null;
     }>;
     remove(id: string): Promise<{
         message: string;

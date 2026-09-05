@@ -63,6 +63,11 @@ export class ParsingProcessor extends WorkerHost {
       return { status: 'parse_failed', reason: validation.errors.join('; ') };
     }
 
+    // Parser có thể làm giàu payload.booking — lưu lại để rawData giữ dữ liệu đầy đủ.
+    if (payload.booking !== undefined) {
+      await this.rawDataService.updatePayload(rawDataId, payload);
+    }
+
     const booking = await this.bookingService.upsert(
       validation.data!,
       rawDataId,

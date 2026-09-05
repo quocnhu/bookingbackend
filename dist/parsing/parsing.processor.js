@@ -58,6 +58,9 @@ let ParsingProcessor = ParsingProcessor_1 = class ParsingProcessor extends bullm
             await this.rawDataService.markParseFailed(rawDataId, validation.errors.join('; '));
             return { status: 'parse_failed', reason: validation.errors.join('; ') };
         }
+        if (payload.booking !== undefined) {
+            await this.rawDataService.updatePayload(rawDataId, payload);
+        }
         const booking = await this.bookingService.upsert(validation.data, rawDataId);
         await this.rawDataService.markParsed(rawDataId, booking.id);
         this.logger.log(`Parsed rawData ${rawDataId} (${parser.templateTag}) -> booking ${booking.bookingRef}`);

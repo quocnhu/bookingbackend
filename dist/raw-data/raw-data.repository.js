@@ -41,6 +41,12 @@ let RawDataRepository = class RawDataRepository {
             data: { status, ...extra },
         });
     }
+    updatePayload(id, payload) {
+        return this.prisma.rawData.update({
+            where: { id },
+            data: { payload },
+        });
+    }
     markParsed(id, bookingId) {
         return this.prisma.rawData.update({
             where: { id },

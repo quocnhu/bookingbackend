@@ -29,8 +29,8 @@ let BookingController = class BookingController {
     findOne(id) {
         return this.bookingService.findOne(id);
     }
-    create(dto) {
-        return this.bookingService.create(dto);
+    create(dto, actor) {
+        return this.bookingService.create(dto, actor);
     }
     update(id, dto) {
         return this.bookingService.update(id, dto);
@@ -61,8 +61,9 @@ __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('booking.create'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [booking_dto_1.CreateBookingDto]),
+    __metadata("design:paramtypes", [booking_dto_1.CreateBookingDto, Object]),
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "create", null);
 __decorate([

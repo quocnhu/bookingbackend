@@ -1,98 +1,84 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
-import { PayeeType, SettlementStatus } from '@prisma/client';
+import { FeeFlowType } from '@prisma/client';
 
 export class CreateSettlementDto {
-  @IsString()
-  assignmentId: string;
-
-  @IsEnum(PayeeType)
-  payeeType: PayeeType;
-
-  @IsOptional()
-  @IsString()
-  providerId?: string;
-
-  @IsOptional()
-  @IsString()
-  userId?: string;
-
-  @Type(() => Number)
-  @IsNumber()
-  baseAmount: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  allowance?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  deduction?: number;
-
-  @IsOptional()
-  @IsString()
-  periodName?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  expenseItems?: ExpenseItemDto[];
-}
-
-export class ExpenseItemDto {
-  @IsString()
-  category: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
   @Type(() => Number)
   @IsNumber()
   amount: number;
 
   @IsOptional()
   @IsString()
-  receiptUrl?: string;
+  note?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  customCategoryName?: string;
+
+  // Lớp 1: tùy chọn gắn theo Booking
+  @IsOptional()
+  @IsUUID()
+  bookingId?: string;
+
+  // Lớp 2: tùy chọn gắn theo Assignment
+  @IsOptional()
+  @IsUUID()
+  assignmentId?: string;
+}
+
+export class CreateSettlementCategoryDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  code: string;
+
+  @IsIn(['COLLECT_MONEY', 'PAY_MONEY'])
+  flowType: FeeFlowType;
 }
 
 export class UpdateSettlementDto {
   @IsOptional()
-  @IsEnum(SettlementStatus)
-  status?: SettlementStatus;
-
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  allowance?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  deduction?: number;
+  amount?: number;
 
   @IsOptional()
   @IsString()
-  periodName?: string;
+  note?: string;
 
   @IsOptional()
   @IsString()
-  notes?: string;
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  customCategoryName?: string;
 }
 
 export class QuerySettlementDto extends PaginationDto {
   @IsOptional()
-  @IsEnum(SettlementStatus)
-  status?: SettlementStatus;
+  @IsUUID()
+  bookingId?: string;
 
   @IsOptional()
-  @IsEnum(PayeeType)
-  payeeType?: PayeeType;
+  @IsUUID()
+  assignmentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }

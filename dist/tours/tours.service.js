@@ -47,7 +47,6 @@ let ToursService = class ToursService {
         const [items, total] = await Promise.all([
             this.prisma.tour.findMany({
                 where,
-                include: { _count: { select: { bookings: true } } },
                 orderBy: { name: 'asc' },
                 skip: (page - 1) * limit,
                 take: limit,
@@ -62,7 +61,6 @@ let ToursService = class ToursService {
             include: {
                 itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
                 prices: { include: { provider: true } },
-                _count: { select: { bookings: true } },
             },
         });
         if (!tour)

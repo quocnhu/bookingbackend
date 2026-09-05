@@ -63,7 +63,7 @@ let DashboardService = class DashboardService {
             this.prisma.assignment.count({
                 where: { status: client_1.AssignmentStatus.DISPATCHED, startDate: { gte: todayStart, lte: todayEnd } },
             }),
-            this.prisma.settlement.count({ where: { status: client_1.SettlementStatus.PENDING } }),
+            this.prisma.assignment.count({ where: { status: client_1.AssignmentStatus.VERIFYING } }),
             this.prisma.tour.count(),
             this.prisma.user.count(),
             this.prisma.role.count(),
@@ -94,14 +94,14 @@ let DashboardService = class DashboardService {
         };
     }
     async sumSettlementRevenue(from, to) {
-        const agg = await this.prisma.settlement.aggregate({
-            _sum: { finalAmount: true },
+        const rows = await this.prisma.settlement.findMany({
             where: {
                 createdAt: { gte: from, lte: to },
-                status: { in: [client_1.SettlementStatus.APPROVED, client_1.SettlementStatus.PAID] },
+                category: { is: { flowType: client_1.FeeFlowType.COLLECT_MONEY } },
             },
+            select: { amount: true },
         });
-        return Number(agg._sum.finalAmount ?? 0);
+        return rows.reduce((sum, s) => sum + Number(s.amount ?? 0), 0);
     }
     async charts(range) {
         const buckets = this.buildBuckets(range);
@@ -111,9 +111,9 @@ let DashboardService = class DashboardService {
             this.prisma.settlement.findMany({
                 where: {
                     createdAt: { gte: new Date(startTime), lte: new Date(endTime) },
-                    status: { in: [client_1.SettlementStatus.APPROVED, client_1.SettlementStatus.PAID] },
+                    category: { is: { flowType: client_1.FeeFlowType.COLLECT_MONEY } },
                 },
-                select: { finalAmount: true, createdAt: true, status: true },
+                select: { amount: true, createdAt: true },
             }),
             this.prisma.booking.findMany({
                 where: { createdAt: { gte: new Date(startTime), lte: new Date(endTime) } },
@@ -133,9 +133,8 @@ let DashboardService = class DashboardService {
             let collected = 0;
             for (const s of settlements) {
                 if (this.bucketIndex(buckets, s.createdAt.getTime()) === buckets.indexOf(b)) {
-                    revenue += Number(s.finalAmount);
-                    if (s.status === client_1.SettlementStatus.PAID)
-                        collected += Number(s.finalAmount);
+                    revenue += Number(s.amount ?? 0);
+                    collected += Number(s.amount ?? 0);
                 }
             }
             return { label: b.label, revenue, collected };

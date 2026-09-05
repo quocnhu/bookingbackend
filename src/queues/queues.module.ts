@@ -2,14 +2,15 @@ import { Global, Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { AuditModule } from '@/audit/audit.module';
-import { AssignmentProcessor } from './assignment.processor';
-import { ASSIGNMENT_QUEUE, BOOKING_MANUAL_QUEUE } from './queue.constants';
+import { AssignmentBoardService } from './assignment-board.service';
+import { BOOKING_MANUAL_QUEUE } from './queue.constants';
 import { PARSE_QUEUE } from '@/parsing/parsing.queue';
 
 /**
  * Module @Global đăng ký BullMQ root + tất cả queue dùng chung:
- * assignment (tự xếp xe), booking-manual (tạo thủ công), parse (Stage 2).
+ * booking-manual (tạo thủ công), parse (Stage 2).
  * Processor của parse nằm ở parsing/parsing.processor.ts.
+ * Assignment queue + Auto-assign engine đã được gỡ — xếp chuyến giờ chỉ bằng tay.
  */
 @Global()
 @Module({
@@ -30,12 +31,11 @@ import { PARSE_QUEUE } from '@/parsing/parsing.queue';
       }),
     }),
     BullModule.registerQueue(
-      { name: ASSIGNMENT_QUEUE },
       { name: BOOKING_MANUAL_QUEUE },
       { name: PARSE_QUEUE },
     ),
   ],
-  providers: [AssignmentProcessor],
-  exports: [BullModule],
+  providers: [AssignmentBoardService],
+  exports: [BullModule, AssignmentBoardService],
 })
 export class QueuesModule {}

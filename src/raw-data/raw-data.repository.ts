@@ -48,6 +48,14 @@ export class RawDataRepository {
     });
   }
 
+  /** Cập nhật payload đã được parser làm giàu (vd payload.booking). */
+  updatePayload(id: string, payload: Prisma.InputJsonValue) {
+    return this.prisma.rawData.update({
+      where: { id },
+      data: { payload },
+    });
+  }
+
   /** Nối rawData → booking sau khi parse thành công (giúp replay được). */
   markParsed(id: string, bookingId: string) {
     return this.prisma.rawData.update({

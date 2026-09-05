@@ -1,12 +1,25 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
-import { AssignmentStatus } from '@prisma/client';
+import { AssignmentOrigin, AssignmentStatus, TourReportStatus } from '@prisma/client';
 
 export class CreateAssignmentDto {
   @IsOptional()
   @IsString()
   code?: string;
+
+  @IsOptional()
+  @IsString()
+  tourName?: string;
 
   @IsString()
   startDate: string | Date;
@@ -54,6 +67,10 @@ export class UpdateAssignmentDto {
   code?: string;
 
   @IsOptional()
+  @IsString()
+  tourName?: string;
+
+  @IsOptional()
   startDate?: string | Date;
 
   @IsOptional()
@@ -98,10 +115,29 @@ export class UpdateAssignmentStatusDto {
   status: AssignmentStatus;
 }
 
+/** Bật/tắt nguồn tạo cho toàn bộ assignment trên Dispatch Board (Manual / Auto). */
+export class SetBoardOriginDto {
+  @IsEnum(AssignmentOrigin)
+  origin: AssignmentOrigin;
+}
+
 export class AssignBookingsDto {
   @IsArray()
   @IsString({ each: true })
   bookingIds: string[];
+}
+
+/** Xếp lại thứ tự khách trong 1 bus (drag-and-drop, bookingflow.md bước 3). */
+export class ReorderBookingsDto {
+  @IsArray()
+  @IsString({ each: true })
+  bookingIds: string[];
+}
+
+/** Di chuyển booking sang bus khác (drag-and-drop). */
+export class MoveBookingDto {
+  @IsString()
+  toAssignmentId: string;
 }
 
 export class QueryAssignmentDto extends PaginationDto {
@@ -124,4 +160,70 @@ export class QueryAssignmentDto extends PaginationDto {
   @IsOptional()
   @IsString()
   guideId?: string;
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
+}
+
+export class SubmitTourReportDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  actualPax?: number;
+
+  @IsOptional()
+  @IsString()
+  pickupNotes?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  distanceKm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  fuelCost?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  tollParking?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class VerifyTourReportDto {
+  @IsIn(['VERIFIED', 'REJECTED'])
+  status: 'VERIFIED' | 'REJECTED';
+
+  @IsOptional()
+  @IsString()
+  verificationNotes?: string;
+}
+
+export class FinalizeServiceDto {
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsString()
+  name: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  amount: number;
+}
+
+export class FinalizeAssignmentDto {
+  @Type(() => Number)
+  @IsNumber()
+  collectedAmount: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FinalizeServiceDto)
+  services?: FinalizeServiceDto[];
 }
