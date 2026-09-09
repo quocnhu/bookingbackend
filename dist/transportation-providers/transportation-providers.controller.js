@@ -25,9 +25,6 @@ let TransportationProvidersController = class TransportationProvidersController 
     findAll() {
         return this.transportationProvidersService.findAll();
     }
-    createProvider(dto) {
-        return this.transportationProvidersService.createProvider(dto);
-    }
     findAllDrivers() {
         return this.transportationProvidersService.findAllDrivers();
     }
@@ -57,14 +54,6 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], TransportationProvidersController.prototype, "findAll", null);
-__decorate([
-    (0, common_1.Post)(),
-    (0, permissions_decorator_1.Permissions)('provider.create'),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [transportation_provider_dto_1.CreateTransportationProviderDto]),
-    __metadata("design:returntype", void 0)
-], TransportationProvidersController.prototype, "createProvider", null);
 __decorate([
     (0, common_1.Get)('drivers'),
     __metadata("design:type", Function),

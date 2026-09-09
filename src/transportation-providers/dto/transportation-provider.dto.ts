@@ -1,18 +1,6 @@
 import { IsInt, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class CreateTransportationProviderDto {
-  @IsString()
-  name: string;
-
-  @IsString()
-  email: string;
-
-  @IsOptional()
-  @IsString()
-  password?: string;
-}
-
 export class CreateTransportationVehicleDto {
   @IsString()
   providerId: string;

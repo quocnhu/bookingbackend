@@ -99,10 +99,6 @@ export class UpdateUserRoleDto {
 
 export class QueryUserDto extends PaginationDto {
   @IsOptional()
-  @IsString()
-  q?: string;
-
-  @IsOptional()
   @IsEnum(RoleType)
   role?: RoleType;
 

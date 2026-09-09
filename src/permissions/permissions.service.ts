@@ -8,13 +8,8 @@ export class PermissionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: QueryPermissionDto): Promise<PaginatedResult<any>> {
-    const { page, limit, q } = query;
-    const where = q
-      ? { OR: [
-          { code: { contains: q, mode: 'insensitive' as const } },
-          { name: { contains: q, mode: 'insensitive' as const } },
-        ] }
-      : {};
+    const { page, limit } = query;
+    const where = {};
     const [items, total] = await Promise.all([
       this.prisma.permission.findMany({
         where,

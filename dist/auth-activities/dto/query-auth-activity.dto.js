@@ -13,18 +13,12 @@ exports.QueryAuthActivityDto = void 0;
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 class QueryAuthActivityDto extends pagination_dto_1.PaginationDto {
-    q;
     eventType;
     userId;
     from;
     to;
 }
 exports.QueryAuthActivityDto = QueryAuthActivityDto;
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryAuthActivityDto.prototype, "q", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

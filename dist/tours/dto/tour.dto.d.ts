@@ -13,6 +13,14 @@ export declare class CreateTourDto {
     discountPercent?: number;
     promotionStartsAt?: string;
     promotionEndsAt?: string;
+    typePrices?: TourTypePriceDto[];
+}
+export declare class TourTypePriceDto {
+    type: TourType;
+    adultPrice?: number;
+    childPrice?: number;
+    infantPrice?: number;
+    currency?: string;
 }
 export declare class UpdateTourDto {
     name?: string;
@@ -37,6 +45,7 @@ export declare class UpdateTourDto {
     discountPercent?: number;
     promotionStartsAt?: string;
     promotionEndsAt?: string;
+    typePrices?: TourTypePriceDto[];
 }
 export declare class ItineraryItemDto {
     id?: string;
@@ -56,6 +65,5 @@ export declare class ReorderGalleryDto {
     files: string[];
 }
 export declare class QueryTourDto extends PaginationDto {
-    q?: string;
     type?: TourType;
 }

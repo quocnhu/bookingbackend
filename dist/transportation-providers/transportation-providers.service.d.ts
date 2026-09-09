@@ -1,6 +1,6 @@
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
-import { AssignDriverToProviderDto, CreateTransportationProviderDto, CreateTransportationVehicleDto, UpdateTransportationVehicleDto } from './dto/transportation-provider.dto';
+import { AssignDriverToProviderDto, CreateTransportationVehicleDto, UpdateTransportationVehicleDto } from './dto/transportation-provider.dto';
 export declare class TransportationProvidersService {
     private readonly prisma;
     private readonly auditService;
@@ -40,21 +40,6 @@ export declare class TransportationProvidersService {
         providerId: string | null;
     }[]>;
     private ensureProviderOrFail;
-    createProvider(dto: CreateTransportationProviderDto): Promise<{
-        provider: {
-            id: string;
-            name: string;
-        };
-        user: {
-            role: import("@prisma/client").$Enums.RoleType;
-            id: string;
-            name: string | null;
-            email: string;
-            isActive: boolean;
-            providerId: string | null;
-        };
-        defaultPassword: string | undefined;
-    }>;
     createVehicle(dto: CreateTransportationVehicleDto): Promise<{
         id: string;
         providerId: string;

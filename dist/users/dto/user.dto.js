@@ -137,17 +137,11 @@ __decorate([
     __metadata("design:type", Array)
 ], UpdateUserRoleDto.prototype, "permissionIds", void 0);
 class QueryUserDto extends pagination_dto_1.PaginationDto {
-    q;
     role;
     userType;
     isActive;
 }
 exports.QueryUserDto = QueryUserDto;
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryUserDto.prototype, "q", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.RoleType),

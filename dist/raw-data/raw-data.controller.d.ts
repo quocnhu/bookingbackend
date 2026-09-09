@@ -4,7 +4,7 @@ export declare class RawDataController {
     private readonly prisma;
     private readonly service;
     constructor(prisma: PrismaService, service: RawDataService);
-    list(status?: string, templateTag?: string, q?: string, page?: string, limit?: string): Promise<{
+    list(status?: string, templateTag?: string, page?: string, limit?: string): Promise<{
         total: number;
         page: number;
         limit: number;

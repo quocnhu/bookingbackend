@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QueryTourDto = exports.ReorderGalleryDto = exports.UpdateItineraryDto = exports.ItineraryItemDto = exports.UpdateTourDto = exports.CreateTourDto = void 0;
+exports.QueryTourDto = exports.ReorderGalleryDto = exports.UpdateItineraryDto = exports.ItineraryItemDto = exports.UpdateTourDto = exports.TourTypePriceDto = exports.CreateTourDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
@@ -27,6 +27,7 @@ class CreateTourDto {
     discountPercent;
     promotionStartsAt;
     promotionEndsAt;
+    typePrices;
 }
 exports.CreateTourDto = CreateTourDto;
 __decorate([
@@ -95,6 +96,48 @@ __decorate([
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], CreateTourDto.prototype, "promotionEndsAt", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => TourTypePriceDto),
+    __metadata("design:type", Array)
+], CreateTourDto.prototype, "typePrices", void 0);
+class TourTypePriceDto {
+    type;
+    adultPrice;
+    childPrice;
+    infantPrice;
+    currency;
+}
+exports.TourTypePriceDto = TourTypePriceDto;
+__decorate([
+    (0, class_validator_1.IsEnum)(client_1.TourType),
+    __metadata("design:type", String)
+], TourTypePriceDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], TourTypePriceDto.prototype, "adultPrice", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], TourTypePriceDto.prototype, "childPrice", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], TourTypePriceDto.prototype, "infantPrice", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], TourTypePriceDto.prototype, "currency", void 0);
 class UpdateTourDto {
     name;
     code;
@@ -118,6 +161,7 @@ class UpdateTourDto {
     discountPercent;
     promotionStartsAt;
     promotionEndsAt;
+    typePrices;
 }
 exports.UpdateTourDto = UpdateTourDto;
 __decorate([
@@ -238,6 +282,13 @@ __decorate([
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], UpdateTourDto.prototype, "promotionEndsAt", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => TourTypePriceDto),
+    __metadata("design:type", Array)
+], UpdateTourDto.prototype, "typePrices", void 0);
 class ItineraryItemDto {
     id;
     dayNumber;
@@ -314,15 +365,9 @@ __decorate([
     __metadata("design:type", Array)
 ], ReorderGalleryDto.prototype, "files", void 0);
 class QueryTourDto extends pagination_dto_1.PaginationDto {
-    q;
     type;
 }
 exports.QueryTourDto = QueryTourDto;
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryTourDto.prototype, "q", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.TourType),

@@ -23,8 +23,4 @@ export class UpdatePermissionDto {
   group?: string;
 }
 
-export class QueryPermissionDto extends PaginationDto {
-  @IsOptional()
-  @IsString()
-  q?: string;
-}
+export class QueryPermissionDto extends PaginationDto {}

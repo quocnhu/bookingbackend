@@ -141,19 +141,8 @@ let AssignmentsService = class AssignmentsService {
         return { ...a, totalPax, tourType: type, tourName, durationDays, pickups };
     }
     async findAll(query, actor) {
-        const { page, limit, q, status, vehicleId, driverId, guideId, sortOrder } = query;
+        const { page, limit, status, vehicleId, driverId, guideId, sortOrder } = query;
         const where = {};
-        if (q) {
-            where.OR = [
-                { code: { contains: q, mode: 'insensitive' } },
-                { vehicle: { is: { plateNumber: { contains: q, mode: 'insensitive' } } } },
-                { driver: { is: { name: { contains: q, mode: 'insensitive' } } } },
-                { guide: { is: { name: { contains: q, mode: 'insensitive' } } } },
-                { provider: { is: { name: { contains: q, mode: 'insensitive' } } } },
-                { tourName: { contains: q, mode: 'insensitive' } },
-                { bookings: { some: { customerName: { contains: q, mode: 'insensitive' } } } },
-            ];
-        }
         if (status)
             where.status = status;
         if (vehicleId)
@@ -396,7 +385,11 @@ let AssignmentsService = class AssignmentsService {
         });
         await this.prisma.$transaction(dto.bookingIds.map((bookingId, i) => this.prisma.booking.update({
             where: { id: bookingId },
-            data: { assignmentId: id, paxSequence: (maxSeq._max.paxSequence ?? 0) + i + 1 },
+            data: {
+                assignmentId: id,
+                paxSequence: (maxSeq._max.paxSequence ?? 0) + i + 1,
+                status: client_1.BookingStatus.ASSIGNED,
+            },
         })));
         await this.refreshSummary(id);
         await this.auditService.log({
@@ -415,7 +408,7 @@ let AssignmentsService = class AssignmentsService {
         }
         await this.prisma.booking.update({
             where: { id: bookingId },
-            data: { assignmentId: null, paxSequence: 0 },
+            data: { assignmentId: null, paxSequence: 0, status: client_1.BookingStatus.PENDING },
         });
         await this.refreshSummary(id);
         return this.findOne(id);
@@ -849,6 +842,101 @@ let AssignmentsService = class AssignmentsService {
             lines,
         };
     }
+    async settlementSummary(from, to, guideId, driverId) {
+        const gte = new Date(from);
+        const lte = new Date(to);
+        if (Number.isNaN(gte.getTime()) || Number.isNaN(lte.getTime()) || gte > lte) {
+            throw new common_1.BadRequestException('Invalid settlement date range');
+        }
+        const where = {
+            tourReport: { is: { finalizedAt: { gte, lte } } },
+        };
+        if (guideId)
+            where.guideId = guideId;
+        if (driverId)
+            where.driverId = driverId;
+        const assignments = await this.prisma.assignment.findMany({
+            where,
+            include: {
+                vehicle: { select: { plateNumber: true } },
+                driver: { select: { id: true, name: true, email: true } },
+                guide: { select: { id: true, name: true, email: true } },
+                tourReport: true,
+                bookings: {
+                    select: {
+                        tourName: true,
+                        tour: {
+                            select: {
+                                name: true,
+                                itineraries: {
+                                    orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }],
+                                    select: { dayNumber: true, title: true, location: true },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: { startDate: 'asc' },
+        });
+        const toNumber = (v) => Number(v ?? 0);
+        const netOf = (a) => toNumber(a.tourReport?.netAmount);
+        const collect = assignments.filter((a) => a.tourReport?.settlementFlow === client_1.FeeFlowType.COLLECT_MONEY);
+        const pay = assignments.filter((a) => a.tourReport?.settlementFlow === client_1.FeeFlowType.PAY_MONEY);
+        const lines = assignments.map((a) => {
+            const places = [];
+            const seen = new Set();
+            for (const b of a.bookings) {
+                for (const it of b.tour?.itineraries ?? []) {
+                    const label = it.location && it.location !== '' ? it.location : it.title;
+                    if (label && !seen.has(`${label}#${it.dayNumber}`)) {
+                        seen.add(`${label}#${it.dayNumber}`);
+                        places.push(it.dayNumber > 1 ? `Day ${it.dayNumber}: ${label}` : label);
+                    }
+                }
+            }
+            return {
+                id: a.id,
+                code: a.code ?? '—',
+                tourName: a.tourName ??
+                    a.bookings.find((b) => b.tourName)?.tourName ??
+                    (a.bookings.find((b) => b.tour)?.tour?.name ?? null),
+                vehiclePlate: a.vehicle?.plateNumber ?? null,
+                guide: a.guide?.name ?? null,
+                driver: a.driver?.name ?? null,
+                startDate: a.startDate,
+                endDate: a.endDate,
+                collectedAmount: toNumber(a.tourReport?.collectedAmount),
+                servicesTotal: toNumber(a.tourReport?.servicesTotal),
+                netAmount: netOf(a),
+                settlementFlow: a.tourReport?.settlementFlow ?? null,
+                places,
+            };
+        });
+        return {
+            from,
+            to,
+            guideId,
+            driverId,
+            guideName: guideId
+                ? (assignments.map((a) => a.guide?.name).find(Boolean) ?? null)
+                : null,
+            driverName: driverId
+                ? (assignments.map((a) => a.driver?.name).find(Boolean) ?? null)
+                : null,
+            summary: {
+                guideReturnsToCompany: {
+                    count: collect.length,
+                    total: collect.reduce((sum, a) => sum + netOf(a), 0),
+                },
+                companyReturnsToGuide: {
+                    count: pay.length,
+                    total: pay.reduce((sum, a) => sum + netOf(a), 0),
+                },
+            },
+            lines,
+        };
+    }
     async findMyFleet(actor, startDate, endDate) {
         if (!actor.providerId) {
             return { providerId: null, items: [] };
@@ -892,7 +980,7 @@ let AssignmentsService = class AssignmentsService {
         await this.findOne(id);
         await this.prisma.booking.updateMany({
             where: { assignmentId: id },
-            data: { assignmentId: null, paxSequence: 0 },
+            data: { assignmentId: null, paxSequence: 0, status: client_1.BookingStatus.PENDING },
         });
         await this.prisma.assignment.delete({ where: { id } });
         await this.auditService.log({ entityType: 'Assignment', entityId: id, action: 'DELETE' });

@@ -287,8 +287,25 @@ model Tour {
   itineraries TourItinerary[]
   gallery     TourGallery[]
   departures  TourDeparture[]
+  typePrices  TourTypePrice[]
   prices      RoutePrice[]
   bookings    Booking[]
+}
+
+model TourTypePrice {
+  id         String   @id @default(uuid())
+  tourId     String
+  tour       Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  type       TourType // PRIVATE_TOUR / GROUP_TOUR
+  adultPrice Decimal  @default(0)
+  childPrice Decimal  @default(0)
+  infantPrice Decimal @default(0)
+  currency   String   @default("USD")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tourId, type])
+  @@index([tourId])
 }
 
 model TourDeparture {
@@ -392,8 +409,8 @@ model Booking {
   startingDate DateTime?
 
   customerName String?
-  hotelName    String?
-  phone        String?
+  hotelName    String
+  phone        String
   mail         String?
   totalPax     Int            @default(0)
   paxDetail    String?

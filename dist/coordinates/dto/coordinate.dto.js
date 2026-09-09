@@ -93,7 +93,6 @@ __decorate([
 class QueryCoordinateDto {
     page = 1;
     limit = 20;
-    q;
 }
 exports.QueryCoordinateDto = QueryCoordinateDto;
 __decorate([
@@ -106,9 +105,4 @@ __decorate([
     (0, class_transformer_1.Type)(() => Number),
     __metadata("design:type", Number)
 ], QueryCoordinateDto.prototype, "limit", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryCoordinateDto.prototype, "q", void 0);
 //# sourceMappingURL=coordinate.dto.js.map

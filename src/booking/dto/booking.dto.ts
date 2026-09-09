@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
 } from 'class-validator';
@@ -15,8 +16,9 @@ import {
 } from '@prisma/client';
 
 export class CreateBookingDto {
+  @IsOptional()
   @IsString()
-  bookingRef: string;
+  bookingRef?: string;
 
   @IsOptional()
   @IsString()
@@ -57,13 +59,13 @@ export class CreateBookingDto {
   @IsString()
   customerName?: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  hotelName?: string;
+  hotelName: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  phone?: string;
+  phone: string;
 
   @IsOptional()
   @IsString()
@@ -170,10 +172,6 @@ export class UpdateBookingDto {
 }
 
 export class QueryBookingDto extends PaginationDto {
-  @IsOptional()
-  @IsString()
-  q?: string;
-
   @IsOptional()
   @IsEnum(BookingStatus)
   status?: BookingStatus;

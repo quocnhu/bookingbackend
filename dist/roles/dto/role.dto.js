@@ -62,12 +62,6 @@ __decorate([
     __metadata("design:type", Array)
 ], UpdateRoleDto.prototype, "permissionIds", void 0);
 class QueryRoleDto extends pagination_dto_1.PaginationDto {
-    q;
 }
 exports.QueryRoleDto = QueryRoleDto;
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryRoleDto.prototype, "q", void 0);
 //# sourceMappingURL=role.dto.js.map

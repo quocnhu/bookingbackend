@@ -16,6 +16,17 @@ export declare class ToursService {
             storageKey: string;
             sortIndex: number;
         }[];
+        typePrices: {
+            type: import("@prisma/client").$Enums.TourType;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            adultPrice: import("@prisma/client/runtime/library").Decimal;
+            childPrice: import("@prisma/client/runtime/library").Decimal;
+            infantPrice: import("@prisma/client/runtime/library").Decimal;
+            currency: string;
+            tourId: string;
+        }[];
         itineraries: {
             id: string;
             createdAt: Date;
@@ -93,6 +104,49 @@ export declare class ToursService {
     }>;
     private generateTourCode;
     update(id: string, dto: UpdateTourDto): Promise<{
+        gallery: {
+            id: string;
+            url: string;
+            storageKey: string;
+            sortIndex: number;
+        }[];
+        typePrices: {
+            type: import("@prisma/client").$Enums.TourType;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            adultPrice: import("@prisma/client/runtime/library").Decimal;
+            childPrice: import("@prisma/client/runtime/library").Decimal;
+            infantPrice: import("@prisma/client/runtime/library").Decimal;
+            currency: string;
+            tourId: string;
+        }[];
+        itineraries: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            description: string | null;
+            mapQuery: string | null;
+            dayNumber: number;
+            orderIndex: number;
+            title: string;
+            timeSlot: string | null;
+            location: string | null;
+            imageUrl: string | null;
+            tourId: string;
+        }[];
+        prices: ({
+            provider: {
+                id: string;
+                name: string;
+            };
+        } & {
+            id: string;
+            providerId: string;
+            tourId: string;
+            vehicleId: string;
+            price: import("@prisma/client/runtime/library").Decimal;
+        })[];
         type: import("@prisma/client").$Enums.TourType;
         id: string;
         name: string;
@@ -123,6 +177,17 @@ export declare class ToursService {
             url: string;
             storageKey: string;
             sortIndex: number;
+        }[];
+        typePrices: {
+            type: import("@prisma/client").$Enums.TourType;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            adultPrice: import("@prisma/client/runtime/library").Decimal;
+            childPrice: import("@prisma/client/runtime/library").Decimal;
+            infantPrice: import("@prisma/client/runtime/library").Decimal;
+            currency: string;
+            tourId: string;
         }[];
         itineraries: {
             id: string;
@@ -183,6 +248,17 @@ export declare class ToursService {
             storageKey: string;
             sortIndex: number;
         }[];
+        typePrices: {
+            type: import("@prisma/client").$Enums.TourType;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            adultPrice: import("@prisma/client/runtime/library").Decimal;
+            childPrice: import("@prisma/client/runtime/library").Decimal;
+            infantPrice: import("@prisma/client/runtime/library").Decimal;
+            currency: string;
+            tourId: string;
+        }[];
         itineraries: {
             id: string;
             createdAt: Date;
@@ -240,6 +316,17 @@ export declare class ToursService {
             storageKey: string;
             sortIndex: number;
         }[];
+        typePrices: {
+            type: import("@prisma/client").$Enums.TourType;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            adultPrice: import("@prisma/client/runtime/library").Decimal;
+            childPrice: import("@prisma/client/runtime/library").Decimal;
+            infantPrice: import("@prisma/client/runtime/library").Decimal;
+            currency: string;
+            tourId: string;
+        }[];
         itineraries: {
             id: string;
             createdAt: Date;
@@ -296,6 +383,17 @@ export declare class ToursService {
             url: string;
             storageKey: string;
             sortIndex: number;
+        }[];
+        typePrices: {
+            type: import("@prisma/client").$Enums.TourType;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            adultPrice: import("@prisma/client/runtime/library").Decimal;
+            childPrice: import("@prisma/client/runtime/library").Decimal;
+            infantPrice: import("@prisma/client/runtime/library").Decimal;
+            currency: string;
+            tourId: string;
         }[];
         itineraries: {
             id: string;

@@ -20,6 +20,7 @@ import {
   CleanBookingData,
 } from '@/parsing/booking-normalizer.service';
 import { AssignmentBoardService } from '@/queues/assignment-board.service';
+import { AssignmentQueue } from '@/queues/assignment.queue';
 import {
   CreateBookingDto,
   QueryBookingDto,
@@ -46,6 +47,7 @@ export class BookingService {
     private readonly auditService: AuditService,
     private readonly normalizer: BookingNormalizerService,
     private readonly board: AssignmentBoardService,
+    private readonly assignmentQueue: AssignmentQueue,
   ) {}
 
   // ─── Pipeline upsert (Stage 2) ──────────────────────────────────────────
@@ -72,10 +74,10 @@ export class BookingService {
       longitude?: number;
       startingDate?: Date;
       customerName?: string;
-      hotelName?: string;
-      phone?: string;
+      hotelName: string;
+      phone: string;
       mail?: string;
-      totalPax?: number;
+totalPax?: number;
       paxDetail?: string;
       payment?: PaymentStatus;
       isNoShow?: boolean;
@@ -102,8 +104,8 @@ export class BookingService {
       longitude: data.longitude,
       startingDate: data.startingDate ? new Date(data.startingDate) : undefined,
       customerName: data.customerName,
-      hotelName: data.hotelName,
-      phone: data.phone,
+      hotelName: data.hotelName ?? '',
+      phone: data.phone ?? '',
       mail: data.mail,
       totalPax: data.totalPax ?? 0,
       paxDetail: data.paxDetail,
@@ -151,11 +153,15 @@ export class BookingService {
   /**
    * Sau khi ghi booking (tạo mới / cập nhật từ pipeline):
    * - đơn CANCELLED → rút khỏi chuyến hiện tại (nếu có).
-   * Không còn enqueue auto-assign — xếp chuyến chỉ thao tác tay trên Dispatch Board.
+   * - đơn còn hiệu lực, chưa xếp chuyến → enqueue auto-assign (Stage 3).
    */
   private async postWrite(booking: Booking) {
     if (booking.status === BookingStatus.CANCELED) {
       await this.board.unassign(booking.id);
+      return;
+    }
+    if (!booking.assignmentId && booking.startingDate) {
+      await this.assignmentQueue.enqueue(booking.id);
     }
   }
 
@@ -164,11 +170,10 @@ export class BookingService {
     data: Record<string, any>,
     actorId?: string,
   ): Promise<Booking> {
-    const bookingRef = data.bookingRef ?? data.confirmationCode;
-    if (!bookingRef)
-      throw new BadRequestException(
-        'bookingRef (hoặc confirmationCode) là bắt buộc',
-      );
+    const bookingRef =
+      data.bookingRef ||
+      data.confirmationCode ||
+      (await this.generateManualBookingRef(data.tourType));
 
     const existing = await this.prisma.booking.findUnique({
       where: { bookingRef },
@@ -216,27 +221,31 @@ export class BookingService {
     return this.prisma.booking.findUnique({ where: { bookingRef } });
   }
 
+  /** Sinh mã thủ công cho booking: <PRV|GR|MB>-YYYYMMDD-#### (tăng dần theo ngày). */
+  private async generateManualBookingRef(tourType?: TourType): Promise<string> {
+    const prefixCode =
+      tourType === TourType.PRIVATE_TOUR
+        ? 'PRV'
+        : tourType === TourType.GROUP_TOUR
+          ? 'GR'
+          : 'MB';
+    const now = new Date();
+    const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const prefix = `${prefixCode}-${ymd}-`;
+    const count = await this.prisma.booking.count({
+      where: { bookingRef: { startsWith: prefix } },
+    });
+    return `${prefix}${String(count + 1).padStart(4, '0')}`;
+  }
+
   // ─── CRUD (dashboard) ───────────────────────────────────────────────────
   async findAll(
     query: QueryBookingDto,
     actor: AuthenticatedUser,
   ): Promise<PaginatedResult<any>> {
-    const { page, limit, q, status, channel, payment, tourId, assignmentId } =
+    const { page, limit, status, channel, payment, tourId, assignmentId } =
       query;
     const where: any = {};
-    if (q) {
-      where.OR = [
-        { bookingRef: { contains: q, mode: 'insensitive' } },
-        { confirmationCode: { contains: q, mode: 'insensitive' } },
-        { customerName: { contains: q, mode: 'insensitive' } },
-        { mail: { contains: q, mode: 'insensitive' } },
-        { phone: { contains: q, mode: 'insensitive' } },
-        { tourName: { contains: q, mode: 'insensitive' } },
-        { status: { contains: q, mode: 'insensitive' } },
-        { channel: { contains: q, mode: 'insensitive' } },
-        { payment: { contains: q, mode: 'insensitive' } },
-      ];
-    }
     if (status) where.status = status;
     if (channel) where.channel = channel;
     if (payment) where.payment = payment;
@@ -273,12 +282,13 @@ export class BookingService {
   }
 
   async create(dto: CreateBookingDto, actor?: AuthenticatedUser) {
+    const bookingRef = dto.bookingRef || (await this.generateManualBookingRef(dto.tourType));
     const existing = await this.prisma.booking.findUnique({
-      where: { bookingRef: dto.bookingRef },
+      where: { bookingRef },
     });
     if (existing)
       throw new ConflictException('Booking reference already exists');
-    const data: any = { ...dto };
+    const data: any = { ...dto, bookingRef };
     if (dto.startingDate) data.startingDate = new Date(dto.startingDate);
     data.createdWho = actor?.name ?? actor?.email ?? 'System';
     const booking = await this.prisma.booking.create({ data });

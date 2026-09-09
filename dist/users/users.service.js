@@ -69,16 +69,10 @@ let UsersService = class UsersService {
         permissions: { include: { permission: true } },
     };
     async findAll(query, actor) {
-        const { page, limit, q, role, userType, isActive } = query;
+        const { page, limit, role, userType, isActive } = query;
         const where = {};
         if (actor.role !== client_1.RoleType.ADMIN) {
             where.id = actor.id;
-        }
-        if (q) {
-            where.OR = [
-                { email: { contains: q, mode: 'insensitive' } },
-                { name: { contains: q, mode: 'insensitive' } },
-            ];
         }
         if (role) {
             where.role = role;

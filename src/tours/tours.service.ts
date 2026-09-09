@@ -31,20 +31,15 @@ export class ToursService {
   ) {}
 
   async findAll(query: QueryTourDto): Promise<PaginatedResult<any>> {
-    const { page, limit, q, type } = query;
+    const { page, limit, type } = query;
     const where: any = {};
-    if (q) {
-      where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { code: { contains: q, mode: 'insensitive' } },
-      ];
-    }
     if (type) {
       where.type = type;
     }
     const [items, total] = await Promise.all([
       this.prisma.tour.findMany({
         where,
+        include: { typePrices: true },
         orderBy: { name: 'asc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -59,6 +54,7 @@ export class ToursService {
       where: { id },
       include: {
         itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
+        typePrices: true,
         prices: { include: { provider: true } },
       },
     });
@@ -78,7 +74,25 @@ export class ToursService {
     } else {
       code = await this.generateTourCode(dto.name, dto.durationDays ?? 1);
     }
-    const tour = await this.prisma.tour.create({ data: { ...dto, code } });
+    const { typePrices, ...rest } = dto;
+    const tour = await this.prisma.tour.create({
+      data: {
+        ...rest,
+        code,
+        typePrices:
+          typePrices && typePrices.length > 0
+            ? {
+                create: typePrices.map((tp) => ({
+                  type: tp.type,
+                  adultPrice: tp.adultPrice ?? 0,
+                  childPrice: tp.childPrice ?? 0,
+                  infantPrice: tp.infantPrice ?? 0,
+                  currency: tp.currency ?? dto.currency ?? 'USD',
+                })),
+              }
+            : undefined,
+      },
+    });
     await this.auditService.log({
       entityType: 'Tour',
       entityId: tour.id,
@@ -113,7 +127,32 @@ export class ToursService {
       });
       if (dup) throw new ConflictException('Tour code already exists');
     }
-    const tour = await this.prisma.tour.update({ where: { id }, data: dto });
+    const { typePrices, ...rest } = dto;
+    await this.prisma.$transaction([
+      this.prisma.tour.update({ where: { id }, data: rest }),
+      ...(typePrices && typePrices.length > 0
+        ? typePrices.map((tp) =>
+            this.prisma.tourTypePrice.upsert({
+              where: { tourId_type: { tourId: id, type: tp.type } },
+              update: {
+                adultPrice: tp.adultPrice ?? 0,
+                childPrice: tp.childPrice ?? 0,
+                infantPrice: tp.infantPrice ?? 0,
+                currency: tp.currency ?? dto.currency ?? 'USD',
+              },
+              create: {
+                tourId: id,
+                type: tp.type,
+                adultPrice: tp.adultPrice ?? 0,
+                childPrice: tp.childPrice ?? 0,
+                infantPrice: tp.infantPrice ?? 0,
+                currency: tp.currency ?? dto.currency ?? 'USD',
+              },
+            }),
+          )
+        : []),
+    ]);
+    const tour = await this.findOne(id);
     await this.auditService.log({
       entityType: 'Tour',
       entityId: id,

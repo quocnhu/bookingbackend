@@ -39,6 +39,7 @@ class CreateBookingDto {
 }
 exports.CreateBookingDto = CreateBookingDto;
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "bookingRef", void 0);
@@ -92,12 +93,12 @@ __decorate([
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "customerName", void 0);
 __decorate([
-    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "hotelName", void 0);
 __decorate([
-    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "phone", void 0);
@@ -248,7 +249,6 @@ __decorate([
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "noShowReason", void 0);
 class QueryBookingDto extends pagination_dto_1.PaginationDto {
-    q;
     status;
     channel;
     payment;
@@ -256,11 +256,6 @@ class QueryBookingDto extends pagination_dto_1.PaginationDto {
     assignmentId;
 }
 exports.QueryBookingDto = QueryBookingDto;
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryBookingDto.prototype, "q", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.BookingStatus),

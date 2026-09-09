@@ -2,7 +2,6 @@ import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common'
 import { TransportationProvidersService } from './transportation-providers.service';
 import {
   AssignDriverToProviderDto,
-  CreateTransportationProviderDto,
   CreateTransportationVehicleDto,
   UpdateTransportationVehicleDto,
 } from './dto/transportation-provider.dto';
@@ -15,12 +14,6 @@ export class TransportationProvidersController {
   @Get()
   findAll() {
     return this.transportationProvidersService.findAll();
-  }
-
-  @Post()
-  @Permissions('provider.create')
-  createProvider(@Body() dto: CreateTransportationProviderDto) {
-    return this.transportationProvidersService.createProvider(dto);
   }
 
   @Get('drivers')

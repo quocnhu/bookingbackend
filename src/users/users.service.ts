@@ -40,16 +40,10 @@ export class UsersService {
   };
 
   async findAll(query: QueryUserDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>> {
-    const { page, limit, q, role, userType, isActive } = query;
+    const { page, limit, role, userType, isActive } = query;
     const where: any = {};
     if (actor.role !== RoleType.ADMIN) {
       where.id = actor.id;
-    }
-    if (q) {
-      where.OR = [
-        { email: { contains: q, mode: 'insensitive' } },
-        { name: { contains: q, mode: 'insensitive' } },
-      ];
     }
     if (role) {
       where.role = role;

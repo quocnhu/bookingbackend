@@ -44,6 +44,9 @@ let AssignmentsController = class AssignmentsController {
     findMyPayments(actor, startDate, endDate) {
         return this.assignmentsService.findMyPayments(actor, startDate, endDate);
     }
+    settlementSummary(dto) {
+        return this.assignmentsService.settlementSummary(dto.from, dto.to, dto.guideId, dto.driverId);
+    }
     findOne(id) {
         return this.assignmentsService.findOne(id);
     }
@@ -139,6 +142,14 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "findMyPayments", null);
+__decorate([
+    (0, common_1.Get)('settlement-summary'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __param(0, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [assignment_dto_1.SettlementSummaryDto]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "settlementSummary", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('assignment.read'),

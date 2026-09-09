@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { BookingNormalizerService, CleanBookingData } from "../parsing/booking-normalizer.service";
 import { AssignmentBoardService } from "../queues/assignment-board.service";
+import { AssignmentQueue } from "../queues/assignment.queue";
 import { CreateBookingDto, QueryBookingDto, UpdateBookingDto } from './dto/booking.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
@@ -19,12 +20,14 @@ export declare class BookingService {
     private readonly auditService;
     private readonly normalizer;
     private readonly board;
+    private readonly assignmentQueue;
     private readonly logger;
-    constructor(prisma: PrismaService, auditService: AuditService, normalizer: BookingNormalizerService, board: AssignmentBoardService);
+    constructor(prisma: PrismaService, auditService: AuditService, normalizer: BookingNormalizerService, board: AssignmentBoardService, assignmentQueue: AssignmentQueue);
     upsert(data: CleanBookingData, rawDataId?: string, actorId?: string, createdWho?: string): Promise<Booking>;
     private postWrite;
     createManual(data: Record<string, any>, actorId?: string): Promise<Booking>;
     private findExisting;
+    private generateManualBookingRef;
     findAll(query: QueryBookingDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     findOne(id: string): Promise<{
         tour: {
@@ -66,8 +69,8 @@ export declare class BookingService {
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         customerName: string | null;
-        hotelName: string | null;
-        phone: string | null;
+        hotelName: string;
+        phone: string;
         mail: string | null;
         startingDate: Date | null;
         totalPax: number;
@@ -97,8 +100,8 @@ export declare class BookingService {
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         customerName: string | null;
-        hotelName: string | null;
-        phone: string | null;
+        hotelName: string;
+        phone: string;
         mail: string | null;
         startingDate: Date | null;
         totalPax: number;
@@ -128,8 +131,8 @@ export declare class BookingService {
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         customerName: string | null;
-        hotelName: string | null;
-        phone: string | null;
+        hotelName: string;
+        phone: string;
         mail: string | null;
         startingDate: Date | null;
         totalPax: number;

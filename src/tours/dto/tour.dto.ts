@@ -68,6 +68,36 @@ export class CreateTourDto {
   @IsOptional()
   @IsDateString()
   promotionEndsAt?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TourTypePriceDto)
+  typePrices?: TourTypePriceDto[];
+}
+
+export class TourTypePriceDto {
+  @IsEnum(TourType)
+  type: TourType;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  adultPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  childPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  infantPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
 }
 
 export class UpdateTourDto {
@@ -166,6 +196,12 @@ export class UpdateTourDto {
   @IsOptional()
   @IsDateString()
   promotionEndsAt?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TourTypePriceDto)
+  typePrices?: TourTypePriceDto[];
 }
 
 export class ItineraryItemDto {
@@ -219,10 +255,6 @@ export class ReorderGalleryDto {
 }
 
 export class QueryTourDto extends PaginationDto {
-  @IsOptional()
-  @IsString()
-  q?: string;
-
   @IsOptional()
   @IsEnum(TourType)
   type?: TourType;

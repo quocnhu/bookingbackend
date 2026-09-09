@@ -23,14 +23,7 @@ let CoordinatesService = class CoordinatesService {
     async findAll(query) {
         const page = query.page ?? 1;
         const limit = query.limit ?? 20;
-        const { q } = query;
         const where = {};
-        if (q) {
-            where.OR = [
-                { hotelName: { contains: q, mode: 'insensitive' } },
-                { address: { contains: q, mode: 'insensitive' } },
-            ];
-        }
         const [items, total] = await Promise.all([
             this.prisma.coordinate.findMany({
                 where,

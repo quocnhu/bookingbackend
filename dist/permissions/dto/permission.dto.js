@@ -47,12 +47,6 @@ __decorate([
     __metadata("design:type", String)
 ], UpdatePermissionDto.prototype, "group", void 0);
 class QueryPermissionDto extends pagination_dto_1.PaginationDto {
-    q;
 }
 exports.QueryPermissionDto = QueryPermissionDto;
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryPermissionDto.prototype, "q", void 0);
 //# sourceMappingURL=permission.dto.js.map

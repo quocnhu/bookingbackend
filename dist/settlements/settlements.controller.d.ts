@@ -72,12 +72,12 @@ export declare class SettlementsController {
         updatedAt: Date;
         imageUrl: string | null;
         assignmentId: string | null;
+        bookingId: string | null;
         categoryId: string | null;
         amount: number;
         note: string | null;
         customCategoryName: string | null;
         createdById: string;
-        bookingId: string | null;
     }>;
     create(dto: CreateSettlementDto, actor: AuthenticatedUser): Promise<{
         booking: {
@@ -113,12 +113,12 @@ export declare class SettlementsController {
         updatedAt: Date;
         imageUrl: string | null;
         assignmentId: string | null;
+        bookingId: string | null;
         categoryId: string | null;
         amount: number;
         note: string | null;
         customCategoryName: string | null;
         createdById: string;
-        bookingId: string | null;
     }>;
     update(id: string, dto: UpdateSettlementDto): Promise<{
         booking: {
@@ -154,12 +154,12 @@ export declare class SettlementsController {
         updatedAt: Date;
         imageUrl: string | null;
         assignmentId: string | null;
+        bookingId: string | null;
         categoryId: string | null;
         amount: number;
         note: string | null;
         customCategoryName: string | null;
         createdById: string;
-        bookingId: string | null;
     }>;
     remove(id: string): Promise<{
         message: string;

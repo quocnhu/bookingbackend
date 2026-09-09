@@ -17,17 +17,20 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const booking_normalizer_service_1 = require("../parsing/booking-normalizer.service");
 const assignment_board_service_1 = require("../queues/assignment-board.service");
+const assignment_queue_1 = require("../queues/assignment.queue");
 let BookingService = BookingService_1 = class BookingService {
     prisma;
     auditService;
     normalizer;
     board;
+    assignmentQueue;
     logger = new common_1.Logger(BookingService_1.name);
-    constructor(prisma, auditService, normalizer, board) {
+    constructor(prisma, auditService, normalizer, board, assignmentQueue) {
         this.prisma = prisma;
         this.auditService = auditService;
         this.normalizer = normalizer;
         this.board = board;
+        this.assignmentQueue = assignmentQueue;
     }
     async upsert(data, rawDataId, actorId, createdWho) {
         const bookingRef = data.bookingRef;
@@ -50,8 +53,8 @@ let BookingService = BookingService_1 = class BookingService {
             longitude: data.longitude,
             startingDate: data.startingDate ? new Date(data.startingDate) : undefined,
             customerName: data.customerName,
-            hotelName: data.hotelName,
-            phone: data.phone,
+            hotelName: data.hotelName ?? '',
+            phone: data.phone ?? '',
             mail: data.mail,
             totalPax: data.totalPax ?? 0,
             paxDetail: data.paxDetail,
@@ -95,12 +98,16 @@ let BookingService = BookingService_1 = class BookingService {
     async postWrite(booking) {
         if (booking.status === client_1.BookingStatus.CANCELED) {
             await this.board.unassign(booking.id);
+            return;
+        }
+        if (!booking.assignmentId && booking.startingDate) {
+            await this.assignmentQueue.enqueue(booking.id);
         }
     }
     async createManual(data, actorId) {
-        const bookingRef = data.bookingRef ?? data.confirmationCode;
-        if (!bookingRef)
-            throw new common_1.BadRequestException('bookingRef (hoặc confirmationCode) là bắt buộc');
+        const bookingRef = data.bookingRef ||
+            data.confirmationCode ||
+            (await this.generateManualBookingRef(data.tourType));
         const existing = await this.prisma.booking.findUnique({
             where: { bookingRef },
         });
@@ -145,22 +152,23 @@ let BookingService = BookingService_1 = class BookingService {
         }
         return this.prisma.booking.findUnique({ where: { bookingRef } });
     }
+    async generateManualBookingRef(tourType) {
+        const prefixCode = tourType === client_1.TourType.PRIVATE_TOUR
+            ? 'PRV'
+            : tourType === client_1.TourType.GROUP_TOUR
+                ? 'GR'
+                : 'MB';
+        const now = new Date();
+        const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        const prefix = `${prefixCode}-${ymd}-`;
+        const count = await this.prisma.booking.count({
+            where: { bookingRef: { startsWith: prefix } },
+        });
+        return `${prefix}${String(count + 1).padStart(4, '0')}`;
+    }
     async findAll(query, actor) {
-        const { page, limit, q, status, channel, payment, tourId, assignmentId } = query;
+        const { page, limit, status, channel, payment, tourId, assignmentId } = query;
         const where = {};
-        if (q) {
-            where.OR = [
-                { bookingRef: { contains: q, mode: 'insensitive' } },
-                { confirmationCode: { contains: q, mode: 'insensitive' } },
-                { customerName: { contains: q, mode: 'insensitive' } },
-                { mail: { contains: q, mode: 'insensitive' } },
-                { phone: { contains: q, mode: 'insensitive' } },
-                { tourName: { contains: q, mode: 'insensitive' } },
-                { status: { contains: q, mode: 'insensitive' } },
-                { channel: { contains: q, mode: 'insensitive' } },
-                { payment: { contains: q, mode: 'insensitive' } },
-            ];
-        }
         if (status)
             where.status = status;
         if (channel)
@@ -200,12 +208,13 @@ let BookingService = BookingService_1 = class BookingService {
         return booking;
     }
     async create(dto, actor) {
+        const bookingRef = dto.bookingRef || (await this.generateManualBookingRef(dto.tourType));
         const existing = await this.prisma.booking.findUnique({
-            where: { bookingRef: dto.bookingRef },
+            where: { bookingRef },
         });
         if (existing)
             throw new common_1.ConflictException('Booking reference already exists');
-        const data = { ...dto };
+        const data = { ...dto, bookingRef };
         if (dto.startingDate)
             data.startingDate = new Date(dto.startingDate);
         data.createdWho = actor?.name ?? actor?.email ?? 'System';
@@ -252,6 +261,7 @@ exports.BookingService = BookingService = BookingService_1 = __decorate([
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_service_1.AuditService,
         booking_normalizer_service_1.BookingNormalizerService,
-        assignment_board_service_1.AssignmentBoardService])
+        assignment_board_service_1.AssignmentBoardService,
+        assignment_queue_1.AssignmentQueue])
 ], BookingService);
 //# sourceMappingURL=booking.service.js.map

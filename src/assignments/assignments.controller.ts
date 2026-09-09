@@ -8,6 +8,7 @@ import {
   QueryAssignmentDto,
   ReorderBookingsDto,
   SetBoardOriginDto,
+  SettlementSummaryDto,
   SubmitTourReportDto,
   UpdateAssignmentDto,
   UpdateAssignmentStatusDto,
@@ -67,6 +68,17 @@ export class AssignmentsController {
     @Query('endDate') endDate?: string,
   ) {
     return this.assignmentsService.findMyPayments(actor, startDate, endDate);
+  }
+
+  @Get('settlement-summary')
+  @Permissions('assignment.read')
+  settlementSummary(@Query() dto: SettlementSummaryDto) {
+    return this.assignmentsService.settlementSummary(
+      dto.from,
+      dto.to,
+      dto.guideId,
+      dto.driverId,
+    );
   }
 
   @Get(':id')

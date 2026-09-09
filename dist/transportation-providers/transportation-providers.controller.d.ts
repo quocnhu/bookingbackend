@@ -1,5 +1,5 @@
 import { TransportationProvidersService } from './transportation-providers.service';
-import { AssignDriverToProviderDto, CreateTransportationProviderDto, CreateTransportationVehicleDto, UpdateTransportationVehicleDto } from './dto/transportation-provider.dto';
+import { AssignDriverToProviderDto, CreateTransportationVehicleDto, UpdateTransportationVehicleDto } from './dto/transportation-provider.dto';
 export declare class TransportationProvidersController {
     private readonly transportationProvidersService;
     constructor(transportationProvidersService: TransportationProvidersService);
@@ -16,21 +16,6 @@ export declare class TransportationProvidersController {
         }[];
         drivers: any[];
     }[]>;
-    createProvider(dto: CreateTransportationProviderDto): Promise<{
-        provider: {
-            id: string;
-            name: string;
-        };
-        user: {
-            role: import("@prisma/client").$Enums.RoleType;
-            id: string;
-            name: string | null;
-            email: string;
-            isActive: boolean;
-            providerId: string | null;
-        };
-        defaultPassword: string | undefined;
-    }>;
     findAllDrivers(): Promise<{
         id: string;
         name: string | null;

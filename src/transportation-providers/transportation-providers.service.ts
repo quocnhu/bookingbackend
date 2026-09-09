@@ -1,11 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { RoleType } from '@prisma/client';
 import {
   AssignDriverToProviderDto,
-  CreateTransportationProviderDto,
   CreateTransportationVehicleDto,
   UpdateTransportationVehicleDto,
 } from './dto/transportation-provider.dto';
@@ -89,47 +87,6 @@ export class TransportationProvidersService {
     });
     if (!provider) throw new NotFoundException('Transportation provider not found');
     return provider;
-  }
-
-  async createProvider(dto: CreateTransportationProviderDto) {
-    const existingUser = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (existingUser) {
-      throw new ConflictException('Email already registered');
-    }
-    const password = dto.password || 'provider123';
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const provider = await this.prisma.transportationProvider.create({
-      data: { name: dto.name },
-    });
-    const user = await this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: dto.email,
-        passwordHash,
-        role: RoleType.TRANSPORT_PROVIDER,
-        userType: 'provider',
-        providerId: provider.id,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        providerId: true,
-      },
-    });
-
-    await this.auditService.log({
-      entityType: 'TransportationProvider',
-      entityId: provider.id,
-      action: 'CREATE',
-      afterData: { provider, user },
-    });
-
-    return { provider, user, defaultPassword: dto.password ? undefined : password };
   }
 
   async createVehicle(dto: CreateTransportationVehicleDto) {

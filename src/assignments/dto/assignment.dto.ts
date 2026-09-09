@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsDateString,
   IsEnum,
   IsIn,
   IsInt,
@@ -142,10 +143,6 @@ export class MoveBookingDto {
 
 export class QueryAssignmentDto extends PaginationDto {
   @IsOptional()
-  @IsString()
-  q?: string;
-
-  @IsOptional()
   @IsEnum(AssignmentStatus)
   status?: AssignmentStatus;
 
@@ -226,4 +223,20 @@ export class FinalizeAssignmentDto {
   @ValidateNested({ each: true })
   @Type(() => FinalizeServiceDto)
   services?: FinalizeServiceDto[];
+}
+
+export class SettlementSummaryDto {
+  @IsDateString()
+  from: string;
+
+  @IsDateString()
+  to: string;
+
+  @IsOptional()
+  @IsString()
+  guideId?: string;
+
+  @IsOptional()
+  @IsString()
+  driverId?: string;
 }

@@ -11,5 +11,4 @@ export declare class UpdateRoleDto {
     permissionIds?: string[];
 }
 export declare class QueryRoleDto extends PaginationDto {
-    q?: string;
 }

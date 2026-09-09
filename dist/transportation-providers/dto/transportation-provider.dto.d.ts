@@ -1,8 +1,3 @@
-export declare class CreateTransportationProviderDto {
-    name: string;
-    email: string;
-    password?: string;
-}
 export declare class CreateTransportationVehicleDto {
     providerId: string;
     plateNumber: string;

@@ -34,8 +34,4 @@ export class UpdateRoleDto {
   permissionIds?: string[];
 }
 
-export class QueryRoleDto extends PaginationDto {
-  @IsOptional()
-  @IsString()
-  q?: string;
-}
+export class QueryRoleDto extends PaginationDto {}

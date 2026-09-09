@@ -10,16 +10,8 @@ export class AuditLogsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: QueryAuditDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>> {
-    const { page, limit, q, entityType, entityId, action, changedBy, from, to } = query;
+    const { page, limit, entityType, entityId, action, changedBy, from, to } = query;
     const where: any = {};
-    if (q) {
-      where.OR = [
-        { entityType: { contains: q, mode: 'insensitive' } },
-        { entityId: { contains: q, mode: 'insensitive' } },
-        { action: { contains: q, mode: 'insensitive' } },
-        { changedBy: { contains: q, mode: 'insensitive' } },
-      ];
-    }
     if (entityType) where.entityType = entityType;
     if (entityId) where.entityId = entityId;
     if (action) where.action = { contains: action };

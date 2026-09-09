@@ -21,7 +21,6 @@ export class RawDataController {
   async list(
     @Query('status') status?: string,
     @Query('templateTag') templateTag?: string,
-    @Query('q') q?: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
@@ -32,8 +31,6 @@ export class RawDataController {
     const where: Record<string, unknown> = {};
     if (status && validStatuses.includes(status)) where.status = status;
     if (templateTag) where.templateTag = templateTag;
-    if (q)
-      where.OR = [{ sourceId: { contains: q } }, { email: { contains: q } }];
 
     const [total, items] = await Promise.all([
       this.prisma.rawData.count({ where }),

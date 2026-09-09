@@ -34,16 +34,8 @@ let AuthActivitiesService = class AuthActivitiesService {
         }
     }
     async findAll(query, actor) {
-        const { page, limit, q, eventType, userId, from, to } = query;
+        const { page, limit, eventType, userId, from, to } = query;
         const where = {};
-        if (q) {
-            where.OR = [
-                { eventType: { contains: q, mode: 'insensitive' } },
-                { ipAddress: { contains: q, mode: 'insensitive' } },
-                { user: { is: { email: { contains: q, mode: 'insensitive' } } } },
-                { user: { is: { name: { contains: q, mode: 'insensitive' } } } },
-            ];
-        }
         if (eventType)
             where.eventType = eventType;
         if (userId)

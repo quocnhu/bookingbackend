@@ -17,5 +17,4 @@ export declare class UpdateCoordinateDto {
 export declare class QueryCoordinateDto {
     page?: number;
     limit?: number;
-    q?: string;
 }

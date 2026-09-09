@@ -9,5 +9,4 @@ export declare class UpdatePermissionDto {
     group?: string;
 }
 export declare class QueryPermissionDto extends PaginationDto {
-    q?: string;
 }

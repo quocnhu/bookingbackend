@@ -61,8 +61,4 @@ export class QueryCoordinateDto {
   @IsOptional()
   @Type(() => Number)
   limit?: number = 20;
-
-  @IsOptional()
-  @IsString()
-  q?: string;
 }

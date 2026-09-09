@@ -3,14 +3,16 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { AuditModule } from '@/audit/audit.module';
 import { AssignmentBoardService } from './assignment-board.service';
-import { BOOKING_MANUAL_QUEUE } from './queue.constants';
+import { AssignmentQueue } from './assignment.queue';
+import { AssignmentProcessor } from './assignment.processor';
+import { ASSIGN_QUEUE, BOOKING_MANUAL_QUEUE } from './queue.constants';
 import { PARSE_QUEUE } from '@/parsing/parsing.queue';
 
 /**
  * Module @Global đăng ký BullMQ root + tất cả queue dùng chung:
- * booking-manual (tạo thủ công), parse (Stage 2).
+ * booking-manual (tạo thủ công), parse (Stage 2), assign (Stage 3 - auto-assign).
  * Processor của parse nằm ở parsing/parsing.processor.ts.
- * Assignment queue + Auto-assign engine đã được gỡ — xếp chuyến giờ chỉ bằng tay.
+ * Processor của assign nằm ở queues/assignment.processor.ts.
  */
 @Global()
 @Module({
@@ -23,7 +25,7 @@ import { PARSE_QUEUE } from '@/parsing/parsing.queue';
           url: config.get<string>('REDIS_URL', 'redis://localhost:6379'),
         },
         defaultJobOptions: {
-          removeOnComplete: 1000,
+          removeOnComplete: true,
           removeOnFail: 5000,
           attempts: 3,
           backoff: { type: 'exponential', delay: 2000 },
@@ -33,9 +35,10 @@ import { PARSE_QUEUE } from '@/parsing/parsing.queue';
     BullModule.registerQueue(
       { name: BOOKING_MANUAL_QUEUE },
       { name: PARSE_QUEUE },
+      { name: ASSIGN_QUEUE },
     ),
   ],
-  providers: [AssignmentBoardService],
-  exports: [BullModule, AssignmentBoardService],
+  providers: [AssignmentBoardService, AssignmentQueue, AssignmentProcessor],
+  exports: [BullModule, AssignmentBoardService, AssignmentQueue],
 })
 export class QueuesModule {}

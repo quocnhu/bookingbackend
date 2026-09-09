@@ -1,5 +1,5 @@
 import { AssignmentsService } from './assignments.service';
-import { AssignBookingsDto, CreateAssignmentDto, FinalizeAssignmentDto, MoveBookingDto, QueryAssignmentDto, ReorderBookingsDto, SetBoardOriginDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, VerifyTourReportDto } from './dto/assignment.dto';
+import { AssignBookingsDto, CreateAssignmentDto, FinalizeAssignmentDto, MoveBookingDto, QueryAssignmentDto, ReorderBookingsDto, SetBoardOriginDto, SettlementSummaryDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, VerifyTourReportDto } from './dto/assignment.dto';
 import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 export declare class AssignmentsController {
     private readonly assignmentsService;
@@ -53,6 +53,39 @@ export declare class AssignmentsController {
                 amount: number;
                 note: string | null;
             }[];
+        }[];
+    }>;
+    settlementSummary(dto: SettlementSummaryDto): Promise<{
+        from: string;
+        to: string;
+        guideId: string | undefined;
+        driverId: string | undefined;
+        guideName: string | null;
+        driverName: string | null;
+        summary: {
+            guideReturnsToCompany: {
+                count: number;
+                total: number;
+            };
+            companyReturnsToGuide: {
+                count: number;
+                total: number;
+            };
+        };
+        lines: {
+            id: string;
+            code: string;
+            tourName: string | null;
+            vehiclePlate: string | null;
+            guide: string | null;
+            driver: string | null;
+            startDate: Date;
+            endDate: Date;
+            collectedAmount: number;
+            servicesTotal: number;
+            netAmount: number;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            places: string[];
         }[];
     }>;
     findOne(id: string): Promise<{
@@ -111,12 +144,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -129,8 +162,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -155,12 +188,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;
@@ -259,12 +292,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -277,8 +310,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -303,12 +336,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;
@@ -407,12 +440,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -425,8 +458,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -451,12 +484,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;
@@ -555,12 +588,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -573,8 +606,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -599,12 +632,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;
@@ -703,12 +736,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -721,8 +754,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -747,12 +780,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;
@@ -851,12 +884,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -869,8 +902,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -895,12 +928,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;
@@ -999,12 +1032,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -1017,8 +1050,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -1043,12 +1076,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;
@@ -1147,12 +1180,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -1165,8 +1198,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -1191,12 +1224,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;
@@ -1326,12 +1359,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -1344,8 +1377,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -1370,12 +1403,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;
@@ -1474,12 +1507,12 @@ export declare class AssignmentsController {
                 updatedAt: Date;
                 imageUrl: string | null;
                 assignmentId: string | null;
+                bookingId: string | null;
                 categoryId: string | null;
                 amount: number;
                 note: string | null;
                 customCategoryName: string | null;
                 createdById: string;
-                bookingId: string | null;
             }[];
         } & {
             id: string;
@@ -1492,8 +1525,8 @@ export declare class AssignmentsController {
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             customerName: string | null;
-            hotelName: string | null;
-            phone: string | null;
+            hotelName: string;
+            phone: string;
             mail: string | null;
             startingDate: Date | null;
             totalPax: number;
@@ -1518,12 +1551,12 @@ export declare class AssignmentsController {
             updatedAt: Date;
             imageUrl: string | null;
             assignmentId: string | null;
+            bookingId: string | null;
             categoryId: string | null;
             amount: number;
             note: string | null;
             customCategoryName: string | null;
             createdById: string;
-            bookingId: string | null;
         }[];
         driver: {
             id: string;

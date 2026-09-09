@@ -13,7 +13,6 @@ exports.QueryAuditDto = void 0;
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 class QueryAuditDto extends pagination_dto_1.PaginationDto {
-    q;
     entityType;
     entityId;
     action;
@@ -22,11 +21,6 @@ class QueryAuditDto extends pagination_dto_1.PaginationDto {
     to;
 }
 exports.QueryAuditDto = QueryAuditDto;
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryAuditDto.prototype, "q", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

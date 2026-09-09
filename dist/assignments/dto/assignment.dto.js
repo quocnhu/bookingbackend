@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FinalizeAssignmentDto = exports.FinalizeServiceDto = exports.VerifyTourReportDto = exports.SubmitTourReportDto = exports.QueryAssignmentDto = exports.MoveBookingDto = exports.ReorderBookingsDto = exports.AssignBookingsDto = exports.SetBoardOriginDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
+exports.SettlementSummaryDto = exports.FinalizeAssignmentDto = exports.FinalizeServiceDto = exports.VerifyTourReportDto = exports.SubmitTourReportDto = exports.QueryAssignmentDto = exports.MoveBookingDto = exports.ReorderBookingsDto = exports.AssignBookingsDto = exports.SetBoardOriginDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
@@ -205,7 +205,6 @@ __decorate([
     __metadata("design:type", String)
 ], MoveBookingDto.prototype, "toAssignmentId", void 0);
 class QueryAssignmentDto extends pagination_dto_1.PaginationDto {
-    q;
     status;
     vehicleId;
     driverId;
@@ -213,11 +212,6 @@ class QueryAssignmentDto extends pagination_dto_1.PaginationDto {
     sortOrder;
 }
 exports.QueryAssignmentDto = QueryAssignmentDto;
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryAssignmentDto.prototype, "q", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.AssignmentStatus),
@@ -335,4 +329,29 @@ __decorate([
     (0, class_transformer_1.Type)(() => FinalizeServiceDto),
     __metadata("design:type", Array)
 ], FinalizeAssignmentDto.prototype, "services", void 0);
+class SettlementSummaryDto {
+    from;
+    to;
+    guideId;
+    driverId;
+}
+exports.SettlementSummaryDto = SettlementSummaryDto;
+__decorate([
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], SettlementSummaryDto.prototype, "from", void 0);
+__decorate([
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], SettlementSummaryDto.prototype, "to", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SettlementSummaryDto.prototype, "guideId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SettlementSummaryDto.prototype, "driverId", void 0);
 //# sourceMappingURL=assignment.dto.js.map

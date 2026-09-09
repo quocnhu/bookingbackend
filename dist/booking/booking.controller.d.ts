@@ -45,8 +45,8 @@ export declare class BookingController {
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         customerName: string | null;
-        hotelName: string | null;
-        phone: string | null;
+        hotelName: string;
+        phone: string;
         mail: string | null;
         startingDate: Date | null;
         totalPax: number;
@@ -76,8 +76,8 @@ export declare class BookingController {
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         customerName: string | null;
-        hotelName: string | null;
-        phone: string | null;
+        hotelName: string;
+        phone: string;
         mail: string | null;
         startingDate: Date | null;
         totalPax: number;
@@ -107,8 +107,8 @@ export declare class BookingController {
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         customerName: string | null;
-        hotelName: string | null;
-        phone: string | null;
+        hotelName: string;
+        phone: string;
         mail: string | null;
         startingDate: Date | null;
         totalPax: number;

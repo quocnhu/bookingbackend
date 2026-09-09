@@ -44,7 +44,6 @@ export declare class MoveBookingDto {
     toAssignmentId: string;
 }
 export declare class QueryAssignmentDto extends PaginationDto {
-    q?: string;
     status?: AssignmentStatus;
     vehicleId?: string;
     driverId?: string;
@@ -71,4 +70,10 @@ export declare class FinalizeServiceDto {
 export declare class FinalizeAssignmentDto {
     collectedAmount: number;
     services?: FinalizeServiceDto[];
+}
+export declare class SettlementSummaryDto {
+    from: string;
+    to: string;
+    guideId?: string;
+    driverId?: string;
 }

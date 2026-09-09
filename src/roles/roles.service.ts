@@ -8,10 +8,8 @@ export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: QueryRoleDto): Promise<PaginatedResult<any>> {
-    const { page, limit, q } = query;
-    const where = q
-      ? { OR: [{ name: { contains: q, mode: 'insensitive' as const } }] }
-      : {};
+    const { page, limit } = query;
+    const where = {};
     const [items, total] = await Promise.all([
       this.prisma.role.findMany({
         where,

@@ -104,6 +104,16 @@ let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardSer
         });
         return { moved: true, toAssignmentId };
     }
+    async attach(assignmentId, bookingId) {
+        const booking = await this.prisma.booking.findUnique({
+            where: { id: bookingId },
+        });
+        if (!booking || booking.assignmentId)
+            return { assigned: false };
+        await this.attachBooking(assignmentId, bookingId);
+        await this.refreshSummary(assignmentId);
+        return { assigned: true, assignmentId };
+    }
     async attachBooking(assignmentId, bookingId) {
         const maxSeq = await this.prisma.booking.aggregate({
             where: { assignmentId },
@@ -114,6 +124,7 @@ let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardSer
             data: {
                 assignmentId,
                 paxSequence: (maxSeq._max.paxSequence ?? 0) + 1,
+                status: client_1.BookingStatus.ASSIGNED,
             },
         });
     }

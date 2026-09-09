@@ -18,10 +18,8 @@ let RolesService = class RolesService {
         this.prisma = prisma;
     }
     async findAll(query) {
-        const { page, limit, q } = query;
-        const where = q
-            ? { OR: [{ name: { contains: q, mode: 'insensitive' } }] }
-            : {};
+        const { page, limit } = query;
+        const where = {};
         const [items, total] = await Promise.all([
             this.prisma.role.findMany({
                 where,

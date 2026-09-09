@@ -25,7 +25,7 @@ let RawDataController = class RawDataController {
         this.prisma = prisma;
         this.service = service;
     }
-    async list(status, templateTag, q, page = '1', limit = '20') {
+    async list(status, templateTag, page = '1', limit = '20') {
         const pageNum = Math.max(1, Number(page) || 1);
         const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
         const validStatuses = Object.values(raw_data_entity_1.RAW_DATA_STATUS);
@@ -34,8 +34,6 @@ let RawDataController = class RawDataController {
             where.status = status;
         if (templateTag)
             where.templateTag = templateTag;
-        if (q)
-            where.OR = [{ sourceId: { contains: q } }, { email: { contains: q } }];
         const [total, items] = await Promise.all([
             this.prisma.rawData.count({ where }),
             this.prisma.rawData.findMany({
@@ -57,11 +55,10 @@ __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)('status')),
     __param(1, (0, common_1.Query)('templateTag')),
-    __param(2, (0, common_1.Query)('q')),
-    __param(3, (0, common_1.Query)('page')),
-    __param(4, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('page')),
+    __param(3, (0, common_1.Query)('limit')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, Object, Object]),
+    __metadata("design:paramtypes", [String, String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], RawDataController.prototype, "list", null);
 __decorate([

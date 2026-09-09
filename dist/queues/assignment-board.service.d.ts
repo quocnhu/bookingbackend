@@ -30,6 +30,10 @@ export declare class AssignmentBoardService {
         toAssignmentId: string;
         error?: undefined;
     }>;
+    attach(assignmentId: string, bookingId: string): Promise<{
+        assigned: boolean;
+        assignmentId?: string;
+    }>;
     private attachBooking;
     private canFit;
     private refreshSummary;

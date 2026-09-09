@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AssignmentStatus, TourType } from '@prisma/client';
+import { AssignmentStatus, BookingStatus, TourType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 
@@ -117,6 +117,23 @@ export class AssignmentBoardService {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
+  /**
+   * Gắn booking vào chuyến (dùng bởi auto-assign queue Stage 3).
+   * Guard: booking đã có assignment khác → không gắn lần nữa.
+   */
+  async attach(
+    assignmentId: string,
+    bookingId: string,
+  ): Promise<{ assigned: boolean; assignmentId?: string }> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+    if (!booking || booking.assignmentId) return { assigned: false };
+    await this.attachBooking(assignmentId, bookingId);
+    await this.refreshSummary(assignmentId);
+    return { assigned: true, assignmentId };
+  }
+
   private async attachBooking(assignmentId: string, bookingId: string) {
     const maxSeq = await this.prisma.booking.aggregate({
       where: { assignmentId },
@@ -127,6 +144,7 @@ export class AssignmentBoardService {
       data: {
         assignmentId,
         paxSequence: (maxSeq._max.paxSequence ?? 0) + 1,
+        status: BookingStatus.ASSIGNED,
       },
     });
   }

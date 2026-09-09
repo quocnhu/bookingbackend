@@ -4,10 +4,6 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 export class QueryAuditDto extends PaginationDto {
   @IsOptional()
   @IsString()
-  q?: string;
-
-  @IsOptional()
-  @IsString()
   entityType?: string;
 
   @IsOptional()
