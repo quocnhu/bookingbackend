@@ -14,10 +14,12 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AssignmentsController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
 const assignments_service_1 = require("./assignments.service");
 const assignment_dto_1 = require("./dto/assignment.dto");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
 let AssignmentsController = class AssignmentsController {
     assignmentsService;
     constructor(assignmentsService) {
@@ -34,6 +36,12 @@ let AssignmentsController = class AssignmentsController {
     }
     dispatchAllBoard() {
         return this.assignmentsService.dispatchAllBoard();
+    }
+    getBoardCrew() {
+        return this.assignmentsService.getBoardCrew();
+    }
+    getCrewAvailability(from, to) {
+        return this.assignmentsService.getCrewAvailability(new Date(from ?? Date.now()), new Date(to ?? Date.now()));
     }
     findMyAssignments(actor) {
         return this.assignmentsService.findMyAssignments(actor);
@@ -77,6 +85,9 @@ let AssignmentsController = class AssignmentsController {
     submitTourReport(id, dto, actor) {
         return this.assignmentsService.submitTourReport(id, dto, actor);
     }
+    uploadTourReportImage(id, file, actor) {
+        return this.assignmentsService.uploadReportImage(id, file, actor);
+    }
     verifyTourReport(id, dto, actor) {
         return this.assignmentsService.verifyTourReport(id, dto, actor);
     }
@@ -117,6 +128,22 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "dispatchAllBoard", null);
+__decorate([
+    (0, common_1.Get)('board/crew'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "getBoardCrew", null);
+__decorate([
+    (0, common_1.Get)('board/crew/availability'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __param(0, (0, common_1.Query)('from')),
+    __param(1, (0, common_1.Query)('to')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "getCrewAvailability", null);
 __decorate([
     (0, common_1.Get)('my-assignments'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
@@ -240,6 +267,20 @@ __decorate([
     __metadata("design:paramtypes", [String, assignment_dto_1.SubmitTourReportDto, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "submitTourReport", null);
+__decorate([
+    (0, common_1.Post)(':id/tour-report/images'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
+        storage: (0, multer_1.memoryStorage)(),
+        limits: { fileSize: 20 * 1024 * 1024 },
+    })),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "uploadTourReportImage", null);
 __decorate([
     (0, common_1.Put)(':id/tour-report/verify'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),

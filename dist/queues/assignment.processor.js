@@ -14,8 +14,8 @@ exports.AssignmentProcessor = void 0;
 const common_1 = require("@nestjs/common");
 const bullmq_1 = require("@nestjs/bullmq");
 const client_1 = require("@prisma/client");
-const prisma_service_1 = require("../prisma/prisma.service");
-const audit_service_1 = require("../audit/audit.service");
+const prisma_service_1 = require("@/prisma/prisma.service");
+const audit_service_1 = require("@/audit/audit.service");
 const assignment_board_service_1 = require("./assignment-board.service");
 const queue_constants_1 = require("./queue.constants");
 const BUS_MAX_PAX = 12;
@@ -34,6 +34,7 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
         const { bookingId } = job.data;
         const booking = await this.prisma.booking.findUnique({
             where: { id: bookingId },
+            include: { tour: true },
         });
         if (!booking)
             return { skipped: true, reason: 'BOOKING_NOT_FOUND' };
@@ -49,11 +50,28 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             return { skipped: true, reason: 'NO_START_DATE' };
         const candidate = await this.findCandidate(booking);
         if (!candidate) {
-            this.logger.log(`No open bus for booking ${booking.bookingRef} — stays PENDING for manual assignment`);
+            const bus = await this.createBusForBooking(booking);
+            this.logger.log(`No open bus for booking ${booking.bookingRef} — created bus ${bus.code}`);
+            const result = await this.board.attach(bus.id, bookingId);
+            if (!result.assigned) {
+                return { skipped: true, reason: 'ASSIGN_FAILED' };
+            }
+            await this.auditService.log({
+                entityType: 'Assignment',
+                entityId: bus.id,
+                action: 'AUTO_CREATE_BUS',
+                afterData: {
+                    bookingId,
+                    bookingRef: booking.bookingRef,
+                    assignmentId: bus.id,
+                },
+                changedBy: null,
+            });
             return {
-                status: 'NO_BUS_FOUND',
+                status: 'CREATED_BUS',
                 bookingId,
                 bookingRef: booking.bookingRef,
+                assignmentId: bus.id,
             };
         }
         const result = await this.board.attach(candidate.id, bookingId);
@@ -74,6 +92,35 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             bookingRef: booking.bookingRef,
             assignmentId: candidate.id,
         };
+    }
+    async createBusForBooking(booking) {
+        const startDate = new Date(booking.startingDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        const durationDays = booking.tour?.durationDays ?? 1;
+        const endDate = new Date(startDate.getTime() + Math.max(1, durationDays) * 86400000);
+        const label = booking.tourType === client_1.TourType.PRIVATE_TOUR ? 'Priv' : 'Group';
+        const existing = await this.prisma.assignment.findMany({
+            where: { code: { startsWith: `${label} Bus -` } },
+            select: { code: true },
+        });
+        const numbers = existing
+            .map((a) => parseInt((a.code ?? '').split('-')[1]?.trim() ?? '0', 10))
+            .filter((n) => !Number.isNaN(n));
+        const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
+        return this.prisma.assignment.create({
+            data: {
+                code: `${label} Bus - ${nextNumber}`,
+                startDate,
+                endDate,
+                status: client_1.AssignmentStatus.PENDING,
+                origin: client_1.AssignmentOrigin.AUTO_ASSIGN,
+                tourType: booking.tourType ?? null,
+                tourName: booking.tourName ?? booking.tour?.name ?? undefined,
+                durationDays,
+                totalPax: booking.totalPax ?? 0,
+                createdWho: 'Auto-Assign System',
+            },
+        });
     }
     async findCandidate(booking) {
         const candidates = await this.prisma.assignment.findMany({

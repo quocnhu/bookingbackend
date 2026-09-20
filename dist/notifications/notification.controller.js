@@ -16,7 +16,8 @@ exports.NotificationController = void 0;
 const common_1 = require("@nestjs/common");
 const notification_service_1 = require("./notification.service");
 const notification_dto_1 = require("./dto/notification.dto");
-const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
 let NotificationController = class NotificationController {
     notificationService;
     constructor(notificationService) {
@@ -24,6 +25,9 @@ let NotificationController = class NotificationController {
     }
     findAll(actor, unread) {
         return this.notificationService.findAll(actor.id, unread === '1');
+    }
+    targets(query) {
+        return this.notificationService.getTargets(query?.search);
     }
     unreadCount(actor) {
         return this.notificationService.unreadCount(actor.id).then((count) => ({ count }));
@@ -33,6 +37,9 @@ let NotificationController = class NotificationController {
     }
     markAllRead(actor) {
         return this.notificationService.markAllRead(actor.id);
+    }
+    send(dto, actor) {
+        return this.notificationService.send(dto, actor);
     }
     registerPush(actor, dto) {
         return this.notificationService.registerPush(actor.id, dto.endpoint, dto.userAgent);
@@ -50,6 +57,14 @@ __decorate([
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], NotificationController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('targets'),
+    (0, permissions_decorator_1.Permissions)('notification.send'),
+    __param(0, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [notification_dto_1.NotificationTargetsQueryDto]),
+    __metadata("design:returntype", void 0)
+], NotificationController.prototype, "targets", null);
 __decorate([
     (0, common_1.Get)('unread-count'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
@@ -71,6 +86,15 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], NotificationController.prototype, "markAllRead", null);
+__decorate([
+    (0, common_1.Post)('send'),
+    (0, permissions_decorator_1.Permissions)('notification.send'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [notification_dto_1.SendNotificationDto, Object]),
+    __metadata("design:returntype", void 0)
+], NotificationController.prototype, "send", null);
 __decorate([
     (0, common_1.Post)('push/register'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),

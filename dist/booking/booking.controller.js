@@ -16,8 +16,8 @@ exports.BookingController = void 0;
 const common_1 = require("@nestjs/common");
 const booking_service_1 = require("./booking.service");
 const booking_dto_1 = require("./dto/booking.dto");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
 let BookingController = class BookingController {
     bookingService;
     constructor(bookingService) {
@@ -31,6 +31,9 @@ let BookingController = class BookingController {
     }
     create(dto, actor) {
         return this.bookingService.create(dto, actor);
+    }
+    updateBatch(dto) {
+        return this.bookingService.updateBatch(dto.items);
     }
     update(id, dto) {
         return this.bookingService.update(id, dto);
@@ -66,6 +69,14 @@ __decorate([
     __metadata("design:paramtypes", [booking_dto_1.CreateBookingDto, Object]),
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "create", null);
+__decorate([
+    (0, common_1.Put)('batch'),
+    (0, permissions_decorator_1.Permissions)('booking.update'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [booking_dto_1.BatchUpdateBookingsDto]),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "updateBatch", null);
 __decorate([
     (0, common_1.Put)(':id'),
     (0, permissions_decorator_1.Permissions)('booking.update'),

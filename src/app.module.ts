@@ -29,6 +29,7 @@ import { QueuesModule } from './queues/queues.module';
 import { DriveModule } from './drive/drive.module';
 import { StorageModule } from './storage';
 import { NotificationsModule } from './notifications/notifications.module';
+import { LeavesModule } from './leaves/leaves.module';
 import { CoordinatesModule } from './coordinates/coordinates.module';
 import { RoutePricesModule } from './route-prices/route-prices.module';
 import { TransportationProvidersModule } from './transportation-providers/transportation-providers.module';
@@ -60,6 +61,7 @@ import { TransportationProvidersModule } from './transportation-providers/transp
     QueuesModule,
     DriveModule,
     NotificationsModule,
+    LeavesModule,
     CoordinatesModule,
     RoutePricesModule,
     TransportationProvidersModule,

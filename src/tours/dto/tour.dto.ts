@@ -59,7 +59,14 @@ export class CreateTourDto {
   @IsInt()
   @Min(0)
   @Max(100)
-  discountPercent?: number;
+  privateDiscountPercent?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  groupDiscountPercent?: number;
 
   @IsOptional()
   @IsDateString()
@@ -187,7 +194,14 @@ export class UpdateTourDto {
   @IsInt()
   @Min(0)
   @Max(100)
-  discountPercent?: number;
+  privateDiscountPercent?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  groupDiscountPercent?: number;
 
   @IsOptional()
   @IsDateString()

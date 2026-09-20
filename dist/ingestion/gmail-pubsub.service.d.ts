@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
-import { PrismaService } from "../prisma/prisma.service";
-import { RawDataService } from "../raw-data/raw-data.service";
-import { ParsingQueue } from "../parsing/parsing.queue";
+import { PrismaService } from '@/prisma/prisma.service';
+import { RawDataService } from '@/raw-data/raw-data.service';
+import { ParsingQueue } from '@/parsing/parsing.queue';
 import { GmailAuthService } from './gmail-auth.provider';
 import type { GmailPushPayload } from './dto/gmail-push-payload.dto';
 export declare class GmailPubSubService {

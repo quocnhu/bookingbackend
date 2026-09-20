@@ -15,11 +15,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
 const common_1 = require("@nestjs/common");
 const throttler_1 = require("@nestjs/throttler");
-const public_decorator_1 = require("../common/decorators/public.decorator");
-const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
-const auth_service_1 = require("./auth.service");
-const auth_dto_1 = require("./dto/auth.dto");
-const cookies_1 = require("../common/cookies");
+const public_decorator_1 = require("@/common/decorators/public.decorator");
+const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
+const auth_service_1 = require("@/auth/auth.service");
+const auth_dto_1 = require("@/auth/dto/auth.dto");
+const cookies_1 = require("@/common/cookies");
 let AuthController = class AuthController {
     authService;
     constructor(authService) {

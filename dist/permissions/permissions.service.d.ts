@@ -1,6 +1,6 @@
-import { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from '@/prisma/prisma.service';
 import { CreatePermissionDto, QueryPermissionDto, UpdatePermissionDto } from './dto/permission.dto';
-import { PaginatedResult } from "../common/dto/pagination.dto";
+import { PaginatedResult } from '@/common/dto/pagination.dto';
 export declare class PermissionsService {
     private readonly prisma;
     constructor(prisma: PrismaService);

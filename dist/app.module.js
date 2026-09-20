@@ -38,6 +38,7 @@ const queues_module_1 = require("./queues/queues.module");
 const drive_module_1 = require("./drive/drive.module");
 const storage_1 = require("./storage");
 const notifications_module_1 = require("./notifications/notifications.module");
+const leaves_module_1 = require("./leaves/leaves.module");
 const coordinates_module_1 = require("./coordinates/coordinates.module");
 const route_prices_module_1 = require("./route-prices/route-prices.module");
 const transportation_providers_module_1 = require("./transportation-providers/transportation-providers.module");
@@ -72,6 +73,7 @@ exports.AppModule = AppModule = __decorate([
             queues_module_1.QueuesModule,
             drive_module_1.DriveModule,
             notifications_module_1.NotificationsModule,
+            leaves_module_1.LeavesModule,
             coordinates_module_1.CoordinatesModule,
             route_prices_module_1.RoutePricesModule,
             transportation_providers_module_1.TransportationProvidersModule,

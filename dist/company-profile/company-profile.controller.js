@@ -16,8 +16,8 @@ exports.CompanyProfileController = void 0;
 const common_1 = require("@nestjs/common");
 const company_profile_service_1 = require("./company-profile.service");
 const update_company_profile_dto_1 = require("./dto/update-company-profile.dto");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
 let CompanyProfileController = class CompanyProfileController {
     companyProfileService;
     constructor(companyProfileService) {

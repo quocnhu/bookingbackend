@@ -1,4 +1,4 @@
-import { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from '@/prisma/prisma.service';
 import { GmailAuthService } from './gmail-auth.provider';
 export declare class GmailWatchService {
     private readonly prisma;

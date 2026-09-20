@@ -18,9 +18,9 @@ const platform_express_1 = require("@nestjs/platform-express");
 const multer_1 = require("multer");
 const tours_service_1 = require("./tours.service");
 const tour_dto_1 = require("./dto/tour.dto");
-const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const public_decorator_1 = require("../common/decorators/public.decorator");
+const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const public_decorator_1 = require("@/common/decorators/public.decorator");
 let ToursController = class ToursController {
     toursService;
     constructor(toursService) {

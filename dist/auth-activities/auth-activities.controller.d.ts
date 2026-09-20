@@ -1,6 +1,6 @@
 import { AuthActivitiesService } from './auth-activities.service';
 import { QueryAuthActivityDto } from './dto/query-auth-activity.dto';
-import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 export declare class AuthActivitiesController {
     private readonly authActivitiesService;
     constructor(authActivitiesService: AuthActivitiesService);

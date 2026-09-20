@@ -14,8 +14,8 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RawDataController = void 0;
 const common_1 = require("@nestjs/common");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const prisma_service_1 = require("../prisma/prisma.service");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const prisma_service_1 = require("@/prisma/prisma.service");
 const raw_data_service_1 = require("./raw-data.service");
 const raw_data_entity_1 = require("./raw-data.entity");
 let RawDataController = class RawDataController {

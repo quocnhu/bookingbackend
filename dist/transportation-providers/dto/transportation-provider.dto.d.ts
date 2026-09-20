@@ -13,3 +13,15 @@ export declare class UpdateTransportationVehicleDto {
 export declare class AssignDriverToProviderDto {
     userId: string;
 }
+export declare class CreateDriverDto {
+    name: string;
+    email: string;
+    licenseNumber: string;
+    providerId?: string;
+}
+export declare class UpdateDriverDto {
+    name?: string;
+    email?: string;
+    licenseNumber?: string;
+    isActive?: boolean;
+}

@@ -15,7 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DashboardController = void 0;
 const common_1 = require("@nestjs/common");
 const dashboard_service_1 = require("./dashboard.service");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
 let DashboardController = class DashboardController {
     dashboardService;
     constructor(dashboardService) {

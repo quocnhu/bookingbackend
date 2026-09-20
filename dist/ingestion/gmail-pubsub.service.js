@@ -19,10 +19,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GmailPubSubService = void 0;
 const common_1 = require("@nestjs/common");
 const ioredis_1 = __importDefault(require("ioredis"));
-const prisma_service_1 = require("../prisma/prisma.service");
-const raw_data_service_1 = require("../raw-data/raw-data.service");
-const parsing_queue_1 = require("../parsing/parsing.queue");
-const redis_constants_1 = require("../common/redis/redis.constants");
+const prisma_service_1 = require("@/prisma/prisma.service");
+const raw_data_service_1 = require("@/raw-data/raw-data.service");
+const parsing_queue_1 = require("@/parsing/parsing.queue");
+const redis_constants_1 = require("@/common/redis/redis.constants");
 const gmail_auth_provider_1 = require("./gmail-auth.provider");
 let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
     prisma;

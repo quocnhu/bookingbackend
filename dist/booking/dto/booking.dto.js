@@ -9,10 +9,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QueryBookingDto = exports.UpdateBookingDto = exports.CreateBookingDto = void 0;
+exports.BatchUpdateBookingsDto = exports.BookingPatchDto = exports.QueryBookingDto = exports.UpdateBookingDto = exports.CreateBookingDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
-const pagination_dto_1 = require("../../common/dto/pagination.dto");
+const pagination_dto_1 = require("@/common/dto/pagination.dto");
 const client_1 = require("@prisma/client");
 class CreateBookingDto {
     bookingRef;
@@ -161,6 +161,9 @@ class UpdateBookingDto {
     payment;
     isNoShow;
     noShowReason;
+    notes;
+    collectAmount;
+    refundAmount;
 }
 exports.UpdateBookingDto = UpdateBookingDto;
 __decorate([
@@ -248,6 +251,21 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "noShowReason", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateBookingDto.prototype, "notes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    __metadata("design:type", Object)
+], UpdateBookingDto.prototype, "collectAmount", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    __metadata("design:type", Object)
+], UpdateBookingDto.prototype, "refundAmount", void 0);
 class QueryBookingDto extends pagination_dto_1.PaginationDto {
     status;
     channel;
@@ -281,4 +299,41 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], QueryBookingDto.prototype, "assignmentId", void 0);
+class BookingPatchDto {
+    id;
+    notes;
+    collectAmount;
+    refundAmount;
+}
+exports.BookingPatchDto = BookingPatchDto;
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], BookingPatchDto.prototype, "id", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", Object)
+], BookingPatchDto.prototype, "notes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    __metadata("design:type", Object)
+], BookingPatchDto.prototype, "collectAmount", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    __metadata("design:type", Object)
+], BookingPatchDto.prototype, "refundAmount", void 0);
+class BatchUpdateBookingsDto {
+    items;
+}
+exports.BatchUpdateBookingsDto = BatchUpdateBookingsDto;
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_transformer_1.Type)(() => BookingPatchDto),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    __metadata("design:type", Array)
+], BatchUpdateBookingsDto.prototype, "items", void 0);
 //# sourceMappingURL=booking.dto.js.map

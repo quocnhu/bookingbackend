@@ -11,9 +11,9 @@ const common_1 = require("@nestjs/common");
 const booking_controller_1 = require("./booking.controller");
 const booking_service_1 = require("./booking.service");
 const booking_manual_processor_1 = require("./booking-manual.processor");
-const booking_normalizer_service_1 = require("../parsing/booking-normalizer.service");
-const audit_module_1 = require("../audit/audit.module");
-const queues_module_1 = require("../queues/queues.module");
+const booking_normalizer_service_1 = require("@/parsing/booking-normalizer.service");
+const audit_module_1 = require("@/audit/audit.module");
+const queues_module_1 = require("@/queues/queues.module");
 let BookingModule = class BookingModule {
 };
 exports.BookingModule = BookingModule;

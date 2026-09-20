@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { AssignmentStatus, BookingStatus } from '@prisma/client';
+import {
+  AssignmentOrigin,
+  AssignmentStatus,
+  BookingStatus,
+  TourType,
+} from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { AssignmentBoardService } from './assignment-board.service';
@@ -34,6 +39,7 @@ export class AssignmentProcessor extends WorkerHost {
     const { bookingId } = job.data;
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
+      include: { tour: true },
     });
     if (!booking) return { skipped: true, reason: 'BOOKING_NOT_FOUND' };
     if (booking.status === BookingStatus.CANCELED)
@@ -48,14 +54,33 @@ export class AssignmentProcessor extends WorkerHost {
       return { skipped: true, reason: 'NO_START_DATE' };
 
     const candidate = await this.findCandidate(booking);
+    // Không có chuyến mở (PENDING/DRAFT) cùng ngày → tự tạo 1 bus mới
+    // cho tour của booking (bookingflow.md bước 3) để Dispatch Board có dữ liệu.
     if (!candidate) {
+      const bus = await this.createBusForBooking(booking);
       this.logger.log(
-        `No open bus for booking ${booking.bookingRef} — stays PENDING for manual assignment`,
+        `No open bus for booking ${booking.bookingRef} — created bus ${bus.code}`,
       );
+      const result = await this.board.attach(bus.id, bookingId);
+      if (!result.assigned) {
+        return { skipped: true, reason: 'ASSIGN_FAILED' };
+      }
+      await this.auditService.log({
+        entityType: 'Assignment',
+        entityId: bus.id,
+        action: 'AUTO_CREATE_BUS',
+        afterData: {
+          bookingId,
+          bookingRef: booking.bookingRef,
+          assignmentId: bus.id,
+        },
+        changedBy: null,
+      });
       return {
-        status: 'NO_BUS_FOUND',
+        status: 'CREATED_BUS',
         bookingId,
         bookingRef: booking.bookingRef,
+        assignmentId: bus.id,
       };
     }
 
@@ -84,6 +109,44 @@ export class AssignmentProcessor extends WorkerHost {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  /**
+   * Tạo 1 bus (assignment) cho booking khi chưa có chuyến mở nào phù hợp
+   * (bookingflow.md: "nếu booking với tour chưa có sẽ tạo 1 khối tượng trưng cho bus").
+   * Bus mới ở trạng thái PENDING để admin xếp HDV/tài xế trên Dispatch Board.
+   */
+  private async createBusForBooking(booking: any) {
+    const startDate = new Date(booking.startingDate);
+    startDate.setUTCHours(0, 0, 0, 0);
+    const durationDays = booking.tour?.durationDays ?? 1;
+    const endDate = new Date(
+      startDate.getTime() + Math.max(1, durationDays) * 86400000,
+    );
+    const label = booking.tourType === TourType.PRIVATE_TOUR ? 'Priv' : 'Group';
+    const existing = await this.prisma.assignment.findMany({
+      where: { code: { startsWith: `${label} Bus -` } },
+      select: { code: true },
+    });
+    const numbers = existing
+      .map((a) => parseInt((a.code ?? '').split('-')[1]?.trim() ?? '0', 10))
+      .filter((n) => !Number.isNaN(n));
+    const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
+    return this.prisma.assignment.create({
+      data: {
+        code: `${label} Bus - ${nextNumber}`,
+        startDate,
+        endDate,
+        status: AssignmentStatus.PENDING,
+        origin: AssignmentOrigin.AUTO_ASSIGN,
+        tourType: booking.tourType ?? null,
+        tourName: booking.tourName ?? booking.tour?.name ?? undefined,
+        durationDays,
+        totalPax: booking.totalPax ?? 0,
+        createdWho: 'Auto-Assign System',
+      },
+    });
+  }
+
   private async findCandidate(booking: any) {
     const candidates = await this.prisma.assignment.findMany({
       where: {

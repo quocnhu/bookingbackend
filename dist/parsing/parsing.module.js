@@ -8,9 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ParsingModule = void 0;
 const common_1 = require("@nestjs/common");
-const raw_data_module_1 = require("../raw-data/raw-data.module");
-const booking_module_1 = require("../booking/booking.module");
-const queues_module_1 = require("../queues/queues.module");
+const raw_data_module_1 = require("@/raw-data/raw-data.module");
+const booking_module_1 = require("@/booking/booking.module");
+const queues_module_1 = require("@/queues/queues.module");
 const parsing_processor_1 = require("./parsing.processor");
 const parsing_queue_1 = require("./parsing.queue");
 const parser_registry_1 = require("./parsers/parser-registry");

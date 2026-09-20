@@ -10,12 +10,12 @@ exports.QueuesModule = void 0;
 const common_1 = require("@nestjs/common");
 const bullmq_1 = require("@nestjs/bullmq");
 const config_1 = require("@nestjs/config");
-const audit_module_1 = require("../audit/audit.module");
+const audit_module_1 = require("@/audit/audit.module");
 const assignment_board_service_1 = require("./assignment-board.service");
 const assignment_queue_1 = require("./assignment.queue");
 const assignment_processor_1 = require("./assignment.processor");
 const queue_constants_1 = require("./queue.constants");
-const parsing_queue_1 = require("../parsing/parsing.queue");
+const parsing_queue_1 = require("@/parsing/parsing.queue");
 let QueuesModule = class QueuesModule {
 };
 exports.QueuesModule = QueuesModule;

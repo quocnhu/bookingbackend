@@ -9,10 +9,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SettlementSummaryDto = exports.FinalizeAssignmentDto = exports.FinalizeServiceDto = exports.VerifyTourReportDto = exports.SubmitTourReportDto = exports.QueryAssignmentDto = exports.MoveBookingDto = exports.ReorderBookingsDto = exports.AssignBookingsDto = exports.SetBoardOriginDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
+exports.SettlementSummaryDto = exports.FinalizeAssignmentDto = exports.BookingSettlementInputDto = exports.FinalizeServiceDto = exports.VerifyTourReportDto = exports.EvidenceImageDto = exports.SubmitTourReportDto = exports.QueryAssignmentDto = exports.MoveBookingDto = exports.ReorderBookingsDto = exports.AssignBookingsDto = exports.SetBoardOriginDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
-const pagination_dto_1 = require("../../common/dto/pagination.dto");
+const pagination_dto_1 = require("@/common/dto/pagination.dto");
 const client_1 = require("@prisma/client");
 class CreateAssignmentDto {
     code;
@@ -244,6 +244,7 @@ class SubmitTourReportDto {
     fuelCost;
     tollParking;
     notes;
+    evidenceImages;
 }
 exports.SubmitTourReportDto = SubmitTourReportDto;
 __decorate([
@@ -278,6 +279,45 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], SubmitTourReportDto.prototype, "notes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => EvidenceImageDto),
+    __metadata("design:type", Array)
+], SubmitTourReportDto.prototype, "evidenceImages", void 0);
+class EvidenceImageDto {
+    name;
+    url;
+    ext;
+    uploadedAt;
+    uploadedByName;
+}
+exports.EvidenceImageDto = EvidenceImageDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EvidenceImageDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EvidenceImageDto.prototype, "url", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EvidenceImageDto.prototype, "ext", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EvidenceImageDto.prototype, "uploadedAt", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EvidenceImageDto.prototype, "uploadedByName", void 0);
 class VerifyTourReportDto {
     status;
     verificationNotes;
@@ -312,9 +352,34 @@ __decorate([
     (0, class_validator_1.IsNumber)(),
     __metadata("design:type", Number)
 ], FinalizeServiceDto.prototype, "amount", void 0);
+class BookingSettlementInputDto {
+    bookingId;
+    collect;
+    refund;
+}
+exports.BookingSettlementInputDto = BookingSettlementInputDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], BookingSettlementInputDto.prototype, "bookingId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], BookingSettlementInputDto.prototype, "collect", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], BookingSettlementInputDto.prototype, "refund", void 0);
 class FinalizeAssignmentDto {
     collectedAmount;
+    refundedAmount;
     services;
+    evidenceImages;
+    bookingSettlements;
 }
 exports.FinalizeAssignmentDto = FinalizeAssignmentDto;
 __decorate([
@@ -324,11 +389,31 @@ __decorate([
 ], FinalizeAssignmentDto.prototype, "collectedAmount", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], FinalizeAssignmentDto.prototype, "refundedAmount", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),
     (0, class_validator_1.ValidateNested)({ each: true }),
     (0, class_transformer_1.Type)(() => FinalizeServiceDto),
     __metadata("design:type", Array)
 ], FinalizeAssignmentDto.prototype, "services", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => EvidenceImageDto),
+    __metadata("design:type", Array)
+], FinalizeAssignmentDto.prototype, "evidenceImages", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => BookingSettlementInputDto),
+    __metadata("design:type", Array)
+], FinalizeAssignmentDto.prototype, "bookingSettlements", void 0);
 class SettlementSummaryDto {
     from;
     to;

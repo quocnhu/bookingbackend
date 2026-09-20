@@ -1,5 +1,5 @@
-import { PrismaService } from "../prisma/prisma.service";
-import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import { PrismaService } from '@/prisma/prisma.service';
+import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 export declare class PermissionsService {
     private readonly prisma;
     constructor(prisma: PrismaService);

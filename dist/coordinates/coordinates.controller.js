@@ -16,8 +16,8 @@ exports.CoordinatesController = void 0;
 const common_1 = require("@nestjs/common");
 const coordinates_service_1 = require("./coordinates.service");
 const coordinate_dto_1 = require("./dto/coordinate.dto");
-const public_decorator_1 = require("../common/decorators/public.decorator");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const public_decorator_1 = require("@/common/decorators/public.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
 let CoordinatesController = class CoordinatesController {
     coordinatesService;
     constructor(coordinatesService) {

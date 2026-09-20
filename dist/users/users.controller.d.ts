@@ -1,30 +1,30 @@
 import { UsersService } from './users.service';
 import { CreateUserDto, QueryUserDto, UpdateUserDto, UpdateUserRoleDto } from './dto/user.dto';
-import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 import { UpdateUserPasswordDto } from './dto/user-password.dto';
 export declare class UsersController {
     private readonly usersService;
     constructor(usersService: UsersService);
     findAll(query: QueryUserDto, actor: AuthenticatedUser): Promise<import("../common/dto/pagination.dto").PaginatedResult<any>>;
     findOne(id: string): Promise<{
-        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         createdAt: Date;
+        updatedAt: Date;
         name: string | null;
-        authProvider: import("@prisma/client").$Enums.AuthProvider;
         email: string;
+        role: import("@prisma/client").$Enums.RoleType;
+        authProvider: import("@prisma/client").$Enums.AuthProvider;
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
-        updatedAt: Date;
         roles: ({
             role: {
                 id: string;
                 createdAt: Date;
-                name: string;
                 updatedAt: Date;
+                name: string;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -45,24 +45,24 @@ export declare class UsersController {
         })[];
     }>;
     create(dto: CreateUserDto): Promise<{
-        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         createdAt: Date;
+        updatedAt: Date;
         name: string | null;
-        authProvider: import("@prisma/client").$Enums.AuthProvider;
         email: string;
+        role: import("@prisma/client").$Enums.RoleType;
+        authProvider: import("@prisma/client").$Enums.AuthProvider;
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
-        updatedAt: Date;
         roles: ({
             role: {
                 id: string;
                 createdAt: Date;
-                name: string;
                 updatedAt: Date;
+                name: string;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -83,24 +83,24 @@ export declare class UsersController {
         })[];
     }>;
     update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser): Promise<{
-        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         createdAt: Date;
+        updatedAt: Date;
         name: string | null;
-        authProvider: import("@prisma/client").$Enums.AuthProvider;
         email: string;
+        role: import("@prisma/client").$Enums.RoleType;
+        authProvider: import("@prisma/client").$Enums.AuthProvider;
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
-        updatedAt: Date;
         roles: ({
             role: {
                 id: string;
                 createdAt: Date;
-                name: string;
                 updatedAt: Date;
+                name: string;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -121,24 +121,24 @@ export declare class UsersController {
         })[];
     }>;
     updateRoles(id: string, dto: UpdateUserRoleDto, actor: AuthenticatedUser): Promise<{
-        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         createdAt: Date;
+        updatedAt: Date;
         name: string | null;
-        authProvider: import("@prisma/client").$Enums.AuthProvider;
         email: string;
+        role: import("@prisma/client").$Enums.RoleType;
+        authProvider: import("@prisma/client").$Enums.AuthProvider;
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
-        updatedAt: Date;
         roles: ({
             role: {
                 id: string;
                 createdAt: Date;
-                name: string;
                 updatedAt: Date;
+                name: string;
                 description: string | null;
                 isSystem: boolean;
             };

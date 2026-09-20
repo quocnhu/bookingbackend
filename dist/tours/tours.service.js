@@ -17,9 +17,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToursService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../prisma/prisma.service");
-const audit_service_1 = require("../audit/audit.service");
-const storage_1 = require("../storage");
+const prisma_service_1 = require("@/prisma/prisma.service");
+const audit_service_1 = require("@/audit/audit.service");
+const storage_1 = require("@/storage");
 const sharp_1 = __importDefault(require("sharp"));
 const MAX_GALLERY_IMAGE_BYTES = 15 * 1024 * 1024;
 const ALLOWED_GALLERY_TYPES = ['image/jpeg', 'image/png', 'image/webp'];

@@ -154,7 +154,7 @@ export class GmailConsumer {
           hotelName: bookingData?.pickUp || 'Unknown Hotel' || null,
           tourType: bookingData?.tourType ? (bookingData.tourType as TourType) : null,
           tourName: bookingData?.tourName || null,
-          payment: PaymentStatus.PENDING,
+          payment: PaymentStatus.PAID,
           rawDataId: rawId || null,
         });
 

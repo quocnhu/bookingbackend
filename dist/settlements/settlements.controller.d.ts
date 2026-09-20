@@ -1,16 +1,16 @@
 import { SettlementsService } from './settlements.service';
 import { CreateSettlementCategoryDto, CreateSettlementDto, QuerySettlementDto, UpdateSettlementDto } from './dto/settlement.dto';
-import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 export declare class SettlementsController {
     private readonly settlementsService;
     constructor(settlementsService: SettlementsService);
     listCategories(): Promise<{
         id: string;
         createdAt: Date;
-        name: string;
         updatedAt: Date;
-        isSystem: boolean;
+        name: string;
         code: string;
+        isSystem: boolean;
         flowType: import("@prisma/client").$Enums.FeeFlowType;
     }[]>;
     exportByProvider(providerId: string, startDate?: string, endDate?: string): Promise<{
@@ -28,10 +28,10 @@ export declare class SettlementsController {
     createCategory(dto: CreateSettlementCategoryDto): Promise<{
         id: string;
         createdAt: Date;
-        name: string;
         updatedAt: Date;
-        isSystem: boolean;
+        name: string;
         code: string;
+        isSystem: boolean;
         flowType: import("@prisma/client").$Enums.FeeFlowType;
     }>;
     removeCategory(id: string): Promise<{
@@ -39,6 +39,12 @@ export declare class SettlementsController {
     }>;
     findAll(query: QuerySettlementDto, actor: AuthenticatedUser): Promise<import("../common/dto/pagination.dto").PaginatedResult<any>>;
     findOne(id: string): Promise<{
+        assignment: {
+            id: string;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            tourName: string | null;
+            code: string | null;
+        } | null;
         booking: {
             id: string;
             bookingRef: string;
@@ -46,19 +52,13 @@ export declare class SettlementsController {
             totalPax: number;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
         } | null;
-        assignment: {
-            id: string;
-            code: string | null;
-            status: import("@prisma/client").$Enums.AssignmentStatus;
-            tourName: string | null;
-        } | null;
         category: {
             id: string;
             createdAt: Date;
-            name: string;
             updatedAt: Date;
-            isSystem: boolean;
+            name: string;
             code: string;
+            isSystem: boolean;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
         createdBy: {
@@ -68,10 +68,10 @@ export declare class SettlementsController {
         };
     } & {
         id: string;
+        assignmentId: string | null;
         createdAt: Date;
         updatedAt: Date;
         imageUrl: string | null;
-        assignmentId: string | null;
         bookingId: string | null;
         categoryId: string | null;
         amount: number;
@@ -80,6 +80,12 @@ export declare class SettlementsController {
         createdById: string;
     }>;
     create(dto: CreateSettlementDto, actor: AuthenticatedUser): Promise<{
+        assignment: {
+            id: string;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            tourName: string | null;
+            code: string | null;
+        } | null;
         booking: {
             id: string;
             bookingRef: string;
@@ -87,19 +93,13 @@ export declare class SettlementsController {
             totalPax: number;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
         } | null;
-        assignment: {
-            id: string;
-            code: string | null;
-            status: import("@prisma/client").$Enums.AssignmentStatus;
-            tourName: string | null;
-        } | null;
         category: {
             id: string;
             createdAt: Date;
-            name: string;
             updatedAt: Date;
-            isSystem: boolean;
+            name: string;
             code: string;
+            isSystem: boolean;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
         createdBy: {
@@ -109,10 +109,10 @@ export declare class SettlementsController {
         };
     } & {
         id: string;
+        assignmentId: string | null;
         createdAt: Date;
         updatedAt: Date;
         imageUrl: string | null;
-        assignmentId: string | null;
         bookingId: string | null;
         categoryId: string | null;
         amount: number;
@@ -121,6 +121,12 @@ export declare class SettlementsController {
         createdById: string;
     }>;
     update(id: string, dto: UpdateSettlementDto): Promise<{
+        assignment: {
+            id: string;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            tourName: string | null;
+            code: string | null;
+        } | null;
         booking: {
             id: string;
             bookingRef: string;
@@ -128,19 +134,13 @@ export declare class SettlementsController {
             totalPax: number;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
         } | null;
-        assignment: {
-            id: string;
-            code: string | null;
-            status: import("@prisma/client").$Enums.AssignmentStatus;
-            tourName: string | null;
-        } | null;
         category: {
             id: string;
             createdAt: Date;
-            name: string;
             updatedAt: Date;
-            isSystem: boolean;
+            name: string;
             code: string;
+            isSystem: boolean;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
         createdBy: {
@@ -150,10 +150,10 @@ export declare class SettlementsController {
         };
     } & {
         id: string;
+        assignmentId: string | null;
         createdAt: Date;
         updatedAt: Date;
         imageUrl: string | null;
-        assignmentId: string | null;
         bookingId: string | null;
         categoryId: string | null;
         amount: number;

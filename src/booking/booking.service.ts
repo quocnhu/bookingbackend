@@ -23,6 +23,7 @@ import { AssignmentBoardService } from '@/queues/assignment-board.service';
 import { AssignmentQueue } from '@/queues/assignment.queue';
 import {
   CreateBookingDto,
+  BookingPatchDto,
   QueryBookingDto,
   UpdateBookingDto,
 } from './dto/booking.dto';
@@ -201,7 +202,7 @@ totalPax?: number;
       mail: data.mail,
       totalPax: data.totalPax,
       paxDetail: data.paxDetail,
-      payment: data.payment,
+      payment: data.payment ?? PaymentStatus.PAID,
       isNoShow: data.isNoShow,
       noShowReason: data.noShowReason,
     };
@@ -290,6 +291,7 @@ totalPax?: number;
       throw new ConflictException('Booking reference already exists');
     const data: any = { ...dto, bookingRef };
     if (dto.startingDate) data.startingDate = new Date(dto.startingDate);
+    if (!data.payment) data.payment = PaymentStatus.PAID;
     data.createdWho = actor?.name ?? actor?.email ?? 'System';
     const booking = await this.prisma.booking.create({ data });
     await this.auditService.log({
@@ -316,6 +318,35 @@ totalPax?: number;
     });
     await this.postWrite(booking);
     return booking;
+  }
+
+  /** Cập nhật nhanh ghi chú + số tiền thu/hoàn cho nhiều booking cùng lúc (Dispatch Board). */
+  async updateBatch(items: BookingPatchDto[]) {
+    if (items.length === 0) return [];
+    const updated = await this.prisma.$transaction(
+      items.map((item) =>
+        this.prisma.booking.update({
+          where: { id: item.id },
+          data: {
+            ...(item.notes !== undefined ? { notes: item.notes } : {}),
+            ...(item.collectAmount !== undefined
+              ? { collectAmount: item.collectAmount }
+              : {}),
+            ...(item.refundAmount !== undefined
+              ? { refundAmount: item.refundAmount }
+              : {}),
+          },
+        }),
+      ),
+    );
+    await this.auditService.log({
+      entityType: 'Booking',
+      entityId: items.map((i) => i.id).join(','),
+      action: 'UPDATE_BATCH',
+      afterData: { count: items.length },
+    });
+    for (const b of updated) await this.postWrite(b);
+    return updated;
   }
 
   async remove(id: string) {

@@ -5,36 +5,36 @@ export declare class CoordinatesController {
     constructor(coordinatesService: CoordinatesService);
     findAll(query: QueryCoordinateDto): Promise<import("../common/dto/pagination.dto").PaginatedResult<any>>;
     findOne(id: string): Promise<{
-        coordinate: string | null;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        hotelName: string;
-        address: string;
         latitude: number;
         longitude: number;
+        id: string;
+        address: string;
+        hotelName: string;
+        createdAt: Date;
+        updatedAt: Date;
+        coordinate: string | null;
         starRating: string | null;
     }>;
     create(dto: CreateCoordinateDto): Promise<{
-        coordinate: string | null;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        hotelName: string;
-        address: string;
         latitude: number;
         longitude: number;
+        id: string;
+        address: string;
+        hotelName: string;
+        createdAt: Date;
+        updatedAt: Date;
+        coordinate: string | null;
         starRating: string | null;
     }>;
     update(id: string, dto: UpdateCoordinateDto): Promise<{
-        coordinate: string | null;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        hotelName: string;
-        address: string;
         latitude: number;
         longitude: number;
+        id: string;
+        address: string;
+        hotelName: string;
+        createdAt: Date;
+        updatedAt: Date;
+        coordinate: string | null;
         starRating: string | null;
     }>;
     remove(id: string): Promise<{

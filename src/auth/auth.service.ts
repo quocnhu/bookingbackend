@@ -297,6 +297,7 @@ export class AuthService {
       userType: user.userType,
       authProvider: user.authProvider,
       createdAt: user.createdAt,
+      providerId: user.providerId,
       permissions: authUser.permissions,
       roles: user.roles.map((r) => r.role),
     };

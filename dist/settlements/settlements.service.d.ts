@@ -1,8 +1,8 @@
-import { PrismaService } from "../prisma/prisma.service";
-import { AuditService } from "../audit/audit.service";
+import { PrismaService } from '@/prisma/prisma.service';
+import { AuditService } from '@/audit/audit.service';
 import { CreateSettlementCategoryDto, CreateSettlementDto, QuerySettlementDto, UpdateSettlementDto } from './dto/settlement.dto';
-import { PaginatedResult } from "../common/dto/pagination.dto";
-import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import { PaginatedResult } from '@/common/dto/pagination.dto';
+import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 export declare class SettlementsService {
     private readonly prisma;
     private readonly auditService;
@@ -11,19 +11,19 @@ export declare class SettlementsService {
     listCategories(): Promise<{
         id: string;
         createdAt: Date;
-        name: string;
         updatedAt: Date;
-        isSystem: boolean;
+        name: string;
         code: string;
+        isSystem: boolean;
         flowType: import("@prisma/client").$Enums.FeeFlowType;
     }[]>;
     createCategory(dto: CreateSettlementCategoryDto): Promise<{
         id: string;
         createdAt: Date;
-        name: string;
         updatedAt: Date;
-        isSystem: boolean;
+        name: string;
         code: string;
+        isSystem: boolean;
         flowType: import("@prisma/client").$Enums.FeeFlowType;
     }>;
     removeCategory(id: string): Promise<{
@@ -31,6 +31,12 @@ export declare class SettlementsService {
     }>;
     findAll(query: QuerySettlementDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     findOne(id: string): Promise<{
+        assignment: {
+            id: string;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            tourName: string | null;
+            code: string | null;
+        } | null;
         booking: {
             id: string;
             bookingRef: string;
@@ -38,19 +44,13 @@ export declare class SettlementsService {
             totalPax: number;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
         } | null;
-        assignment: {
-            id: string;
-            code: string | null;
-            status: import("@prisma/client").$Enums.AssignmentStatus;
-            tourName: string | null;
-        } | null;
         category: {
             id: string;
             createdAt: Date;
-            name: string;
             updatedAt: Date;
-            isSystem: boolean;
+            name: string;
             code: string;
+            isSystem: boolean;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
         createdBy: {
@@ -60,10 +60,10 @@ export declare class SettlementsService {
         };
     } & {
         id: string;
+        assignmentId: string | null;
         createdAt: Date;
         updatedAt: Date;
         imageUrl: string | null;
-        assignmentId: string | null;
         bookingId: string | null;
         categoryId: string | null;
         amount: number;
@@ -72,6 +72,12 @@ export declare class SettlementsService {
         createdById: string;
     }>;
     create(dto: CreateSettlementDto, actor: AuthenticatedUser): Promise<{
+        assignment: {
+            id: string;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            tourName: string | null;
+            code: string | null;
+        } | null;
         booking: {
             id: string;
             bookingRef: string;
@@ -79,19 +85,13 @@ export declare class SettlementsService {
             totalPax: number;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
         } | null;
-        assignment: {
-            id: string;
-            code: string | null;
-            status: import("@prisma/client").$Enums.AssignmentStatus;
-            tourName: string | null;
-        } | null;
         category: {
             id: string;
             createdAt: Date;
-            name: string;
             updatedAt: Date;
-            isSystem: boolean;
+            name: string;
             code: string;
+            isSystem: boolean;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
         createdBy: {
@@ -101,10 +101,10 @@ export declare class SettlementsService {
         };
     } & {
         id: string;
+        assignmentId: string | null;
         createdAt: Date;
         updatedAt: Date;
         imageUrl: string | null;
-        assignmentId: string | null;
         bookingId: string | null;
         categoryId: string | null;
         amount: number;
@@ -113,6 +113,12 @@ export declare class SettlementsService {
         createdById: string;
     }>;
     update(id: string, dto: UpdateSettlementDto): Promise<{
+        assignment: {
+            id: string;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            tourName: string | null;
+            code: string | null;
+        } | null;
         booking: {
             id: string;
             bookingRef: string;
@@ -120,19 +126,13 @@ export declare class SettlementsService {
             totalPax: number;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
         } | null;
-        assignment: {
-            id: string;
-            code: string | null;
-            status: import("@prisma/client").$Enums.AssignmentStatus;
-            tourName: string | null;
-        } | null;
         category: {
             id: string;
             createdAt: Date;
-            name: string;
             updatedAt: Date;
-            isSystem: boolean;
+            name: string;
             code: string;
+            isSystem: boolean;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
         createdBy: {
@@ -142,10 +142,10 @@ export declare class SettlementsService {
         };
     } & {
         id: string;
+        assignmentId: string | null;
         createdAt: Date;
         updatedAt: Date;
         imageUrl: string | null;
-        assignmentId: string | null;
         bookingId: string | null;
         categoryId: string | null;
         amount: number;

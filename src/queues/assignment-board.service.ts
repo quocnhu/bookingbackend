@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AssignmentStatus, BookingStatus, TourType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
+import { rootFromProfile, sortByRootDistance } from '@/geo/distance';
 
 /** Một chuyến xe (bus) chở tối đa 12 khách — theo bookingflow.md bước 3. */
 const BUS_MAX_PAX = 12;
@@ -36,6 +37,7 @@ export class AssignmentBoardService {
     });
     await this.resequence(assignmentId);
     await this.refreshSummary(assignmentId);
+    await this.geoSort(assignmentId);
     return { unassigned: true, assignmentId };
   }
 
@@ -106,6 +108,8 @@ export class AssignmentBoardService {
     await this.attachBooking(toAssignmentId, bookingId);
     await this.refreshSummary(fromAssignmentId);
     await this.refreshSummary(toAssignmentId);
+    await this.geoSort(fromAssignmentId);
+    await this.geoSort(toAssignmentId);
 
     await this.auditService.log({
       entityType: 'Assignment',
@@ -131,6 +135,7 @@ export class AssignmentBoardService {
     if (!booking || booking.assignmentId) return { assigned: false };
     await this.attachBooking(assignmentId, bookingId);
     await this.refreshSummary(assignmentId);
+    await this.geoSort(assignmentId);
     return { assigned: true, assignmentId };
   }
 
@@ -225,6 +230,32 @@ export class AssignmentBoardService {
     });
     await this.prisma.$transaction(
       bookings.map((b, i) =>
+        this.prisma.booking.update({
+          where: { id: b.id },
+          data: { paxSequence: i + 1 },
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Sắp xếp bookings trong bus theo khoảng cách tăng dần tới root coordinate
+   * (gần nhất lên đầu — thứ tự đón khách). Ghi lại paxSequence 1..n.
+   * Bookings thiếu toạ độ được đẩy xuống cuối danh sách.
+   */
+  async geoSort(assignmentId: string) {
+    const bookings = await this.prisma.booking.findMany({
+      where: { assignmentId },
+      select: { id: true, latitude: true, longitude: true },
+    });
+    if (bookings.length <= 1) return;
+
+    const profile = await this.prisma.companyProfile.findFirst();
+    const root = rootFromProfile(profile);
+    const ordered = sortByRootDistance(bookings, root);
+
+    await this.prisma.$transaction(
+      ordered.map((b, i) =>
         this.prisma.booking.update({
           where: { id: b.id },
           data: { paxSequence: i + 1 },

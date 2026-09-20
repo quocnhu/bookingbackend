@@ -1,12 +1,18 @@
-import { PrismaService } from "../prisma/prisma.service";
-import { AuditService } from "../audit/audit.service";
-import { AssignDriverToProviderDto, CreateTransportationVehicleDto, UpdateTransportationVehicleDto } from './dto/transportation-provider.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import { AuditService } from '@/audit/audit.service';
+import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
+import { AssignDriverToProviderDto, CreateDriverDto, CreateTransportationVehicleDto, UpdateDriverDto, UpdateTransportationVehicleDto } from './dto/transportation-provider.dto';
 export declare class TransportationProvidersService {
     private readonly prisma;
     private readonly auditService;
     constructor(prisma: PrismaService, auditService: AuditService);
     private personSelect;
-    findAll(): Promise<{
+    private driverSelect;
+    private toDriverView;
+    private isProvider;
+    private providerScope;
+    private requireProviderId;
+    findAll(actor?: AuthenticatedUser): Promise<{
         id: string;
         name: string;
         contact: any;
@@ -19,7 +25,7 @@ export declare class TransportationProvidersService {
         }[];
         drivers: any[];
     }[]>;
-    findOne(id: string): Promise<{
+    findOne(id: string, actor?: AuthenticatedUser): Promise<{
         id: string;
         name: string;
         contact: any;
@@ -32,43 +38,61 @@ export declare class TransportationProvidersService {
         }[];
         drivers: any[];
     }>;
-    findAllDrivers(): Promise<{
-        id: string;
-        name: string | null;
-        email: string;
-        isActive: boolean;
-        providerId: string | null;
+    findAllDrivers(actor?: AuthenticatedUser): Promise<{
+        id: any;
+        name: any;
+        email: any;
+        isActive: any;
+        providerId: any;
+        licenseNumber: any;
     }[]>;
+    createDriver(actor: AuthenticatedUser, dto: CreateDriverDto): Promise<{
+        defaultPassword: string;
+        id: any;
+        name: any;
+        email: any;
+        isActive: any;
+        providerId: any;
+        licenseNumber: any;
+    }>;
+    updateDriver(actor: AuthenticatedUser, id: string, dto: UpdateDriverDto): Promise<{
+        id: any;
+        name: any;
+        email: any;
+        isActive: any;
+        providerId: any;
+        licenseNumber: any;
+    }>;
     private ensureProviderOrFail;
-    createVehicle(dto: CreateTransportationVehicleDto): Promise<{
+    createVehicle(actor: AuthenticatedUser, dto: CreateTransportationVehicleDto): Promise<{
         id: string;
         providerId: string;
         plateNumber: string;
         capacity: number | null;
         brand: string | null;
     }>;
-    updateVehicle(id: string, dto: UpdateTransportationVehicleDto): Promise<{
+    updateVehicle(actor: AuthenticatedUser, id: string, dto: UpdateTransportationVehicleDto): Promise<{
         id: string;
         providerId: string;
         plateNumber: string;
         capacity: number | null;
         brand: string | null;
     }>;
-    deleteVehicle(id: string): Promise<{
+    deleteVehicle(actor: AuthenticatedUser, id: string): Promise<{
         message: string;
     }>;
     assignDriver(providerId: string, dto: AssignDriverToProviderDto): Promise<{
-        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         name: string | null;
-        email: string;
         providerId: string | null;
+        email: string;
+        role: import("@prisma/client").$Enums.RoleType;
     }>;
     unassignDriver(providerId: string, userId: string): Promise<{
-        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         name: string | null;
-        email: string;
         providerId: string | null;
+        email: string;
+        role: import("@prisma/client").$Enums.RoleType;
     }>;
 }

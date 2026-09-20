@@ -110,6 +110,8 @@ const DEFAULT_PERMISSIONS: Array<{ code: string; name: string; group: string }> 
   { code: 'vehicle.update', name: 'Sửa xe (provider)', group: 'Vehicle' },
   { code: 'vehicle.delete', name: 'Xoá xe (provider)', group: 'Vehicle' },
   { code: 'provider.create', name: 'Tạo transportation provider', group: 'Provider' },
+  { code: 'driver.create', name: 'Tạo tài xế', group: 'Provider Driver' },
+  { code: 'driver.update', name: 'Sửa tài xế', group: 'Provider Driver' },
   { code: 'provider-driver.assign', name: 'Gán tài xế vào provider', group: 'Provider Driver' },
   { code: 'provider-driver.unassign', name: 'Gỡ tài xế khỏi provider', group: 'Provider Driver' },
 ];
@@ -741,6 +743,38 @@ async function main() {
     },
   });
   console.log(`✅ Seeded OFFICE role`);
+
+  // 3.5 TRANSPORT_PROVIDER role — tự quản lý nhà xe của mình (KHÔNG gán/gỡ tài xế,
+  // không xem settlement/user của công ty — mọi query phải scope theo providerId).
+  const providerRole = await prisma.role.upsert({
+    where: { name: 'TRANSPORT_PROVIDER' },
+    update: {},
+    create: {
+      name: 'TRANSPORT_PROVIDER',
+      description: 'Đối tác vận chuyển — quản lý xe & tài xế của chính nhà xe',
+      isSystem: false,
+    },
+  });
+  await prisma.rolePermission.deleteMany({ where: { roleId: providerRole.id } });
+  const PROVIDER_ROLE_PERMISSIONS = [
+    'assignment.read',
+    'assignment.create',
+    'vehicle.create',
+    'vehicle.update',
+    'vehicle.delete',
+    'driver.create',
+    'driver.update',
+    'route-price.create',
+    'route-price.update',
+  ];
+  await prisma.rolePermission.createMany({
+    data: PROVIDER_ROLE_PERMISSIONS
+      .filter((code) => permissionMap.has(code))
+      .map((code) => ({ roleId: providerRole.id, permissionId: permissionMap.get(code)! })),
+  });
+  console.log(
+    `✅ Seeded TRANSPORT_PROVIDER role (${PROVIDER_ROLE_PERMISSIONS.filter((c) => permissionMap.has(c)).length} permissions)`,
+  );
 
   // 4. Admin user mặc định
   const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@booking.local';

@@ -12,13 +12,27 @@ var NotificationService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../prisma/prisma.service");
+const prisma_service_1 = require("@/prisma/prisma.service");
+const audit_service_1 = require("@/audit/audit.service");
+const notifications_gateway_1 = require("./notifications.gateway");
 const client_1 = require("@prisma/client");
+const ROLE_LABELS = {
+    ADMIN: 'Admin',
+    OFFICE: 'Office',
+    TOUR_GUIDE: 'Tour Guide',
+    DRIVER: 'Driver',
+    TRANSPORT_PROVIDER: 'Transport Provider',
+    CUSTOMER: 'Customer',
+};
 let NotificationService = NotificationService_1 = class NotificationService {
     prisma;
+    auditService;
+    gateway;
     logger = new common_1.Logger(NotificationService_1.name);
-    constructor(prisma) {
+    constructor(prisma, auditService, gateway) {
         this.prisma = prisma;
+        this.auditService = auditService;
+        this.gateway = gateway;
     }
     async create(userId, type, title, body, data) {
         const notification = await this.prisma.notification.create({
@@ -62,10 +76,82 @@ let NotificationService = NotificationService_1 = class NotificationService {
             select: { endpoint: true },
         });
     }
+    async getTargets(search) {
+        const groups = await this.prisma.user.groupBy({
+            by: ['role'],
+            where: { isActive: true },
+            _count: { _all: true },
+            orderBy: { _count: { role: 'desc' } },
+        });
+        const roleGroups = groups
+            .filter((g) => g._count._all > 0)
+            .map((g) => ({
+            key: g.role,
+            label: ROLE_LABELS[g.role] ?? g.role,
+            count: g._count._all,
+        }));
+        const users = await this.prisma.user.findMany({
+            where: {
+                isActive: true,
+                ...(search
+                    ? {
+                        OR: [
+                            { name: { contains: search, mode: 'insensitive' } },
+                            { email: { contains: search, mode: 'insensitive' } },
+                        ],
+                    }
+                    : {}),
+            },
+            select: { id: true, name: true, email: true, role: true },
+            orderBy: [{ name: 'asc' }],
+            take: 100,
+        });
+        return { roleGroups, users };
+    }
+    async send(dto, actor) {
+        const recipientIds = new Set(dto.userIds ?? []);
+        if (dto.roleTypes?.length) {
+            const byRole = await this.prisma.user.findMany({
+                where: { isActive: true, role: { in: dto.roleTypes } },
+                select: { id: true },
+            });
+            for (const u of byRole)
+                recipientIds.add(u.id);
+        }
+        if (recipientIds.size === 0) {
+            throw new common_1.BadRequestException('No recipients selected');
+        }
+        const type = dto.type ?? client_1.NotificationType.GENERAL;
+        const created = [];
+        for (const userId of recipientIds) {
+            const notif = await this.create(userId, type, dto.title, dto.body, {
+                fromUserId: actor.id,
+            });
+            this.gateway.notifyUser(userId, 'notification', notif);
+            created.push(notif);
+        }
+        this.auditService.log({
+            entityType: 'Notification',
+            entityId: dto.title || 'notification',
+            action: 'SEND',
+            afterData: {
+                recipients: recipientIds.size,
+                roleTypes: dto.roleTypes ?? [],
+                userIds: dto.userIds ?? [],
+            },
+            changedBy: actor.id,
+        });
+        return {
+            sent: recipientIds.size,
+            recipients: [...recipientIds],
+        };
+    }
 };
 exports.NotificationService = NotificationService;
 exports.NotificationService = NotificationService = NotificationService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        audit_service_1.AuditService,
+        notifications_gateway_1.NotificationsGateway])
 ], NotificationService);
 //# sourceMappingURL=notification.service.js.map

@@ -54,6 +54,16 @@ async function main() {
     });
     userCount++;
 
+    // Bind TRANSPORT_PROVIDER user to the role so role-permissions resolve.
+    const providerRole = await prisma.role.findUnique({ where: { name: 'TRANSPORT_PROVIDER' } });
+    if (providerRole) {
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: providerUser.id, roleId: providerRole.id } },
+        update: {},
+        create: { userId: providerUser.id, roleId: providerRole.id },
+      });
+    }
+
     // One vehicle per seat size.
     const vehicles = [];
     for (const seats of SEATS) {

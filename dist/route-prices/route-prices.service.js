@@ -11,8 +11,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RoutePricesService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../prisma/prisma.service");
-const audit_service_1 = require("../audit/audit.service");
+const prisma_service_1 = require("@/prisma/prisma.service");
+const audit_service_1 = require("@/audit/audit.service");
+const client_1 = require("@prisma/client");
 let RoutePricesService = class RoutePricesService {
     prisma;
     auditService;
@@ -25,11 +26,23 @@ let RoutePricesService = class RoutePricesService {
         provider: true,
         vehicle: true,
     };
-    async findAll(query) {
+    isProvider(actor) {
+        return !!actor && actor.role === client_1.RoleType.TRANSPORT_PROVIDER;
+    }
+    providerScope(actor) {
+        return this.isProvider(actor) ? { providerId: actor.providerId } : undefined;
+    }
+    requireProviderId(actor) {
+        if (!this.isProvider(actor) || !actor.providerId) {
+            throw new common_1.ForbiddenException('Your account is not linked to a transportation provider');
+        }
+        return actor.providerId;
+    }
+    async findAll(query, actor) {
         const page = query.page ?? 1;
         const limit = query.limit ?? 20;
         const { tourId, providerId, vehicleId } = query;
-        const where = {};
+        const where = this.providerScope(actor);
         if (tourId)
             where.tourId = tourId;
         if (providerId)
@@ -59,9 +72,10 @@ let RoutePricesService = class RoutePricesService {
         const items = flat.slice((page - 1) * limit, page * limit);
         return { items, total, page, limit };
     }
-    async getDropdownData() {
+    async getDropdownData(actor) {
         const [providers, tours] = await Promise.all([
             this.prisma.transportationProvider.findMany({
+                where: this.providerScope(actor),
                 select: {
                     id: true,
                     name: true,
@@ -79,6 +93,29 @@ let RoutePricesService = class RoutePricesService {
         ]);
         return { providers, tours };
     }
+    async getAssignable(actor) {
+        const prices = await this.prisma.routePrice.findMany({
+            where: this.providerScope(actor),
+            include: {
+                tour: { select: { id: true, name: true, durationDays: true } },
+                vehicle: { select: { id: true, capacity: true, plateNumber: true, brand: true } },
+                provider: { select: { id: true, name: true } },
+            },
+            orderBy: [{ provider: { name: 'asc' } }, { tour: { name: 'asc' } }],
+        });
+        return prices.map((p) => ({
+            providerId: p.providerId,
+            providerName: p.provider.name,
+            vehicleId: p.vehicle.id,
+            capacity: p.vehicle.capacity,
+            plateNumber: p.vehicle.plateNumber,
+            brand: p.vehicle.brand,
+            tourId: p.tour.id,
+            tourName: p.tour.name,
+            durationDays: p.tour.durationDays ?? 1,
+            price: Number(p.price),
+        }));
+    }
     async findOne(id) {
         const routePrice = await this.prisma.routePrice.findUnique({
             where: { id },
@@ -88,12 +125,15 @@ let RoutePricesService = class RoutePricesService {
             throw new common_1.NotFoundException('Route price not found');
         return routePrice;
     }
-    async create(dto) {
+    async create(actor, dto) {
+        const providerId = this.isProvider(actor) ? this.requireProviderId(actor) : dto.providerId;
+        if (this.isProvider(actor))
+            await this.assertVehicleBelongsToProvider(dto.vehicleId, providerId);
         const existing = await this.prisma.routePrice.findUnique({
             where: {
                 tourId_providerId_vehicleId: {
                     tourId: dto.tourId,
-                    providerId: dto.providerId,
+                    providerId,
                     vehicleId: dto.vehicleId,
                 },
             },
@@ -101,7 +141,7 @@ let RoutePricesService = class RoutePricesService {
         if (existing)
             throw new common_1.ConflictException('Route price already exists for this tour, provider and vehicle');
         const routePrice = await this.prisma.routePrice.create({
-            data: { ...dto },
+            data: { ...dto, providerId },
             include: this.routeInclude,
         });
         await this.auditService.log({
@@ -112,12 +152,20 @@ let RoutePricesService = class RoutePricesService {
         });
         return routePrice;
     }
-    async update(id, dto) {
+    async update(actor, id, dto) {
         const before = await this.findOne(id);
+        if (this.isProvider(actor)) {
+            if (before.providerId !== actor.providerId) {
+                throw new common_1.ForbiddenException('Cannot edit a route price of another provider');
+            }
+            delete dto.providerId;
+        }
         const tourId = dto.tourId ?? before.tourId;
         const providerId = dto.providerId ?? before.providerId;
         const vehicleId = dto.vehicleId ?? before.vehicleId;
         if (tourId && providerId) {
+            if (this.isProvider(actor))
+                await this.assertVehicleBelongsToProvider(vehicleId, providerId);
             const dup = await this.prisma.routePrice.findFirst({
                 where: {
                     tourId,
@@ -142,6 +190,14 @@ let RoutePricesService = class RoutePricesService {
             afterData: routePrice,
         });
         return routePrice;
+    }
+    async assertVehicleBelongsToProvider(vehicleId, providerId) {
+        if (!vehicleId || !providerId)
+            return;
+        const vehicle = await this.prisma.vehicle.findUnique({ where: { id: vehicleId } });
+        if (!vehicle || vehicle.providerId !== providerId) {
+            throw new common_1.ForbiddenException('Vehicle does not belong to your provider');
+        }
     }
     async remove(id) {
         await this.findOne(id);

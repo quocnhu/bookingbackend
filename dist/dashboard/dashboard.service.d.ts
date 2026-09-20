@@ -1,4 +1,4 @@
-import { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from '@/prisma/prisma.service';
 export type RangeKey = 'day' | 'week' | 'month';
 export declare class DashboardService {
     private readonly prisma;
@@ -58,60 +58,63 @@ export declare class DashboardService {
                 name: string;
             } | null;
         } & {
+            latitude: number | null;
+            longitude: number | null;
             id: string;
-            createdAt: Date;
-            updatedAt: Date;
+            bookingRef: string;
+            rawDataId: string | null;
+            channel: import("@prisma/client").$Enums.BookingProvider;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
-            channel: import("@prisma/client").$Enums.BookingProvider;
+            confirmationCode: string | null;
+            address: string | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
             mail: string | null;
-            startingDate: Date | null;
             totalPax: number;
             paxDetail: string | null;
-            tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
-            address: string | null;
-            latitude: number | null;
-            longitude: number | null;
+            tourName: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            rawDataId: string | null;
+            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
+            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
+            notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            createdAt: Date;
+            updatedAt: Date;
         })[];
         recentRawData: {
             id: string;
-            createdAt: Date;
             status: string;
+            createdAt: Date;
             sourceId: string;
         }[];
         assignmentsToday: {
-            id: string;
-            createdAt: Date;
-            providerId: string | null;
-            updatedAt: Date;
-            code: string | null;
-            status: import("@prisma/client").$Enums.AssignmentStatus;
-            durationDays: number | null;
-            vehicleId: string | null;
-            totalPax: number;
-            tourName: string | null;
-            tourType: import("@prisma/client").$Enums.TourType | null;
             latitude: number | null;
             longitude: number | null;
+            id: string;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            totalPax: number;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            tourName: string | null;
             createdWho: string | null;
+            createdAt: Date;
+            updatedAt: Date;
+            code: string | null;
             startDate: Date;
             endDate: Date;
+            durationDays: number | null;
             pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+            vehicleId: string | null;
+            providerId: string | null;
             driverId: string | null;
             guideId: string | null;
             reportVerifierId: string | null;
@@ -130,10 +133,10 @@ export declare class DashboardService {
             id: string;
             createdAt: Date;
             eventType: string;
-            userId: string | null;
             authProvider: import("@prisma/client").$Enums.AuthProvider | null;
             ipAddress: string | null;
             userAgent: string | null;
+            userId: string | null;
         })[];
         recentActions: ({
             user: {
@@ -143,12 +146,12 @@ export declare class DashboardService {
             } | null;
         } & {
             id: string;
+            createdAt: Date;
             entityType: string;
             entityId: string;
             action: string;
             beforeData: import("@prisma/client/runtime/library").JsonValue | null;
             afterData: import("@prisma/client/runtime/library").JsonValue | null;
-            createdAt: Date;
             changedBy: string | null;
         })[];
     }>;

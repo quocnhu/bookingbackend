@@ -14,6 +14,8 @@ const NEW_PERMISSIONS = [
   { code: 'vehicle.update', name: 'Sửa xe (provider)', group: 'Vehicle' },
   { code: 'vehicle.delete', name: 'Xoá xe (provider)', group: 'Vehicle' },
   { code: 'provider.create', name: 'Tạo transportation provider', group: 'Provider' },
+  { code: 'driver.create', name: 'Tạo tài xế', group: 'Provider Driver' },
+  { code: 'driver.update', name: 'Sửa tài xế', group: 'Provider Driver' },
   { code: 'provider-driver.assign', name: 'Gán tài xế vào provider', group: 'Provider Driver' },
   { code: 'provider-driver.unassign', name: 'Gỡ tài xế khỏi provider', group: 'Provider Driver' },
 ];

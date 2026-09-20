@@ -10,7 +10,7 @@ exports.SettlementsModule = void 0;
 const common_1 = require("@nestjs/common");
 const settlements_controller_1 = require("./settlements.controller");
 const settlements_service_1 = require("./settlements.service");
-const audit_module_1 = require("../audit/audit.module");
+const audit_module_1 = require("@/audit/audit.module");
 let SettlementsModule = class SettlementsModule {
 };
 exports.SettlementsModule = SettlementsModule;

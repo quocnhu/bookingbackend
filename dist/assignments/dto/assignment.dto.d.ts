@@ -1,4 +1,4 @@
-import { PaginationDto } from "../../common/dto/pagination.dto";
+import { PaginationDto } from '@/common/dto/pagination.dto';
 import { AssignmentOrigin, AssignmentStatus } from '@prisma/client';
 export declare class CreateAssignmentDto {
     code?: string;
@@ -57,6 +57,14 @@ export declare class SubmitTourReportDto {
     fuelCost?: number;
     tollParking?: number;
     notes?: string;
+    evidenceImages?: EvidenceImageDto[];
+}
+export declare class EvidenceImageDto {
+    name?: string;
+    url: string;
+    ext?: string;
+    uploadedAt?: string;
+    uploadedByName?: string;
 }
 export declare class VerifyTourReportDto {
     status: 'VERIFIED' | 'REJECTED';
@@ -67,9 +75,17 @@ export declare class FinalizeServiceDto {
     name: string;
     amount: number;
 }
+export declare class BookingSettlementInputDto {
+    bookingId: string;
+    collect?: number;
+    refund?: number;
+}
 export declare class FinalizeAssignmentDto {
     collectedAmount: number;
+    refundedAmount?: number;
     services?: FinalizeServiceDto[];
+    evidenceImages?: EvidenceImageDto[];
+    bookingSettlements?: BookingSettlementInputDto[];
 }
 export declare class SettlementSummaryDto {
     from: string;

@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  ValidateNested,
 } from 'class-validator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import {
@@ -169,6 +170,18 @@ export class UpdateBookingDto {
   @IsOptional()
   @IsString()
   noShowReason?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  collectAmount?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  refundAmount?: number | null;
 }
 
 export class QueryBookingDto extends PaginationDto {
@@ -191,4 +204,29 @@ export class QueryBookingDto extends PaginationDto {
   @IsOptional()
   @IsString()
   assignmentId?: string;
+}
+
+export class BookingPatchDto {
+  @IsNotEmpty()
+  @IsString()
+  id: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  collectAmount?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  refundAmount?: number | null;
+}
+
+export class BatchUpdateBookingsDto {
+  @IsNotEmpty()
+  @Type(() => BookingPatchDto)
+  @ValidateNested({ each: true })
+  items: BookingPatchDto[];
 }

@@ -13,8 +13,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AssignmentBoardService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
-const prisma_service_1 = require("../prisma/prisma.service");
-const audit_service_1 = require("../audit/audit.service");
+const prisma_service_1 = require("@/prisma/prisma.service");
+const audit_service_1 = require("@/audit/audit.service");
+const distance_1 = require("@/geo/distance");
 const BUS_MAX_PAX = 12;
 let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardService {
     prisma;
@@ -37,6 +38,7 @@ let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardSer
         });
         await this.resequence(assignmentId);
         await this.refreshSummary(assignmentId);
+        await this.geoSort(assignmentId);
         return { unassigned: true, assignmentId };
     }
     async reorder(assignmentId, bookingIds) {
@@ -96,6 +98,8 @@ let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardSer
         await this.attachBooking(toAssignmentId, bookingId);
         await this.refreshSummary(fromAssignmentId);
         await this.refreshSummary(toAssignmentId);
+        await this.geoSort(fromAssignmentId);
+        await this.geoSort(toAssignmentId);
         await this.auditService.log({
             entityType: 'Assignment',
             entityId: toAssignmentId,
@@ -112,6 +116,7 @@ let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardSer
             return { assigned: false };
         await this.attachBooking(assignmentId, bookingId);
         await this.refreshSummary(assignmentId);
+        await this.geoSort(assignmentId);
         return { assigned: true, assignmentId };
     }
     async attachBooking(assignmentId, bookingId) {
@@ -187,6 +192,21 @@ let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardSer
             select: { id: true },
         });
         await this.prisma.$transaction(bookings.map((b, i) => this.prisma.booking.update({
+            where: { id: b.id },
+            data: { paxSequence: i + 1 },
+        })));
+    }
+    async geoSort(assignmentId) {
+        const bookings = await this.prisma.booking.findMany({
+            where: { assignmentId },
+            select: { id: true, latitude: true, longitude: true },
+        });
+        if (bookings.length <= 1)
+            return;
+        const profile = await this.prisma.companyProfile.findFirst();
+        const root = (0, distance_1.rootFromProfile)(profile);
+        const ordered = (0, distance_1.sortByRootDistance)(bookings, root);
+        await this.prisma.$transaction(ordered.map((b, i) => this.prisma.booking.update({
             where: { id: b.id },
             data: { paxSequence: i + 1 },
         })));

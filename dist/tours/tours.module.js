@@ -10,7 +10,7 @@ exports.ToursModule = void 0;
 const common_1 = require("@nestjs/common");
 const tours_controller_1 = require("./tours.controller");
 const tours_service_1 = require("./tours.service");
-const audit_module_1 = require("../audit/audit.module");
+const audit_module_1 = require("@/audit/audit.module");
 let ToursModule = class ToursModule {
 };
 exports.ToursModule = ToursModule;

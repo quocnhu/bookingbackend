@@ -1,4 +1,4 @@
-import { PaginationDto } from "../../common/dto/pagination.dto";
+import { PaginationDto } from '@/common/dto/pagination.dto';
 import { TourType } from '@prisma/client';
 export declare class CreateTourDto {
     name: string;
@@ -10,7 +10,8 @@ export declare class CreateTourDto {
     childPrice?: number;
     infantPrice?: number;
     currency?: string;
-    discountPercent?: number;
+    privateDiscountPercent?: number;
+    groupDiscountPercent?: number;
     promotionStartsAt?: string;
     promotionEndsAt?: string;
     typePrices?: TourTypePriceDto[];
@@ -42,7 +43,8 @@ export declare class UpdateTourDto {
     childPrice?: number;
     infantPrice?: number;
     currency?: string;
-    discountPercent?: number;
+    privateDiscountPercent?: number;
+    groupDiscountPercent?: number;
     promotionStartsAt?: string;
     promotionEndsAt?: string;
     typePrices?: TourTypePriceDto[];

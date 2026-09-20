@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.redisProvider = void 0;
 const common_1 = require("@nestjs/common");
 const ioredis_1 = __importDefault(require("ioredis"));
-const redis_constants_1 = require("../common/redis/redis.constants");
+const redis_constants_1 = require("@/common/redis/redis.constants");
 const logger = new common_1.Logger('RedisProvider');
 exports.redisProvider = {
     provide: redis_constants_1.REDIS_CLIENT,

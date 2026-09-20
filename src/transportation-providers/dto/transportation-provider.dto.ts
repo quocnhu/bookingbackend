@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEmail, IsInt, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateTransportationVehicleDto {
@@ -40,4 +40,37 @@ export class UpdateTransportationVehicleDto {
 export class AssignDriverToProviderDto {
   @IsString()
   userId: string;
+}
+
+export class CreateDriverDto {
+  @IsString()
+  name: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  licenseNumber: string;
+
+  @IsOptional()
+  @IsString()
+  providerId?: string;
+}
+
+export class UpdateDriverDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  licenseNumber?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

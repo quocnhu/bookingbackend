@@ -1,18 +1,52 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TransportationProvidersService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../prisma/prisma.service");
-const audit_service_1 = require("../audit/audit.service");
+const bcrypt = __importStar(require("bcrypt"));
+const prisma_service_1 = require("@/prisma/prisma.service");
+const audit_service_1 = require("@/audit/audit.service");
 const client_1 = require("@prisma/client");
 let TransportationProvidersService = class TransportationProvidersService {
     prisma;
@@ -27,9 +61,37 @@ let TransportationProvidersService = class TransportationProvidersService {
         email: true,
         isActive: true,
     };
-    async findAll() {
+    driverSelect = {
+        ...this.personSelect,
+        providerId: true,
+        driverProfile: { select: { licenseNumber: true } },
+    };
+    toDriverView(d) {
+        return {
+            id: d.id,
+            name: d.name,
+            email: d.email,
+            isActive: d.isActive,
+            providerId: d.providerId ?? null,
+            licenseNumber: d.driverProfile?.licenseNumber ?? null,
+        };
+    }
+    isProvider(actor) {
+        return !!actor && actor.role === client_1.RoleType.TRANSPORT_PROVIDER;
+    }
+    providerScope(actor) {
+        return this.isProvider(actor) ? { providerId: actor.providerId } : undefined;
+    }
+    requireProviderId(actor) {
+        if (!this.isProvider(actor) || !actor.providerId) {
+            throw new common_1.ForbiddenException('Your account is not linked to a transportation provider');
+        }
+        return actor.providerId;
+    }
+    async findAll(actor) {
         const [providers, contacts, drivers] = await Promise.all([
             this.prisma.transportationProvider.findMany({
+                where: this.providerScope(actor),
                 include: {
                     vehicles: {
                         orderBy: [{ capacity: 'asc' }, { brand: 'asc' }],
@@ -38,13 +100,13 @@ let TransportationProvidersService = class TransportationProvidersService {
                 orderBy: { name: 'asc' },
             }),
             this.prisma.user.findMany({
-                where: { role: client_1.RoleType.TRANSPORT_PROVIDER },
+                where: { role: client_1.RoleType.TRANSPORT_PROVIDER, ...this.providerScope(actor) },
                 select: { ...this.personSelect, providerId: true },
                 orderBy: { name: 'asc' },
             }),
             this.prisma.user.findMany({
-                where: { role: client_1.RoleType.DRIVER },
-                select: { ...this.personSelect, providerId: true },
+                where: { role: client_1.RoleType.DRIVER, ...this.providerScope(actor) },
+                select: this.driverSelect,
                 orderBy: { name: 'asc' },
             }),
         ]);
@@ -59,7 +121,7 @@ let TransportationProvidersService = class TransportationProvidersService {
                 continue;
             if (!driversByProvider.has(d.providerId))
                 driversByProvider.set(d.providerId, []);
-            driversByProvider.get(d.providerId).push(d);
+            driversByProvider.get(d.providerId).push(this.toDriverView(d));
         }
         return providers.map((p) => ({
             id: p.id,
@@ -69,19 +131,87 @@ let TransportationProvidersService = class TransportationProvidersService {
             drivers: driversByProvider.get(p.id) ?? [],
         }));
     }
-    async findOne(id) {
-        const providers = await this.findAll();
+    async findOne(id, actor) {
+        const providers = await this.findAll(actor);
         const provider = providers.find((p) => p.id === id);
         if (!provider)
             throw new common_1.NotFoundException('Transportation provider not found');
         return provider;
     }
-    async findAllDrivers() {
-        return this.prisma.user.findMany({
-            where: { role: client_1.RoleType.DRIVER },
-            select: { ...this.personSelect, providerId: true },
+    async findAllDrivers(actor) {
+        const rows = await this.prisma.user.findMany({
+            where: { role: client_1.RoleType.DRIVER, ...this.providerScope(actor) },
+            select: this.driverSelect,
             orderBy: [{ name: 'asc' }, { email: 'asc' }],
         });
+        return rows.map((d) => this.toDriverView(d));
+    }
+    async createDriver(actor, dto) {
+        const providerId = this.isProvider(actor) ? this.requireProviderId(actor) : (dto.providerId ?? null);
+        if (providerId)
+            await this.ensureProviderOrFail(providerId);
+        const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+        if (existing)
+            throw new common_1.ConflictException('Email already registered');
+        const passwordHash = await bcrypt.hash('driver123', 10);
+        const user = await this.prisma.user.create({
+            data: {
+                email: dto.email,
+                name: dto.name,
+                passwordHash,
+                role: client_1.RoleType.DRIVER,
+                userType: 'crew',
+                providerId,
+                isActive: true,
+                driverProfile: { create: { licenseNumber: dto.licenseNumber } },
+            },
+            select: this.driverSelect,
+        });
+        await this.auditService.log({
+            entityType: 'Driver',
+            entityId: user.id,
+            action: 'CREATE',
+            beforeData: { providerId: null },
+            afterData: { providerId, licenseNumber: dto.licenseNumber },
+        });
+        return { ...this.toDriverView(user), defaultPassword: 'driver123' };
+    }
+    async updateDriver(actor, id, dto) {
+        const user = await this.prisma.user.findUnique({ where: { id }, include: { driverProfile: true } });
+        if (!user || user.role !== client_1.RoleType.DRIVER)
+            throw new common_1.NotFoundException('Driver not found');
+        if (this.isProvider(actor) && user.providerId !== actor.providerId) {
+            throw new common_1.ForbiddenException('Cannot edit a driver that belongs to another provider');
+        }
+        if (dto.email && dto.email !== user.email) {
+            const dup = await this.prisma.user.findUnique({ where: { email: dto.email } });
+            if (dup)
+                throw new common_1.ConflictException('Email already registered');
+        }
+        const updated = await this.prisma.user.update({
+            where: { id },
+            data: {
+                name: dto.name,
+                email: dto.email,
+                isActive: dto.isActive,
+            },
+            select: this.driverSelect,
+        });
+        if (dto.licenseNumber !== undefined) {
+            await this.prisma.driverProfile.upsert({
+                where: { userId: id },
+                update: { licenseNumber: dto.licenseNumber },
+                create: { userId: id, licenseNumber: dto.licenseNumber },
+            });
+        }
+        await this.auditService.log({
+            entityType: 'Driver',
+            entityId: id,
+            action: 'UPDATE',
+            beforeData: { name: user.name, email: user.email },
+            afterData: dto,
+        });
+        return this.toDriverView(updated);
     }
     async ensureProviderOrFail(providerId) {
         const provider = await this.prisma.transportationProvider.findUnique({
@@ -91,11 +221,12 @@ let TransportationProvidersService = class TransportationProvidersService {
             throw new common_1.NotFoundException('Transportation provider not found');
         return provider;
     }
-    async createVehicle(dto) {
-        await this.ensureProviderOrFail(dto.providerId);
+    async createVehicle(actor, dto) {
+        const providerId = this.isProvider(actor) ? this.requireProviderId(actor) : dto.providerId;
+        await this.ensureProviderOrFail(providerId);
         const vehicle = await this.prisma.vehicle.create({
             data: {
-                providerId: dto.providerId,
+                providerId,
                 plateNumber: dto.plateNumber,
                 capacity: dto.capacity ?? 12,
                 brand: dto.brand,
@@ -109,10 +240,16 @@ let TransportationProvidersService = class TransportationProvidersService {
         });
         return vehicle;
     }
-    async updateVehicle(id, dto) {
+    async updateVehicle(actor, id, dto) {
         const before = await this.prisma.vehicle.findUnique({ where: { id } });
         if (!before)
             throw new common_1.NotFoundException('Vehicle not found');
+        if (this.isProvider(actor)) {
+            if (before.providerId !== actor.providerId) {
+                throw new common_1.ForbiddenException('Cannot edit a vehicle that belongs to another provider');
+            }
+            dto.providerId = actor.providerId;
+        }
         if (dto.providerId)
             await this.ensureProviderOrFail(dto.providerId);
         const vehicle = await this.prisma.vehicle.update({
@@ -133,10 +270,13 @@ let TransportationProvidersService = class TransportationProvidersService {
         });
         return vehicle;
     }
-    async deleteVehicle(id) {
+    async deleteVehicle(actor, id) {
         const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
         if (!vehicle)
             throw new common_1.NotFoundException('Vehicle not found');
+        if (this.isProvider(actor) && vehicle.providerId !== actor.providerId) {
+            throw new common_1.ForbiddenException('Cannot delete a vehicle that belongs to another provider');
+        }
         const priceIds = await this.prisma.routePrice.findMany({
             where: { vehicleId: id },
             select: { id: true },

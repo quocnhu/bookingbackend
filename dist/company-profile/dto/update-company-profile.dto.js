@@ -18,6 +18,8 @@ class UpdateCompanyProfileDto {
     email;
     taxId;
     website;
+    rootLatitude;
+    rootLongitude;
 }
 exports.UpdateCompanyProfileDto = UpdateCompanyProfileDto;
 __decorate([
@@ -55,4 +57,18 @@ __decorate([
     (0, class_validator_1.MaxLength)(255),
     __metadata("design:type", String)
 ], UpdateCompanyProfileDto.prototype, "website", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(-90),
+    (0, class_validator_1.Max)(90),
+    __metadata("design:type", Object)
+], UpdateCompanyProfileDto.prototype, "rootLatitude", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(-180),
+    (0, class_validator_1.Max)(180),
+    __metadata("design:type", Object)
+], UpdateCompanyProfileDto.prototype, "rootLongitude", void 0);
 //# sourceMappingURL=update-company-profile.dto.js.map

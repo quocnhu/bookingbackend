@@ -1,4 +1,4 @@
-import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 import { DriveService } from './drive.service';
 import { CreateFolderDto, RenameFileDto, RenameFolderDto } from './dto/drive.dto';
 export declare class DriveController {
@@ -8,9 +8,9 @@ export declare class DriveController {
         current: {
             id: string;
             createdAt: Date;
+            updatedAt: Date;
             name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         } | null;
@@ -21,9 +21,9 @@ export declare class DriveController {
         folders: {
             id: string;
             createdAt: Date;
+            updatedAt: Date;
             name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         }[];
@@ -58,9 +58,9 @@ export declare class DriveController {
         current: {
             id: string;
             createdAt: Date;
+            updatedAt: Date;
             name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         } | null;
@@ -71,9 +71,9 @@ export declare class DriveController {
         folders: {
             id: string;
             createdAt: Date;
+            updatedAt: Date;
             name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         }[];
@@ -107,18 +107,18 @@ export declare class DriveController {
     createFolder(dto: CreateFolderDto, user: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
+        updatedAt: Date;
         name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
     renameFolder(id: string, dto: RenameFolderDto, user: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
+        updatedAt: Date;
         name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;

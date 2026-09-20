@@ -1,7 +1,7 @@
 import { WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { PrismaService } from "../prisma/prisma.service";
-import { AuditService } from "../audit/audit.service";
+import { PrismaService } from '@/prisma/prisma.service';
+import { AuditService } from '@/audit/audit.service';
 import { AssignmentBoardService } from './assignment-board.service';
 import { AssignJobData } from './assignment.queue';
 export declare class AssignmentProcessor extends WorkerHost {
@@ -28,17 +28,11 @@ export declare class AssignmentProcessor extends WorkerHost {
         status: string;
         bookingId: string;
         bookingRef: string;
-        skipped?: undefined;
-        reason?: undefined;
-        assignmentId?: undefined;
-    } | {
-        status: string;
-        bookingId: string;
-        bookingRef: string;
         assignmentId: string;
         skipped?: undefined;
         reason?: undefined;
     }>;
+    private createBusForBooking;
     private findCandidate;
     private freeSeats;
 }

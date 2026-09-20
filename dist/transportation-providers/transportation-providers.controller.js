@@ -16,29 +16,36 @@ exports.TransportationProvidersController = void 0;
 const common_1 = require("@nestjs/common");
 const transportation_providers_service_1 = require("./transportation-providers.service");
 const transportation_provider_dto_1 = require("./dto/transportation-provider.dto");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
 let TransportationProvidersController = class TransportationProvidersController {
     transportationProvidersService;
     constructor(transportationProvidersService) {
         this.transportationProvidersService = transportationProvidersService;
     }
-    findAll() {
-        return this.transportationProvidersService.findAll();
+    findAll(actor) {
+        return this.transportationProvidersService.findAll(actor);
     }
-    findAllDrivers() {
-        return this.transportationProvidersService.findAllDrivers();
+    findAllDrivers(actor) {
+        return this.transportationProvidersService.findAllDrivers(actor);
     }
-    findOne(id) {
-        return this.transportationProvidersService.findOne(id);
+    findOne(id, actor) {
+        return this.transportationProvidersService.findOne(id, actor);
     }
-    createVehicle(dto) {
-        return this.transportationProvidersService.createVehicle(dto);
+    createDriver(dto, actor) {
+        return this.transportationProvidersService.createDriver(actor, dto);
     }
-    updateVehicle(id, dto) {
-        return this.transportationProvidersService.updateVehicle(id, dto);
+    updateDriver(id, dto, actor) {
+        return this.transportationProvidersService.updateDriver(actor, id, dto);
     }
-    deleteVehicle(id) {
-        return this.transportationProvidersService.deleteVehicle(id);
+    createVehicle(dto, actor) {
+        return this.transportationProvidersService.createVehicle(actor, dto);
+    }
+    updateVehicle(id, dto, actor) {
+        return this.transportationProvidersService.updateVehicle(actor, id, dto);
+    }
+    deleteVehicle(id, actor) {
+        return this.transportationProvidersService.deleteVehicle(actor, id);
     }
     assignDriver(providerId, dto) {
         return this.transportationProvidersService.assignDriver(providerId, dto);
@@ -50,29 +57,52 @@ let TransportationProvidersController = class TransportationProvidersController 
 exports.TransportationProvidersController = TransportationProvidersController;
 __decorate([
     (0, common_1.Get)(),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], TransportationProvidersController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)('drivers'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], TransportationProvidersController.prototype, "findAllDrivers", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], TransportationProvidersController.prototype, "findOne", null);
+__decorate([
+    (0, common_1.Post)('drivers'),
+    (0, permissions_decorator_1.Permissions)('driver.create'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [transportation_provider_dto_1.CreateDriverDto, Object]),
+    __metadata("design:returntype", void 0)
+], TransportationProvidersController.prototype, "createDriver", null);
+__decorate([
+    (0, common_1.Put)('drivers/:id'),
+    (0, permissions_decorator_1.Permissions)('driver.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, transportation_provider_dto_1.UpdateDriverDto, Object]),
+    __metadata("design:returntype", void 0)
+], TransportationProvidersController.prototype, "updateDriver", null);
 __decorate([
     (0, common_1.Post)('vehicles'),
     (0, permissions_decorator_1.Permissions)('vehicle.create'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [transportation_provider_dto_1.CreateTransportationVehicleDto]),
+    __metadata("design:paramtypes", [transportation_provider_dto_1.CreateTransportationVehicleDto, Object]),
     __metadata("design:returntype", void 0)
 ], TransportationProvidersController.prototype, "createVehicle", null);
 __decorate([
@@ -80,16 +110,18 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('vehicle.update'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, transportation_provider_dto_1.UpdateTransportationVehicleDto]),
+    __metadata("design:paramtypes", [String, transportation_provider_dto_1.UpdateTransportationVehicleDto, Object]),
     __metadata("design:returntype", void 0)
 ], TransportationProvidersController.prototype, "updateVehicle", null);
 __decorate([
     (0, common_1.Delete)('vehicles/:id'),
     (0, permissions_decorator_1.Permissions)('vehicle.delete'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], TransportationProvidersController.prototype, "deleteVehicle", null);
 __decorate([

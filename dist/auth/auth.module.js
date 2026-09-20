@@ -12,8 +12,8 @@ const jwt_1 = require("@nestjs/jwt");
 const auth_controller_1 = require("./auth.controller");
 const auth_service_1 = require("./auth.service");
 const permissions_service_1 = require("./permissions.service");
-const auth_activities_module_1 = require("../auth-activities/auth-activities.module");
-const drive_module_1 = require("../drive/drive.module");
+const auth_activities_module_1 = require("@/auth-activities/auth-activities.module");
+const drive_module_1 = require("@/drive/drive.module");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;

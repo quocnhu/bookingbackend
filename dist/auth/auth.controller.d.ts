@@ -1,6 +1,6 @@
 import type { Response } from 'express';
-import { AuthService } from "./auth.service";
-import { ChangePasswordDto, LoginDto, RefreshTokenDto, RegisterDto, UpdateProfileDto } from "./dto/auth.dto";
+import { AuthService } from '@/auth/auth.service';
+import { ChangePasswordDto, LoginDto, RefreshTokenDto, RegisterDto, UpdateProfileDto } from '@/auth/dto/auth.dto';
 export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
@@ -29,6 +29,7 @@ export declare class AuthController {
         userType: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
         createdAt: Date;
+        providerId: string | null;
         permissions: string[];
         roles: ({
             permissions: ({
@@ -45,8 +46,8 @@ export declare class AuthController {
         } & {
             id: string;
             createdAt: Date;
-            name: string;
             updatedAt: Date;
+            name: string;
             description: string | null;
             isSystem: boolean;
         })[];
@@ -60,6 +61,7 @@ export declare class AuthController {
         userType: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
         createdAt: Date;
+        providerId: string | null;
         permissions: string[];
         roles: ({
             permissions: ({
@@ -76,8 +78,8 @@ export declare class AuthController {
         } & {
             id: string;
             createdAt: Date;
-            name: string;
             updatedAt: Date;
+            name: string;
             description: string | null;
             isSystem: boolean;
         })[];

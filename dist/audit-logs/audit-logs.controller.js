@@ -16,8 +16,8 @@ exports.AuditLogsController = void 0;
 const common_1 = require("@nestjs/common");
 const audit_logs_service_1 = require("./audit-logs.service");
 const audit_log_dto_1 = require("./dto/audit-log.dto");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
 let AuditLogsController = class AuditLogsController {
     auditLogsService;
     constructor(auditLogsService) {

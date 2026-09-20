@@ -16,26 +16,30 @@ exports.RoutePricesController = void 0;
 const common_1 = require("@nestjs/common");
 const route_prices_service_1 = require("./route-prices.service");
 const route_price_dto_1 = require("./dto/route-price.dto");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
 let RoutePricesController = class RoutePricesController {
     routePricesService;
     constructor(routePricesService) {
         this.routePricesService = routePricesService;
     }
-    findAll(query) {
-        return this.routePricesService.findAll(query);
+    findAll(query, actor) {
+        return this.routePricesService.findAll(query, actor);
     }
-    getDropdownData() {
-        return this.routePricesService.getDropdownData();
+    getDropdownData(actor) {
+        return this.routePricesService.getDropdownData(actor);
+    }
+    getAssignable(actor) {
+        return this.routePricesService.getAssignable(actor);
     }
     findOne(id) {
         return this.routePricesService.findOne(id);
     }
-    create(dto) {
-        return this.routePricesService.create(dto);
+    create(dto, actor) {
+        return this.routePricesService.create(actor, dto);
     }
-    update(id, dto) {
-        return this.routePricesService.update(id, dto);
+    update(id, dto, actor) {
+        return this.routePricesService.update(actor, id, dto);
     }
     remove(id) {
         return this.routePricesService.remove(id);
@@ -45,16 +49,25 @@ exports.RoutePricesController = RoutePricesController;
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [route_price_dto_1.QueryRoutePriceDto]),
+    __metadata("design:paramtypes", [route_price_dto_1.QueryRoutePriceDto, Object]),
     __metadata("design:returntype", void 0)
 ], RoutePricesController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)('dropdown'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], RoutePricesController.prototype, "getDropdownData", null);
+__decorate([
+    (0, common_1.Get)('assignable'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], RoutePricesController.prototype, "getAssignable", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
@@ -66,8 +79,9 @@ __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('route-price.create'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [route_price_dto_1.CreateRoutePriceDto]),
+    __metadata("design:paramtypes", [route_price_dto_1.CreateRoutePriceDto, Object]),
     __metadata("design:returntype", void 0)
 ], RoutePricesController.prototype, "create", null);
 __decorate([
@@ -75,8 +89,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('route-price.update'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, route_price_dto_1.UpdateRoutePriceDto]),
+    __metadata("design:paramtypes", [String, route_price_dto_1.UpdateRoutePriceDto, Object]),
     __metadata("design:returntype", void 0)
 ], RoutePricesController.prototype, "update", null);
 __decorate([

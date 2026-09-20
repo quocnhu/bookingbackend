@@ -172,6 +172,7 @@ model User {
 
   // Quản lý lịch nghỉ & Session
   leaves         UserLeave[]
+  reviewedLeaves UserLeave[]   @relation("LeaveReviewedBy")
   sessions       UserSession[]
   auditLogs      AuditLog[]
   authActivities AuthActivity[]
@@ -195,7 +196,11 @@ model UserLeave {
   startDate DateTime
   endDate   DateTime
   reason    String?
-  status    LeaveStatus @default(APPROVED)
+  status    LeaveStatus @default(PENDING)
+
+  reviewedById String?
+  reviewedBy   User?   @relation("LeaveReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -249,6 +254,8 @@ model CompanyProfile {
   email     String?
   taxId     String?
   website   String?
+  rootLatitude  Float? // Root/depot coordinate — dùng cho tính toán khoảng cách đón khách
+  rootLongitude Float?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -267,10 +274,11 @@ model Tour {
   currency     String   @default("USD")
   durationDays Int?     @default(1) // Half-day tours = 1; otherwise number of days
 
-  // Promotion / discount
-  discountPercent   Int?      @default(0) // % off during the promotion window
-  promotionStartsAt DateTime?
-  promotionEndsAt   DateTime?
+  // Promotion / discount — separate per tour type
+  privateDiscountPercent Int?      @default(0) // % off Private Tour during the promotion window
+  groupDiscountPercent   Int?      @default(0) // % off Group Tour during the promotion window
+  promotionStartsAt      DateTime?
+  promotionEndsAt        DateTime?
 
   // Thông tin trang chi tiết tour (layout kiểu "Chương trình Tour")
   departureLocation String? // Nơi khởi hành
@@ -416,10 +424,17 @@ model Booking {
   paxDetail    String?
   tourType     TourType?
   tourName     String?
-  payment      PaymentStatus? @default(PENDING)
+  payment      PaymentStatus? @default(PAID)
 
   isNoShow     Boolean @default(false)
   noShowReason String?
+
+  // Số tiền thu/hoàn dự kiến chuẩn bị sẵn cho booking (ghi trước chuyến, sync vào Confirm Finished)
+  collectAmount Decimal? @db.Decimal(12, 2)
+  refundAmount  Decimal? @db.Decimal(12, 2)
+
+  // Ghi chú nội bộ cho booking (chế độ ăn, nơi nhận khách, hướng dẫn thu/hoàn...)
+  notes String? @db.Text
 
   rawDataId String?  @unique
   rawData   RawData? @relation(fields: [rawDataId], references: [id])
@@ -527,10 +542,12 @@ model TourReport {
   // ── Quyết toán tiền sau khi kết thúc chuyến (Confirm finished) ──
   // Số tiền HDV đã thu hộ từ khách (base = tổng các khoản thu COD của booking trong chuyến).
   collectedAmount Decimal?
+  // Số tiền HDV đã hoàn lại cho khách.
+  refundedAmount  Decimal?
   // Các khoản chi hộ (operator services) HDV đã trả: [{ categoryId?, name, amount }].
   services        Json?
   servicesTotal   Decimal?
-  // net = collectedAmount - servicesTotal. Nếu dương → HDV nộp lại cho công ty; âm → công ty hoàn trả.
+  // net = collectedAmount - refundedAmount - servicesTotal. Nếu dương → HDV nộp lại cho công ty; âm → công ty hoàn trả.
   netAmount       Decimal?
   // COLLECT_MONEY → HDV nộp net cho công ty; PAY_MONEY → công ty hoàn trả |net| cho HDV.
   settlementFlow  FeeFlowType?
@@ -538,6 +555,10 @@ model TourReport {
   finalizedById   String?
   finalizedByName String?
   finalizedAt     DateTime?
+
+  // Ảnh chứng từ / bằng chứng HDV chụp sau tour. [{ name, url, uploadedAt }].
+  // Upload xong đến khi kế toán xác minh thì toàn bộ nằm ở trạng thái chờ xác minh.
+  evidenceImages Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -707,6 +728,9 @@ enum NotificationType {
   CANCELED // Khách hủy / chuyến bị hủy
   REPORT_VERIFIED // Báo cáo tour được xác nhận
   REPORT_REJECTED // Báo cáo tour bị từ chối
+  LEAVE_REQUESTED // Nhân sự đăng ký nghỉ phép — cần Admin duyệt
+  LEAVE_APPROVED // Admin đã duyệt nghỉ phép
+  LEAVE_REJECTED // Admin từ chối nghỉ phép
   GENERAL // Thông báo chung
 }
 

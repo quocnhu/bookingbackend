@@ -9,7 +9,7 @@ const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 const helmet_1 = __importDefault(require("helmet"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
-const app_module_1 = require("./app.module");
+const app_module_1 = require("@/app.module");
 async function bootstrap() {
     const isProduction = process.env.NODE_ENV === 'production';
     if (isProduction &&

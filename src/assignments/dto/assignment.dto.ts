@@ -189,6 +189,34 @@ export class SubmitTourReportDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  // Ảnh chứng từ HDV upload (từ POST /assignments/:id/tour-report/images)
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EvidenceImageDto)
+  evidenceImages?: EvidenceImageDto[];
+}
+
+export class EvidenceImageDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  ext?: string;
+
+  @IsOptional()
+  @IsString()
+  uploadedAt?: string;
+
+  @IsOptional()
+  @IsString()
+  uploadedByName?: string;
 }
 
 export class VerifyTourReportDto {
@@ -213,16 +241,48 @@ export class FinalizeServiceDto {
   amount: number;
 }
 
+export class BookingSettlementInputDto {
+  @IsString()
+  bookingId: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  collect?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  refund?: number;
+}
+
 export class FinalizeAssignmentDto {
   @Type(() => Number)
   @IsNumber()
   collectedAmount: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  refundedAmount?: number;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => FinalizeServiceDto)
   services?: FinalizeServiceDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EvidenceImageDto)
+  evidenceImages?: EvidenceImageDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BookingSettlementInputDto)
+  bookingSettlements?: BookingSettlementInputDto[];
 }
 
 export class SettlementSummaryDto {

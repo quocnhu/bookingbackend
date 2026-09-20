@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.QueryTourDto = exports.ReorderGalleryDto = exports.UpdateItineraryDto = exports.ItineraryItemDto = exports.UpdateTourDto = exports.TourTypePriceDto = exports.CreateTourDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
-const pagination_dto_1 = require("../../common/dto/pagination.dto");
+const pagination_dto_1 = require("@/common/dto/pagination.dto");
 const client_1 = require("@prisma/client");
 class CreateTourDto {
     name;
@@ -24,7 +24,8 @@ class CreateTourDto {
     childPrice;
     infantPrice;
     currency;
-    discountPercent;
+    privateDiscountPercent;
+    groupDiscountPercent;
     promotionStartsAt;
     promotionEndsAt;
     typePrices;
@@ -85,7 +86,15 @@ __decorate([
     (0, class_validator_1.Min)(0),
     (0, class_validator_1.Max)(100),
     __metadata("design:type", Number)
-], CreateTourDto.prototype, "discountPercent", void 0);
+], CreateTourDto.prototype, "privateDiscountPercent", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], CreateTourDto.prototype, "groupDiscountPercent", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsDateString)(),
@@ -158,7 +167,8 @@ class UpdateTourDto {
     childPrice;
     infantPrice;
     currency;
-    discountPercent;
+    privateDiscountPercent;
+    groupDiscountPercent;
     promotionStartsAt;
     promotionEndsAt;
     typePrices;
@@ -271,7 +281,15 @@ __decorate([
     (0, class_validator_1.Min)(0),
     (0, class_validator_1.Max)(100),
     __metadata("design:type", Number)
-], UpdateTourDto.prototype, "discountPercent", void 0);
+], UpdateTourDto.prototype, "privateDiscountPercent", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], UpdateTourDto.prototype, "groupDiscountPercent", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsDateString)(),

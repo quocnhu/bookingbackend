@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AssignDriverToProviderDto = exports.UpdateTransportationVehicleDto = exports.CreateTransportationVehicleDto = void 0;
+exports.UpdateDriverDto = exports.CreateDriverDto = exports.AssignDriverToProviderDto = exports.UpdateTransportationVehicleDto = exports.CreateTransportationVehicleDto = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 class CreateTransportationVehicleDto {
@@ -74,4 +74,55 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], AssignDriverToProviderDto.prototype, "userId", void 0);
+class CreateDriverDto {
+    name;
+    email;
+    licenseNumber;
+    providerId;
+}
+exports.CreateDriverDto = CreateDriverDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateDriverDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsEmail)(),
+    __metadata("design:type", String)
+], CreateDriverDto.prototype, "email", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateDriverDto.prototype, "licenseNumber", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateDriverDto.prototype, "providerId", void 0);
+class UpdateDriverDto {
+    name;
+    email;
+    licenseNumber;
+    isActive;
+}
+exports.UpdateDriverDto = UpdateDriverDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateDriverDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEmail)(),
+    __metadata("design:type", String)
+], UpdateDriverDto.prototype, "email", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateDriverDto.prototype, "licenseNumber", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateDriverDto.prototype, "isActive", void 0);
 //# sourceMappingURL=transportation-provider.dto.js.map

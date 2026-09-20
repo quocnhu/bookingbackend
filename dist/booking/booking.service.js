@@ -13,11 +13,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BookingService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
-const prisma_service_1 = require("../prisma/prisma.service");
-const audit_service_1 = require("../audit/audit.service");
-const booking_normalizer_service_1 = require("../parsing/booking-normalizer.service");
-const assignment_board_service_1 = require("../queues/assignment-board.service");
-const assignment_queue_1 = require("../queues/assignment.queue");
+const prisma_service_1 = require("@/prisma/prisma.service");
+const audit_service_1 = require("@/audit/audit.service");
+const booking_normalizer_service_1 = require("@/parsing/booking-normalizer.service");
+const assignment_board_service_1 = require("@/queues/assignment-board.service");
+const assignment_queue_1 = require("@/queues/assignment.queue");
 let BookingService = BookingService_1 = class BookingService {
     prisma;
     auditService;
@@ -133,7 +133,7 @@ let BookingService = BookingService_1 = class BookingService {
             mail: data.mail,
             totalPax: data.totalPax,
             paxDetail: data.paxDetail,
-            payment: data.payment,
+            payment: data.payment ?? client_1.PaymentStatus.PAID,
             isNoShow: data.isNoShow,
             noShowReason: data.noShowReason,
         };
@@ -217,6 +217,8 @@ let BookingService = BookingService_1 = class BookingService {
         const data = { ...dto, bookingRef };
         if (dto.startingDate)
             data.startingDate = new Date(dto.startingDate);
+        if (!data.payment)
+            data.payment = client_1.PaymentStatus.PAID;
         data.createdWho = actor?.name ?? actor?.email ?? 'System';
         const booking = await this.prisma.booking.create({ data });
         await this.auditService.log({
@@ -243,6 +245,31 @@ let BookingService = BookingService_1 = class BookingService {
         });
         await this.postWrite(booking);
         return booking;
+    }
+    async updateBatch(items) {
+        if (items.length === 0)
+            return [];
+        const updated = await this.prisma.$transaction(items.map((item) => this.prisma.booking.update({
+            where: { id: item.id },
+            data: {
+                ...(item.notes !== undefined ? { notes: item.notes } : {}),
+                ...(item.collectAmount !== undefined
+                    ? { collectAmount: item.collectAmount }
+                    : {}),
+                ...(item.refundAmount !== undefined
+                    ? { refundAmount: item.refundAmount }
+                    : {}),
+            },
+        })));
+        await this.auditService.log({
+            entityType: 'Booking',
+            entityId: items.map((i) => i.id).join(','),
+            action: 'UPDATE_BATCH',
+            afterData: { count: items.length },
+        });
+        for (const b of updated)
+            await this.postWrite(b);
+        return updated;
     }
     async remove(id) {
         await this.findOne(id);

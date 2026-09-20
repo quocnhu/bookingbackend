@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { BookingService } from './booking.service';
 import {
+  BatchUpdateBookingsDto,
   CreateBookingDto,
   QueryBookingDto,
   UpdateBookingDto,
@@ -41,6 +42,12 @@ export class BookingController {
   @Permissions('booking.create')
   create(@Body() dto: CreateBookingDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.bookingService.create(dto, actor);
+  }
+
+  @Put('batch')
+  @Permissions('booking.update')
+  updateBatch(@Body() dto: BatchUpdateBookingsDto) {
+    return this.bookingService.updateBatch(dto.items);
   }
 
   @Put(':id')

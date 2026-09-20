@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RegisterPushDto = exports.CreateNotificationDto = void 0;
+exports.NotificationTargetsQueryDto = exports.SendNotificationDto = exports.RegisterPushDto = exports.CreateNotificationDto = void 0;
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
 class CreateNotificationDto {
@@ -54,4 +54,44 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], RegisterPushDto.prototype, "userAgent", void 0);
+class SendNotificationDto {
+    title;
+    body;
+    type;
+    roleTypes;
+    userIds;
+}
+exports.SendNotificationDto = SendNotificationDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SendNotificationDto.prototype, "title", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SendNotificationDto.prototype, "body", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.NotificationType),
+    __metadata("design:type", String)
+], SendNotificationDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], SendNotificationDto.prototype, "roleTypes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], SendNotificationDto.prototype, "userIds", void 0);
+class NotificationTargetsQueryDto {
+    search;
+}
+exports.NotificationTargetsQueryDto = NotificationTargetsQueryDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], NotificationTargetsQueryDto.prototype, "search", void 0);
 //# sourceMappingURL=notification.dto.js.map

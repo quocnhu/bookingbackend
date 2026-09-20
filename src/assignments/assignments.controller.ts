@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AssignmentsService } from './assignments.service';
 import {
   AssignBookingsDto,
@@ -45,6 +47,24 @@ export class AssignmentsController {
   @Permissions('assignment.update')
   dispatchAllBoard() {
     return this.assignmentsService.dispatchAllBoard();
+  }
+
+  @Get('board/crew')
+  @Permissions('assignment.read')
+  getBoardCrew() {
+    return this.assignmentsService.getBoardCrew();
+  }
+
+  @Get('board/crew/availability')
+  @Permissions('assignment.read')
+  getCrewAvailability(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.assignmentsService.getCrewAvailability(
+      new Date(from ?? Date.now()),
+      new Date(to ?? Date.now()),
+    );
   }
 
   @Get('my-assignments')
@@ -150,6 +170,22 @@ export class AssignmentsController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.assignmentsService.submitTourReport(id, dto, actor);
+  }
+
+  @Post(':id/tour-report/images')
+  @Permissions('assignment.update')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 20 * 1024 * 1024 },
+    }),
+  )
+  uploadTourReportImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.uploadReportImage(id, file, actor);
   }
 
   @Put(':id/tour-report/verify')
