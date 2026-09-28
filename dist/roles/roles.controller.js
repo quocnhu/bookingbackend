@@ -16,7 +16,7 @@ exports.RolesController = void 0;
 const common_1 = require("@nestjs/common");
 const roles_service_1 = require("./roles.service");
 const role_dto_1 = require("./dto/role.dto");
-const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 let RolesController = class RolesController {
     rolesService;
     constructor(rolesService) {

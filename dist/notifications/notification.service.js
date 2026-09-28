@@ -12,8 +12,8 @@ var NotificationService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("@/prisma/prisma.service");
-const audit_service_1 = require("@/audit/audit.service");
+const prisma_service_1 = require("../prisma/prisma.service");
+const audit_service_1 = require("../audit/audit.service");
 const notifications_gateway_1 = require("./notifications.gateway");
 const client_1 = require("@prisma/client");
 const ROLE_LABELS = {
@@ -42,10 +42,28 @@ let NotificationService = NotificationService_1 = class NotificationService {
         return notification;
     }
     async findAll(userId, unreadOnly = false) {
-        return this.prisma.notification.findMany({
+        const notifications = await this.prisma.notification.findMany({
             where: { userId, ...(unreadOnly ? { read: false } : {}) },
             orderBy: { createdAt: 'desc' },
             take: 50,
+        });
+        return this.attachSenders(notifications);
+    }
+    async attachSenders(notifications) {
+        const senderIds = [
+            ...new Set(notifications.map((n) => n.data?.fromUserId).filter(Boolean)),
+        ];
+        if (senderIds.length === 0)
+            return notifications;
+        const users = await this.prisma.user.findMany({
+            where: { id: { in: senderIds } },
+            select: { id: true, name: true, email: true },
+        });
+        const byId = new Map(users.map((u) => [u.id, u]));
+        return notifications.map((n) => {
+            const fromUserId = n.data?.fromUserId;
+            const sender = byId.get(fromUserId);
+            return sender ? { ...n, sender } : n;
         });
     }
     async unreadCount(userId) {
@@ -122,13 +140,19 @@ let NotificationService = NotificationService_1 = class NotificationService {
             throw new common_1.BadRequestException('No recipients selected');
         }
         const type = dto.type ?? client_1.NotificationType.GENERAL;
+        const actorInfo = await this.prisma.user.findUnique({
+            where: { id: actor.id },
+            select: { id: true, name: true, email: true },
+        });
+        const sender = actorInfo ?? { id: actor.id, name: actor.name ?? actor.email ?? 'System', email: actor.email ?? null };
         const created = [];
         for (const userId of recipientIds) {
             const notif = await this.create(userId, type, dto.title, dto.body, {
                 fromUserId: actor.id,
             });
-            this.gateway.notifyUser(userId, 'notification', notif);
-            created.push(notif);
+            const enriched = { ...notif, sender };
+            this.gateway.notifyUser(userId, 'notification', enriched);
+            created.push(enriched);
         }
         this.auditService.log({
             entityType: 'Notification',

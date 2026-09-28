@@ -7,6 +7,7 @@ import { ParsingQueue } from './parsing.queue';
 import { ParserRegistry } from './parsers/parser-registry';
 import { AirbnbParser } from './parsers/airbnb.parser';
 import { BookingComParser } from './parsers/booking-com.parser';
+import { GetYourGuideParser } from './parsers/getyourguide.parser';
 import { TripAdvisorParser } from './parsers/tripadvisor.parser';
 import { WebsiteParser } from './parsers/website.parser';
 
@@ -18,6 +19,7 @@ import { WebsiteParser } from './parsers/website.parser';
     ParserRegistry,
     AirbnbParser,
     BookingComParser,
+    GetYourGuideParser,
     TripAdvisorParser,
     WebsiteParser,
   ],

@@ -72,6 +72,7 @@ enum TourReportStatus {
 
 enum BookingProvider {
   TRIPADVISOR // Tự động từ webhook / mail TripAdvisor
+  GETYOURGUIDE // Tự động từ Pub/Sub Gmail cho đơn GetYourGuide
   AIRBNB // Tự động từ Pub/Sub Gmail cho đơn Airbnb
   BOOKING_COM // Tự động từ Pub/Sub Gmail cho đơn Booking.com
   WEBSITE // Tự động từ Pub/Sub Gmail cho đơn Website
@@ -166,6 +167,7 @@ model User {
   driverAssignments Assignment[] @relation("DriverAssignment")
   guidedAssignments Assignment[] @relation("GuideAssignment")
   reportVerifies    Assignment[] @relation("ReportVerifier")
+  guidePaymentPeriods GuidePaymentPeriod[]
 
   // Quyết toán 2 lớp — lớp 1 theo Booking (thu hộ/hòan tiền) & lớp 2 theo Assignment (phí xe/nhà hàng/chung)
   createdSettlements Settlement[]
@@ -365,10 +367,13 @@ model TourGallery {
 }
 
 model TransportationProvider {
-  id          String       @id @default(uuid())
-  name        String
-  users       User[]
-  vehicles    Vehicle[]
+  id       String       @id @default(uuid())
+  name     String
+  // Công ty sở hữu đội xe riêng (Company Fleet): xe/HDV của hãng là tài nguyên nội bộ,
+  // giá luôn 0 VND và được ưu tiên khi auto-assign trước nhà xe ngoài.
+  isCompany Boolean      @default(false)
+  users     User[]
+  vehicles  Vehicle[]
   routePrices RoutePrice[]
   assignments Assignment[]
 }
@@ -556,6 +561,13 @@ model TourReport {
   finalizedByName String?
   finalizedAt     DateTime?
 
+  // ── Thanh toán cho HDV (bộ phận kế toán export kỳ quyết toán) ──
+  // Khi kế toán export một khoảng thời gian (Handle payment), mọi tour đã finalized
+  // trong khoảng đó được đánh dấu paid → lần sau tính từ watermark (không tính lại miền đã trả).
+  guidePaidAt     DateTime?
+  guidePaidById   String?
+  guidePaidByName String?
+
   // Ảnh chứng từ / bằng chứng HDV chụp sau tour. [{ name, url, uploadedAt }].
   // Upload xong đến khi kế toán xác minh thì toàn bộ nằm ở trạng thái chờ xác minh.
   evidenceImages Json?
@@ -565,6 +577,33 @@ model TourReport {
 
   @@index([status])
   @@index([finalizedAt])
+  @@index([guidePaidAt])
+}
+
+// ─── GUIDE PAYMENT PERIOD (Kỳ thanh toán cho HDV) ──────────────────────
+// Mỗi lần kế toán "export / handle payment" cho một HDV trên một khoảng thời gian
+// will ghi 1 bản ghi audit. Lần sau, watermark = max(toDate) → kỳ mới bắt đầu ngay sau đó.
+model GuidePaymentPeriod {
+  id          String   @id @default(uuid())
+  guideId     String
+  fromDate    DateTime
+  toDate      DateTime
+  tourCount   Int      @default(0)
+  // HDV nộp lại cho công ty (COLLECT_MONEY).
+  guideReturnsToCompany Decimal @default(0)
+  // Công ty hoàn trả cho HDV (PAY_MONEY).
+  companyReturnsToGuide Decimal @default(0)
+  totalNet    Decimal  @default(0)
+  note        String?  @db.Text
+
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  guide User @relation(fields: [guideId], references: [id])
+
+  @@index([guideId, createdAt])
+  @@map("guide_payment_periods")
 }
 
 // ─── FINANCIAL SETTLEMENT (2 LỚP) ────────────────────────────────────

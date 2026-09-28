@@ -13,8 +13,8 @@ exports.JwtAuthGuard = void 0;
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 const jwt_1 = require("@nestjs/jwt");
-const public_decorator_1 = require("@/common/decorators/public.decorator");
-const cookies_1 = require("@/common/cookies");
+const public_decorator_1 = require("../decorators/public.decorator");
+const cookies_1 = require("../cookies");
 let JwtAuthGuard = class JwtAuthGuard {
     jwtService;
     reflector;

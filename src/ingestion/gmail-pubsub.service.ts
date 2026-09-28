@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { PrismaService } from '@/prisma/prisma.service';
 import { RawDataService } from '@/raw-data/raw-data.service';
@@ -41,12 +42,14 @@ interface MessagePart {
 @Injectable()
 export class GmailPubSubService {
   private readonly logger = new Logger(GmailPubSubService.name);
+  private allowedSendersCache: Set<string> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: GmailAuthService,
     private readonly rawDataService: RawDataService,
     private readonly parsingQueue: ParsingQueue,
+    private readonly config: ConfigService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
@@ -81,6 +84,7 @@ export class GmailPubSubService {
 
     let handled = 0;
     let duplicates = 0;
+    let ignored = 0;
 
     for (const messageId of messageIds) {
       // Dedup claim (bước 5): atomic, an toàn dưới concurrency.
@@ -98,6 +102,15 @@ export class GmailPubSubService {
 
       try {
         const mail = await this.fetchMessage(gmail, messageId, emailAddress);
+
+        // Chỉ ingest mail từ sender trong MAIL_ALLOWED_SENDERS — còn lại IGNORE.
+        if (!this.isAllowedSender(mail.from)) {
+          ignored++;
+          this.logger.log(
+            `Ignored mail "${mail.subject}" from "${mail.from}" — sender not in MAIL_ALLOWED_SENDERS`,
+          );
+          continue;
+        }
 
         // >>> PARSED MAIL — console.log để debug/extend parser <<<
         console.log('[ingestion] parsed mail:', {
@@ -152,7 +165,7 @@ export class GmailPubSubService {
       });
     }
 
-    return { handled, duplicates, nextHistoryId: nextHistoryId ?? null };
+    return { handled, duplicates, ignored, nextHistoryId: nextHistoryId ?? null };
   }
 
   /** Test kết nối bằng refresh token đã lưu (dùng cho nút "Test" trên frontend). */
@@ -225,6 +238,40 @@ export class GmailPubSubService {
     return html.trim();
   }
 
+  /** Đọc MAIL_ALLOWED_SENDERS từ env (domain/email, ngăn cách bằng dấu phẩy). */
+  private get allowedSenders(): Set<string> {
+    if (!this.allowedSendersCache) {
+      const raw =
+        this.config.get<string>('MAIL_ALLOWED_SENDERS') ??
+        'tripadvisor.com,getyourguide.com,viator.com';
+      this.allowedSendersCache = new Set(
+        raw
+          .split(/[,\s;]+/)
+          .map((s) => s.trim().toLowerCase().replace(/^@/, ''))
+          .filter(Boolean),
+      );
+    }
+    return this.allowedSendersCache;
+  }
+
+  /** Mail chỉ được ingest nếu From trùng domain/email trong MAIL_ALLOWED_SENDERS. */
+  private isAllowedSender(fromRaw: string): boolean {
+    const tokens = this.allowedSenders;
+    if (tokens.size === 0) return true;
+    const emailMatch = fromRaw.match(/<([^<>@]+\@[^<>]+)>/i);
+    const email = (emailMatch ? emailMatch[1] : fromRaw).toLowerCase().trim();
+    for (const token of tokens) {
+      if (
+        email === token ||
+        email.endsWith('@' + token) ||
+        email.endsWith('.' + token)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Gán templateTag từ header From/Subject (bước 7) — chỉ match rẻ, chưa extract.
    * Gọi console.log tại điểm này để dễ thấy template nào được chọn.
@@ -237,6 +284,10 @@ export class GmailPubSubService {
     if (from.includes('airbnb.com')) tag = 'airbnb';
     else if (from.includes('booking.com') || from.includes('@booking.com'))
       tag = 'booking-com';
+    else if (from.includes('getyourguide.com') || subject.includes('getyourguide'))
+      tag = 'getyourguide';
+    else if (from.includes('viator.com') || subject.includes('viator'))
+      tag = 'viator';
     else if (from.includes('tripadvisor.com')) tag = 'tripadvisor';
     else if (subject.includes('tripadvisor')) tag = 'tripadvisor';
     else if (/booking|reservation|confirmation|trip to/i.test(subject))

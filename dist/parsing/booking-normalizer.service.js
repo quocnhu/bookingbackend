@@ -19,6 +19,7 @@ const PAYMENT_STATUSES = [
 const SOURCE_TO_CHANNEL = {
     airbnb: client_1.BookingProvider.AIRBNB,
     'booking-com': client_1.BookingProvider.BOOKING_COM,
+    getyourguide: client_1.BookingProvider.GETYOURGUIDE,
     tripadvisor: client_1.BookingProvider.TRIPADVISOR,
     website: client_1.BookingProvider.WEBSITE,
     manual: client_1.BookingProvider.MANUAL,

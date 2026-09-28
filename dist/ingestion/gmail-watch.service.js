@@ -13,7 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GmailWatchService = void 0;
 const common_1 = require("@nestjs/common");
 const schedule_1 = require("@nestjs/schedule");
-const prisma_service_1 = require("@/prisma/prisma.service");
+const prisma_service_1 = require("../prisma/prisma.service");
 const gmail_auth_provider_1 = require("./gmail-auth.provider");
 const RENEW_WINDOW_MS = 24 * 60 * 60 * 1000;
 let GmailWatchService = GmailWatchService_1 = class GmailWatchService {

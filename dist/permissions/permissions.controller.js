@@ -16,7 +16,7 @@ exports.PermissionsController = void 0;
 const common_1 = require("@nestjs/common");
 const permissions_service_1 = require("./permissions.service");
 const permission_dto_1 = require("./dto/permission.dto");
-const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 let PermissionsController = class PermissionsController {
     permissionsService;
     constructor(permissionsService) {

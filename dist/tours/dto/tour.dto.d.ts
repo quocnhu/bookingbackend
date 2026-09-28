@@ -1,4 +1,4 @@
-import { PaginationDto } from '@/common/dto/pagination.dto';
+import { PaginationDto } from "../../common/dto/pagination.dto";
 import { TourType } from '@prisma/client';
 export declare class CreateTourDto {
     name: string;

@@ -10,7 +10,7 @@ exports.LeavesModule = void 0;
 const common_1 = require("@nestjs/common");
 const leaves_controller_1 = require("./leaves.controller");
 const leaves_service_1 = require("./leaves.service");
-const audit_module_1 = require("@/audit/audit.module");
+const audit_module_1 = require("../audit/audit.module");
 let LeavesModule = class LeavesModule {
 };
 exports.LeavesModule = LeavesModule;

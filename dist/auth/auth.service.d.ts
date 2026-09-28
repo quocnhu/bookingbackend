@@ -1,8 +1,8 @@
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from "../prisma/prisma.service";
 import { PermissionsService } from './permissions.service';
-import { AuthActivitiesService } from '@/auth-activities/auth-activities.service';
-import { DriveService } from '@/drive/drive.service';
+import { AuthActivitiesService } from "../auth-activities/auth-activities.service";
+import { DriveService } from "../drive/drive.service";
 import { LoginDto, RegisterDto, ChangePasswordDto, UpdateProfileDto } from './dto/auth.dto';
 export declare class AuthService {
     private readonly prisma;
@@ -76,8 +76,8 @@ export declare class AuthService {
         } & {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             description: string | null;
             isSystem: boolean;
         })[];
@@ -111,8 +111,8 @@ export declare class AuthService {
         } & {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             description: string | null;
             isSystem: boolean;
         })[];

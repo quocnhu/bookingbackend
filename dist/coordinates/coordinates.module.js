@@ -10,7 +10,7 @@ exports.CoordinatesModule = void 0;
 const common_1 = require("@nestjs/common");
 const coordinates_controller_1 = require("./coordinates.controller");
 const coordinates_service_1 = require("./coordinates.service");
-const audit_module_1 = require("@/audit/audit.module");
+const audit_module_1 = require("../audit/audit.module");
 let CoordinatesModule = class CoordinatesModule {
 };
 exports.CoordinatesModule = CoordinatesModule;

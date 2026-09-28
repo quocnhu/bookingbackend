@@ -1,6 +1,6 @@
-import { PrismaService } from '@/prisma/prisma.service';
-import { AuditService } from '@/audit/audit.service';
-import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
+import { PrismaService } from "../prisma/prisma.service";
+import { AuditService } from "../audit/audit.service";
+import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 import { AssignDriverToProviderDto, CreateDriverDto, CreateTransportationVehicleDto, UpdateDriverDto, UpdateTransportationVehicleDto } from './dto/transportation-provider.dto';
 export declare class TransportationProvidersService {
     private readonly prisma;
@@ -82,17 +82,17 @@ export declare class TransportationProvidersService {
         message: string;
     }>;
     assignDriver(providerId: string, dto: AssignDriverToProviderDto): Promise<{
+        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         name: string | null;
-        providerId: string | null;
         email: string;
-        role: import("@prisma/client").$Enums.RoleType;
+        providerId: string | null;
     }>;
     unassignDriver(providerId: string, userId: string): Promise<{
+        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         name: string | null;
-        providerId: string | null;
         email: string;
-        role: import("@prisma/client").$Enums.RoleType;
+        providerId: string | null;
     }>;
 }

@@ -5,7 +5,9 @@ import { AssignmentsService } from './assignments.service';
 import {
   AssignBookingsDto,
   CreateAssignmentDto,
+  ExportGuidePaymentDto,
   FinalizeAssignmentDto,
+  GuidePaymentPeriodsQueryDto,
   MoveBookingDto,
   QueryAssignmentDto,
   ReorderBookingsDto,
@@ -98,7 +100,24 @@ export class AssignmentsController {
       dto.to,
       dto.guideId,
       dto.driverId,
+      dto.unpaidOnly,
     );
+  }
+
+  @Get('settlement/guide-payments')
+  guidePaymentPeriods(
+    @Query() query: GuidePaymentPeriodsQueryDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.listGuidePaymentPeriods(actor, query.guideId);
+  }
+
+  @Post('settlement/export')
+  exportGuidePayment(
+    @Body() dto: ExportGuidePaymentDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.exportGuidePayment(actor, dto);
   }
 
   @Get(':id')

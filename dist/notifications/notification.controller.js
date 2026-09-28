@@ -16,8 +16,8 @@ exports.NotificationController = void 0;
 const common_1 = require("@nestjs/common");
 const notification_service_1 = require("./notification.service");
 const notification_dto_1 = require("./dto/notification.dto");
-const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
-const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 let NotificationController = class NotificationController {
     notificationService;
     constructor(notificationService) {

@@ -1,8 +1,8 @@
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from "../prisma/prisma.service";
 import { CreateUserDto, QueryUserDto, UpdateUserDto, UpdateUserRoleDto } from './dto/user.dto';
-import { PaginatedResult } from '@/common/dto/pagination.dto';
+import { PaginatedResult } from "../common/dto/pagination.dto";
 import { RoleType } from '@prisma/client';
-import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
+import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 import { UpdateUserPasswordDto } from './dto/user-password.dto';
 export declare class UsersService {
     private readonly prisma;
@@ -10,24 +10,24 @@ export declare class UsersService {
     private userSelect;
     findAll(query: QueryUserDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     findOne(id: string): Promise<{
+        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string | null;
-        email: string;
-        role: import("@prisma/client").$Enums.RoleType;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
+        email: string;
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
+        updatedAt: Date;
         roles: ({
             role: {
                 id: string;
                 createdAt: Date;
-                updatedAt: Date;
                 name: string;
+                updatedAt: Date;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -48,24 +48,24 @@ export declare class UsersService {
         })[];
     }>;
     create(dto: CreateUserDto): Promise<{
+        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string | null;
-        email: string;
-        role: import("@prisma/client").$Enums.RoleType;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
+        email: string;
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
+        updatedAt: Date;
         roles: ({
             role: {
                 id: string;
                 createdAt: Date;
-                updatedAt: Date;
                 name: string;
+                updatedAt: Date;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -89,24 +89,24 @@ export declare class UsersService {
         id: string;
         role: RoleType;
     }): Promise<{
+        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string | null;
-        email: string;
-        role: import("@prisma/client").$Enums.RoleType;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
+        email: string;
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
+        updatedAt: Date;
         roles: ({
             role: {
                 id: string;
                 createdAt: Date;
-                updatedAt: Date;
                 name: string;
+                updatedAt: Date;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -130,24 +130,24 @@ export declare class UsersService {
         id: string;
         role: RoleType;
     }): Promise<{
+        role: import("@prisma/client").$Enums.RoleType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string | null;
-        email: string;
-        role: import("@prisma/client").$Enums.RoleType;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
+        email: string;
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
+        updatedAt: Date;
         roles: ({
             role: {
                 id: string;
                 createdAt: Date;
-                updatedAt: Date;
                 name: string;
+                updatedAt: Date;
                 description: string | null;
                 isSystem: boolean;
             };

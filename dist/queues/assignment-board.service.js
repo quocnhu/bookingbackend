@@ -13,9 +13,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AssignmentBoardService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
-const prisma_service_1 = require("@/prisma/prisma.service");
-const audit_service_1 = require("@/audit/audit.service");
-const distance_1 = require("@/geo/distance");
+const prisma_service_1 = require("../prisma/prisma.service");
+const audit_service_1 = require("../audit/audit.service");
+const distance_1 = require("../geo/distance");
 const BUS_MAX_PAX = 12;
 let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardService {
     prisma;

@@ -14,21 +14,24 @@ exports.AssignmentProcessor = void 0;
 const common_1 = require("@nestjs/common");
 const bullmq_1 = require("@nestjs/bullmq");
 const client_1 = require("@prisma/client");
-const prisma_service_1 = require("@/prisma/prisma.service");
-const audit_service_1 = require("@/audit/audit.service");
+const prisma_service_1 = require("../prisma/prisma.service");
+const audit_service_1 = require("../audit/audit.service");
 const assignment_board_service_1 = require("./assignment-board.service");
+const auto_crew_service_1 = require("./auto-crew.service");
 const queue_constants_1 = require("./queue.constants");
 const BUS_MAX_PAX = 12;
 let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor extends bullmq_1.WorkerHost {
     prisma;
     board;
     auditService;
+    autoCrew;
     logger = new common_1.Logger(AssignmentProcessor_1.name);
-    constructor(prisma, board, auditService) {
+    constructor(prisma, board, auditService, autoCrew) {
         super();
         this.prisma = prisma;
         this.board = board;
         this.auditService = auditService;
+        this.autoCrew = autoCrew;
     }
     async process(job) {
         const { bookingId } = job.data;
@@ -67,6 +70,7 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
                 },
                 changedBy: null,
             });
+            await this.assignCrew(bus.id);
             return {
                 status: 'CREATED_BUS',
                 bookingId,
@@ -86,6 +90,7 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             changedBy: null,
         });
         this.logger.log(`Auto-assigned booking ${booking.bookingRef} -> bus ${candidate.code ?? candidate.id}`);
+        await this.assignCrew(candidate.id);
         return {
             status: 'ASSIGNED',
             bookingId,
@@ -93,11 +98,22 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             assignmentId: candidate.id,
         };
     }
+    async assignCrew(assignmentId) {
+        try {
+            const { assigned } = await this.autoCrew.assignCrewForBus(assignmentId);
+            if (assigned) {
+                this.logger.log(`Auto-assigned crew for bus ${assignmentId}`);
+            }
+        }
+        catch (error) {
+            this.logger.warn(`Auto-crew skipped for bus ${assignmentId}: ${error.message}`);
+        }
+    }
     async createBusForBooking(booking) {
         const startDate = new Date(booking.startingDate);
         startDate.setUTCHours(0, 0, 0, 0);
         const durationDays = booking.tour?.durationDays ?? 1;
-        const endDate = new Date(startDate.getTime() + Math.max(1, durationDays) * 86400000);
+        const endDate = new Date(startDate.getTime() + Math.max(1, durationDays - 1) * 86400000);
         const label = booking.tourType === client_1.TourType.PRIVATE_TOUR ? 'Priv' : 'Group';
         const existing = await this.prisma.assignment.findMany({
             where: { code: { startsWith: `${label} Bus -` } },
@@ -107,6 +123,7 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             .map((a) => parseInt((a.code ?? '').split('-')[1]?.trim() ?? '0', 10))
             .filter((n) => !Number.isNaN(n));
         const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
+        const companyVehicle = await this.findCompanyVehicle(booking, startDate, endDate);
         return this.prisma.assignment.create({
             data: {
                 code: `${label} Bus - ${nextNumber}`,
@@ -119,7 +136,30 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
                 durationDays,
                 totalPax: booking.totalPax ?? 0,
                 createdWho: 'Auto-Assign System',
+                vehicleId: companyVehicle?.id ?? null,
+                providerId: companyVehicle?.providerId ?? null,
+                priceOverride: companyVehicle?.provider?.isCompany ? 0 : undefined,
             },
+        });
+    }
+    async findCompanyVehicle(booking, startDate, endDate) {
+        const pax = booking.totalPax ?? 1;
+        return this.prisma.vehicle.findFirst({
+            where: {
+                capacity: { gte: pax },
+                provider: { isCompany: true },
+                assignments: {
+                    none: {
+                        startDate: { lte: endDate },
+                        endDate: { gte: startDate },
+                        status: {
+                            notIn: [client_1.AssignmentStatus.CANCELED, client_1.AssignmentStatus.COMPLETED],
+                        },
+                    },
+                },
+            },
+            orderBy: [{ capacity: 'asc' }],
+            select: { id: true, providerId: true, provider: { select: { isCompany: true } } },
         });
     }
     async findCandidate(booking) {
@@ -131,7 +171,16 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
                 startDate: { lte: booking.startingDate },
                 endDate: { gte: booking.startingDate },
             },
-            include: { bookings: true, vehicle: true },
+            include: {
+                bookings: true,
+                vehicle: {
+                    select: {
+                        id: true,
+                        capacity: true,
+                        provider: { select: { isCompany: true } },
+                    },
+                },
+            },
             orderBy: [{ startDate: 'asc' }],
         });
         const typeOk = (a) => booking.tourType == null ||
@@ -146,6 +195,10 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
         if (matches.length === 0)
             return null;
         matches.sort((a, b) => {
+            const aCompany = a.vehicle?.provider?.isCompany ? 0 : 1;
+            const bCompany = b.vehicle?.provider?.isCompany ? 0 : 1;
+            if (aCompany !== bCompany)
+                return aCompany - bCompany;
             const aExact = a.tourType === booking.tourType ? 0 : 1;
             const bExact = b.tourType === booking.tourType ? 0 : 1;
             if (aExact !== bExact)
@@ -166,6 +219,7 @@ exports.AssignmentProcessor = AssignmentProcessor = AssignmentProcessor_1 = __de
     (0, bullmq_1.Processor)(queue_constants_1.ASSIGN_QUEUE, { concurrency: 5 }),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         assignment_board_service_1.AssignmentBoardService,
-        audit_service_1.AuditService])
+        audit_service_1.AuditService,
+        auto_crew_service_1.AutoCrewService])
 ], AssignmentProcessor);
 //# sourceMappingURL=assignment.processor.js.map

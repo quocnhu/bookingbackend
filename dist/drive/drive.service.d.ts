@@ -1,5 +1,5 @@
-import { PrismaService } from '@/prisma/prisma.service';
-import type { FileStorage } from '@/storage';
+import { PrismaService } from "../prisma/prisma.service";
+import type { FileStorage } from "../storage";
 import { CreateFolderDto, RenameFileDto, RenameFolderDto } from './dto/drive.dto';
 export declare const AVATAR_SIZE = 515;
 export declare const DEFAULT_QUOTA_MB = 3072;
@@ -23,18 +23,18 @@ export declare class DriveService {
         root: {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
             userId: string | null;
+            updatedAt: Date;
             parentId: string | null;
             kind: string;
         };
         avatar: {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
             userId: string | null;
+            updatedAt: Date;
             parentId: string | null;
             kind: string;
         };
@@ -43,9 +43,9 @@ export declare class DriveService {
         current: {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
             userId: string | null;
+            updatedAt: Date;
             parentId: string | null;
             kind: string;
         } | null;
@@ -56,9 +56,9 @@ export declare class DriveService {
         folders: {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
             userId: string | null;
+            updatedAt: Date;
             parentId: string | null;
             kind: string;
         }[];
@@ -92,18 +92,18 @@ export declare class DriveService {
     createFolder(userId: string, dto: CreateFolderDto): Promise<{
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
         userId: string | null;
+        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
     renameFolder(userId: string, id: string, dto: RenameFolderDto): Promise<{
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
         userId: string | null;
+        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;

@@ -10,7 +10,7 @@ exports.CompanyProfileModule = void 0;
 const common_1 = require("@nestjs/common");
 const company_profile_controller_1 = require("./company-profile.controller");
 const company_profile_service_1 = require("./company-profile.service");
-const audit_module_1 = require("@/audit/audit.module");
+const audit_module_1 = require("../audit/audit.module");
 let CompanyProfileModule = class CompanyProfileModule {
 };
 exports.CompanyProfileModule = CompanyProfileModule;

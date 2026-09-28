@@ -11,10 +11,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LeavesService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("@/prisma/prisma.service");
-const audit_service_1 = require("@/audit/audit.service");
-const notification_service_1 = require("@/notifications/notification.service");
-const notifications_gateway_1 = require("@/notifications/notifications.gateway");
+const prisma_service_1 = require("../prisma/prisma.service");
+const audit_service_1 = require("../audit/audit.service");
+const notification_service_1 = require("../notifications/notification.service");
+const notifications_gateway_1 = require("../notifications/notifications.gateway");
 const client_1 = require("@prisma/client");
 const LEAVE_BLOCKING_STATUSES = [client_1.LeaveStatus.PENDING, client_1.LeaveStatus.APPROVED];
 let LeavesService = class LeavesService {

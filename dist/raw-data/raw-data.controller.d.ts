@@ -1,4 +1,4 @@
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from "../prisma/prisma.service";
 import { RawDataService } from './raw-data.service';
 export declare class RawDataController {
     private readonly prisma;
@@ -10,10 +10,10 @@ export declare class RawDataController {
         limit: number;
         items: {
             id: string;
-            status: string;
             createdAt: Date;
-            updatedAt: Date;
             email: string | null;
+            updatedAt: Date;
+            status: string;
             templateTag: string | null;
             sourceId: string;
             payload: import("@prisma/client/runtime/library").JsonValue;

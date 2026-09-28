@@ -11,7 +11,7 @@ const common_1 = require("@nestjs/common");
 const notification_service_1 = require("./notification.service");
 const notification_controller_1 = require("./notification.controller");
 const notifications_gateway_1 = require("./notifications.gateway");
-const audit_module_1 = require("@/audit/audit.module");
+const audit_module_1 = require("../audit/audit.module");
 let NotificationsModule = class NotificationsModule {
 };
 exports.NotificationsModule = NotificationsModule;

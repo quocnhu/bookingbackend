@@ -10,7 +10,7 @@ exports.TransportationProvidersModule = void 0;
 const common_1 = require("@nestjs/common");
 const transportation_providers_controller_1 = require("./transportation-providers.controller");
 const transportation_providers_service_1 = require("./transportation-providers.service");
-const audit_module_1 = require("@/audit/audit.module");
+const audit_module_1 = require("../audit/audit.module");
 let TransportationProvidersModule = class TransportationProvidersModule {
 };
 exports.TransportationProvidersModule = TransportationProvidersModule;

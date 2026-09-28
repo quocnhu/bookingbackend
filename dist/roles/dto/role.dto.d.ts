@@ -1,4 +1,4 @@
-import { PaginationDto } from '@/common/dto/pagination.dto';
+import { PaginationDto } from "../../common/dto/pagination.dto";
 export declare class CreateRoleDto {
     name: string;
     description?: string;

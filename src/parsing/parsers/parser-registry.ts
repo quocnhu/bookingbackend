@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { TemplateParser } from './parser.interface';
 import { AirbnbParser } from './airbnb.parser';
 import { BookingComParser } from './booking-com.parser';
+import { GetYourGuideParser } from './getyourguide.parser';
 import { TripAdvisorParser } from './tripadvisor.parser';
 import { WebsiteParser } from './website.parser';
 
@@ -16,10 +17,17 @@ export class ParserRegistry {
   constructor(
     airbnb: AirbnbParser,
     bookingCom: BookingComParser,
+    getYourGuide: GetYourGuideParser,
     tripAdvisor: TripAdvisorParser,
     website: WebsiteParser,
   ) {
-    for (const parser of [airbnb, bookingCom, tripAdvisor, website]) {
+    for (const parser of [
+      airbnb,
+      bookingCom,
+      getYourGuide,
+      tripAdvisor,
+      website,
+    ]) {
       this.parsers.set(parser.templateTag, parser);
     }
   }

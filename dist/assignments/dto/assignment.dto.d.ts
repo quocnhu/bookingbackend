@@ -1,4 +1,4 @@
-import { PaginationDto } from '@/common/dto/pagination.dto';
+import { PaginationDto } from "../../common/dto/pagination.dto";
 import { AssignmentOrigin, AssignmentStatus } from '@prisma/client';
 export declare class CreateAssignmentDto {
     code?: string;

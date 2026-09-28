@@ -8,14 +8,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ParsingModule = void 0;
 const common_1 = require("@nestjs/common");
-const raw_data_module_1 = require("@/raw-data/raw-data.module");
-const booking_module_1 = require("@/booking/booking.module");
-const queues_module_1 = require("@/queues/queues.module");
+const raw_data_module_1 = require("../raw-data/raw-data.module");
+const booking_module_1 = require("../booking/booking.module");
+const queues_module_1 = require("../queues/queues.module");
 const parsing_processor_1 = require("./parsing.processor");
 const parsing_queue_1 = require("./parsing.queue");
 const parser_registry_1 = require("./parsers/parser-registry");
 const airbnb_parser_1 = require("./parsers/airbnb.parser");
 const booking_com_parser_1 = require("./parsers/booking-com.parser");
+const getyourguide_parser_1 = require("./parsers/getyourguide.parser");
 const tripadvisor_parser_1 = require("./parsers/tripadvisor.parser");
 const website_parser_1 = require("./parsers/website.parser");
 let ParsingModule = class ParsingModule {
@@ -30,6 +31,7 @@ exports.ParsingModule = ParsingModule = __decorate([
             parser_registry_1.ParserRegistry,
             airbnb_parser_1.AirbnbParser,
             booking_com_parser_1.BookingComParser,
+            getyourguide_parser_1.GetYourGuideParser,
             tripadvisor_parser_1.TripAdvisorParser,
             website_parser_1.WebsiteParser,
         ],

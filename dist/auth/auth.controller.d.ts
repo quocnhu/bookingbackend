@@ -1,6 +1,6 @@
 import type { Response } from 'express';
-import { AuthService } from '@/auth/auth.service';
-import { ChangePasswordDto, LoginDto, RefreshTokenDto, RegisterDto, UpdateProfileDto } from '@/auth/dto/auth.dto';
+import { AuthService } from "./auth.service";
+import { ChangePasswordDto, LoginDto, RefreshTokenDto, RegisterDto, UpdateProfileDto } from "./dto/auth.dto";
 export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
@@ -46,8 +46,8 @@ export declare class AuthController {
         } & {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             description: string | null;
             isSystem: boolean;
         })[];
@@ -78,8 +78,8 @@ export declare class AuthController {
         } & {
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             description: string | null;
             isSystem: boolean;
         })[];

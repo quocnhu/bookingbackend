@@ -1,8 +1,8 @@
 import { WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { RawDataRepository } from '@/raw-data/raw-data.repository';
-import { RawDataService } from '@/raw-data/raw-data.service';
-import { BookingService } from '@/booking/booking.service';
+import { RawDataRepository } from "../raw-data/raw-data.repository";
+import { RawDataService } from "../raw-data/raw-data.service";
+import { BookingService } from "../booking/booking.service";
 import { ParserRegistry } from './parsers/parser-registry';
 import { ParseJobData } from './parsing.queue';
 export declare class ParsingProcessor extends WorkerHost {

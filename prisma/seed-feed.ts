@@ -508,7 +508,7 @@ async function main() {
     const dayStart = new Date(bus.date);
     dayStart.setUTCHours(0, 0, 0, 0);
     const dayEnd = new Date(
-      dayStart.getTime() + (bus.tour.durationDays ?? 1) * 86400000,
+      dayStart.getTime() + Math.max(1, (bus.tour.durationDays ?? 1) - 1) * 86400000,
     );
 
     const assignment = await prisma.assignment.create({

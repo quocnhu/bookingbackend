@@ -16,8 +16,8 @@ exports.BookingController = void 0;
 const common_1 = require("@nestjs/common");
 const booking_service_1 = require("./booking.service");
 const booking_dto_1 = require("./dto/booking.dto");
-const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
-const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let BookingController = class BookingController {
     bookingService;
     constructor(bookingService) {

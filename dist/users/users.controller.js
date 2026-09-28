@@ -16,8 +16,8 @@ exports.UsersController = void 0;
 const common_1 = require("@nestjs/common");
 const users_service_1 = require("./users.service");
 const user_dto_1 = require("./dto/user.dto");
-const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
-const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const user_password_dto_1 = require("./dto/user-password.dto");
 let UsersController = class UsersController {
     usersService;

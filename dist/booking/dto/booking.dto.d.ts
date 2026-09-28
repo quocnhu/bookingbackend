@@ -1,4 +1,4 @@
-import { PaginationDto } from '@/common/dto/pagination.dto';
+import { PaginationDto } from "../../common/dto/pagination.dto";
 import { BookingProvider, BookingStatus, PaymentStatus, TourType } from '@prisma/client';
 export declare class CreateBookingDto {
     bookingRef?: string;

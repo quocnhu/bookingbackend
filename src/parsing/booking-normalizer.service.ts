@@ -22,6 +22,7 @@ export interface NormalizeResult {
 const SOURCE_TO_CHANNEL: Record<string, BookingProvider> = {
   airbnb: BookingProvider.AIRBNB,
   'booking-com': BookingProvider.BOOKING_COM,
+  getyourguide: BookingProvider.GETYOURGUIDE,
   tripadvisor: BookingProvider.TRIPADVISOR,
   website: BookingProvider.WEBSITE,
   manual: BookingProvider.MANUAL,

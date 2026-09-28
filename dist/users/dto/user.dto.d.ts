@@ -1,4 +1,4 @@
-import { PaginationDto } from '@/common/dto/pagination.dto';
+import { PaginationDto } from "../../common/dto/pagination.dto";
 import { RoleType } from '@prisma/client';
 export declare class CreateUserDto {
     email: string;

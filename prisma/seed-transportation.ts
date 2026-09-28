@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { PrismaClient, RoleType } from '@prisma/client';
+import type { Vehicle } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -31,10 +32,11 @@ async function main() {
   let routeCount = 0;
 
   for (const p of PROVIDERS) {
+    const isCompany = p.id === 'demo-company-fleet';
     const provider = await prisma.transportationProvider.upsert({
       where: { id: p.id },
-      update: { name: p.name },
-      create: { id: p.id, name: p.name },
+      update: { name: p.name, isCompany },
+      create: { id: p.id, name: p.name, isCompany },
     });
     providerCount++;
 
@@ -65,7 +67,7 @@ async function main() {
     }
 
     // One vehicle per seat size.
-    const vehicles = [];
+    const vehicles: Vehicle[] = [];
     for (const seats of SEATS) {
       const vehicleId = `${provider.id}-seat-${seats}`;
       const v = await prisma.vehicle.upsert({
@@ -87,7 +89,8 @@ async function main() {
     for (const tour of tours) {
       for (const v of vehicles) {
         const seats = v.capacity ?? 12;
-        const price = 40 + seats * 3 + (tour.name.length % 5) * 10;
+        // Đội xe công ty (Company Fleet) phục vụ miễn phí: luôn 0 VND.
+        const price = isCompany ? 0 : 40 + seats * 3 + (tour.name.length % 5) * 10;
         await prisma.routePrice.upsert({
           where: {
             tourId_providerId_vehicleId: {

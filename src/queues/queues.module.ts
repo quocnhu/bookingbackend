@@ -2,9 +2,11 @@ import { Global, Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { AuditModule } from '@/audit/audit.module';
+import { LeavesModule } from '@/leaves/leaves.module';
 import { AssignmentBoardService } from './assignment-board.service';
 import { AssignmentQueue } from './assignment.queue';
 import { AssignmentProcessor } from './assignment.processor';
+import { AutoCrewService } from './auto-crew.service';
 import { ASSIGN_QUEUE, BOOKING_MANUAL_QUEUE } from './queue.constants';
 import { PARSE_QUEUE } from '@/parsing/parsing.queue';
 
@@ -18,6 +20,7 @@ import { PARSE_QUEUE } from '@/parsing/parsing.queue';
 @Module({
   imports: [
     AuditModule,
+    LeavesModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -38,7 +41,7 @@ import { PARSE_QUEUE } from '@/parsing/parsing.queue';
       { name: ASSIGN_QUEUE },
     ),
   ],
-  providers: [AssignmentBoardService, AssignmentQueue, AssignmentProcessor],
-  exports: [BullModule, AssignmentBoardService, AssignmentQueue],
+  providers: [AssignmentBoardService, AssignmentQueue, AssignmentProcessor, AutoCrewService],
+  exports: [BullModule, AssignmentBoardService, AssignmentQueue, AutoCrewService],
 })
 export class QueuesModule {}

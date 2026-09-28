@@ -1,5 +1,5 @@
-import { PrismaService } from '@/prisma/prisma.service';
-import { AuditService } from '@/audit/audit.service';
+import { PrismaService } from "../prisma/prisma.service";
+import { AuditService } from "../audit/audit.service";
 export declare class AssignmentBoardService {
     private readonly prisma;
     private readonly auditService;

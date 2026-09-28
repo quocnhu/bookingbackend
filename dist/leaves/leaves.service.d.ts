@@ -1,10 +1,10 @@
-import { PrismaService } from '@/prisma/prisma.service';
-import { AuditService } from '@/audit/audit.service';
-import { NotificationService } from '@/notifications/notification.service';
-import { NotificationsGateway } from '@/notifications/notifications.gateway';
+import { PrismaService } from "../prisma/prisma.service";
+import { AuditService } from "../audit/audit.service";
+import { NotificationService } from "../notifications/notification.service";
+import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { CreateLeaveDto, QueryLeaveDto, UpdateLeaveStatusDto } from './dto/leave.dto';
-import { PaginatedResult } from '@/common/dto/pagination.dto';
-import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
+import { PaginatedResult } from "../common/dto/pagination.dto";
+import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 export declare class LeavesService {
     private readonly prisma;
     private readonly auditService;
@@ -16,25 +16,25 @@ export declare class LeavesService {
     hasLeaveConflict(userId: string, start: Date, end: Date, excludeId?: string): Promise<boolean>;
     create(dto: CreateLeaveDto, actor: AuthenticatedUser): Promise<{
         user: {
+            role: import("@prisma/client").$Enums.RoleType;
             id: string;
             name: string | null;
             email: string;
-            role: import("@prisma/client").$Enums.RoleType;
         };
         reviewedBy: {
+            role: import("@prisma/client").$Enums.RoleType;
             id: string;
             name: string | null;
             email: string;
-            role: import("@prisma/client").$Enums.RoleType;
         } | null;
     } & {
         id: string;
-        status: import("@prisma/client").$Enums.LeaveStatus;
         createdAt: Date;
+        userId: string;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.LeaveStatus;
         startDate: Date;
         endDate: Date;
-        userId: string;
         reason: string | null;
         reviewedAt: Date | null;
         reviewedById: string | null;
@@ -42,50 +42,50 @@ export declare class LeavesService {
     findAll(query: QueryLeaveDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     findMy(actor: AuthenticatedUser): Promise<({
         user: {
+            role: import("@prisma/client").$Enums.RoleType;
             id: string;
             name: string | null;
             email: string;
-            role: import("@prisma/client").$Enums.RoleType;
         };
         reviewedBy: {
+            role: import("@prisma/client").$Enums.RoleType;
             id: string;
             name: string | null;
             email: string;
-            role: import("@prisma/client").$Enums.RoleType;
         } | null;
     } & {
         id: string;
-        status: import("@prisma/client").$Enums.LeaveStatus;
         createdAt: Date;
+        userId: string;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.LeaveStatus;
         startDate: Date;
         endDate: Date;
-        userId: string;
         reason: string | null;
         reviewedAt: Date | null;
         reviewedById: string | null;
     })[]>;
     updateStatus(id: string, dto: UpdateLeaveStatusDto, actor: AuthenticatedUser): Promise<{
         user: {
+            role: import("@prisma/client").$Enums.RoleType;
             id: string;
             name: string | null;
             email: string;
-            role: import("@prisma/client").$Enums.RoleType;
         };
         reviewedBy: {
+            role: import("@prisma/client").$Enums.RoleType;
             id: string;
             name: string | null;
             email: string;
-            role: import("@prisma/client").$Enums.RoleType;
         } | null;
     } & {
         id: string;
-        status: import("@prisma/client").$Enums.LeaveStatus;
         createdAt: Date;
+        userId: string;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.LeaveStatus;
         startDate: Date;
         endDate: Date;
-        userId: string;
         reason: string | null;
         reviewedAt: Date | null;
         reviewedById: string | null;

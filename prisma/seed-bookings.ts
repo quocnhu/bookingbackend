@@ -115,8 +115,8 @@ async function main() {
   // ─── Ensure providers, vehicles, drivers, guides exist ──────────────
   const company = await prisma.transportationProvider.upsert({
     where: { id: 'seed-company' },
-    update: { name: 'Company Fleet' },
-    create: { id: 'seed-company', name: 'Company Fleet' },
+    update: { name: 'Company Fleet', isCompany: true },
+    create: { id: 'seed-company', name: 'Company Fleet', isCompany: true },
   });
   const external = await prisma.transportationProvider.upsert({
     where: { id: 'seed-external' },
@@ -251,7 +251,7 @@ async function main() {
     const dayStart = new Date(bk.startingDate as Date);
     dayStart.setUTCHours(0, 0, 0, 0);
     const dayEnd = new Date(
-      dayStart.getTime() + (bk.tour?.durationDays ?? 1) * 86400000,
+      dayStart.getTime() + Math.max(1, (bk.tour?.durationDays ?? 1) - 1) * 86400000,
     );
 
     const bus = await prisma.assignment.create({

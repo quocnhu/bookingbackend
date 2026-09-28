@@ -14,14 +14,14 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AssignmentsService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("@/prisma/prisma.service");
-const audit_service_1 = require("@/audit/audit.service");
+const prisma_service_1 = require("../prisma/prisma.service");
+const audit_service_1 = require("../audit/audit.service");
 const client_1 = require("@prisma/client");
-const assignment_board_service_1 = require("@/queues/assignment-board.service");
-const notification_service_1 = require("@/notifications/notification.service");
-const notifications_gateway_1 = require("@/notifications/notifications.gateway");
-const leaves_service_1 = require("@/leaves/leaves.service");
-const storage_1 = require("@/storage");
+const assignment_board_service_1 = require("../queues/assignment-board.service");
+const notification_service_1 = require("../notifications/notification.service");
+const notifications_gateway_1 = require("../notifications/notifications.gateway");
+const leaves_service_1 = require("../leaves/leaves.service");
+const storage_1 = require("../storage");
 let AssignmentsService = class AssignmentsService {
     prisma;
     auditService;
@@ -253,10 +253,13 @@ let AssignmentsService = class AssignmentsService {
     async dispatchAllBoard() {
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date(startOfToday);
+        endOfToday.setHours(23, 59, 59, 999);
         const items = await this.prisma.assignment.findMany({
             where: {
                 status: client_1.AssignmentStatus.PENDING,
-                startDate: { gte: startOfToday },
+                startDate: { lte: endOfToday },
+                endDate: { gte: startOfToday },
             },
             select: { id: true },
         });
@@ -331,6 +334,25 @@ let AssignmentsService = class AssignmentsService {
                 throw new common_1.ForbiddenException('Driver does not belong to your provider');
             }
         }
+    }
+    async resolvePriceOverride(dto) {
+        const provId = dto.providerId ?? null;
+        let isCompany = false;
+        if (provId) {
+            const p = await this.prisma.transportationProvider.findUnique({
+                where: { id: provId },
+                select: { isCompany: true },
+            });
+            isCompany = p?.isCompany ?? false;
+        }
+        else if (dto.vehicleId) {
+            const v = await this.prisma.vehicle.findUnique({
+                where: { id: dto.vehicleId },
+                select: { provider: { select: { isCompany: true } } },
+            });
+            isCompany = v?.provider?.isCompany ?? false;
+        }
+        return isCompany ? 0 : (dto.priceOverride ?? null);
     }
     decorateBoardCard(a) {
         const totalPax = a.totalPax ??
@@ -412,7 +434,7 @@ let AssignmentsService = class AssignmentsService {
                 guideId: dto.guideId,
                 status: dto.status,
                 sequenceIndex: dto.sequenceIndex,
-                priceOverride: dto.priceOverride,
+                priceOverride: await this.resolvePriceOverride(dto),
                 tripNotes: dto.tripNotes,
                 createdWho: actor?.name ?? actor?.email ?? 'System',
             },
@@ -445,7 +467,11 @@ let AssignmentsService = class AssignmentsService {
                 guideId: dto.guideId,
                 status: dto.status,
                 sequenceIndex: dto.sequenceIndex,
-                priceOverride: dto.priceOverride,
+                priceOverride: await this.resolvePriceOverride({
+                    providerId: dto.providerId !== undefined ? dto.providerId : before.providerId,
+                    vehicleId: dto.vehicleId !== undefined ? dto.vehicleId : before.vehicleId,
+                    priceOverride: dto.priceOverride,
+                }),
                 tripNotes: dto.tripNotes,
             },
         });
@@ -458,10 +484,36 @@ let AssignmentsService = class AssignmentsService {
         });
         return this.findOne(id);
     }
+    assertDispatchableToday(assignment) {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date(startOfToday);
+        endOfToday.setHours(23, 59, 59, 999);
+        const start = new Date(assignment.startDate);
+        const end = new Date(assignment.endDate ?? assignment.startDate);
+        if (start.getTime() > endOfToday.getTime() || end.getTime() < startOfToday.getTime()) {
+            const label = `${start.getDate()}/${start.getMonth() + 1}/${start.getFullYear()}`;
+            throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" (starts ${label}) — only tours active today can be dispatched. Future departures must wait until their tour day.`);
+        }
+    }
+    assertRecallAllowed(assignment) {
+        const cutoff = new Date(assignment.startDate);
+        cutoff.setHours(5, 0, 0, 0);
+        if (Date.now() > cutoff.getTime()) {
+            throw new common_1.BadRequestException(`Recall locked — the 05:00 cutoff has passed for "${assignment.code ?? 'Bus'}". The tour is considered departed; cancel it instead if needed.`);
+        }
+    }
     async updateStatus(id, dto) {
         const before = await this.findOne(id);
         if (dto.status === before.status)
             return before;
+        if (dto.status === client_1.AssignmentStatus.DISPATCHED) {
+            this.assertDispatchableToday(before);
+        }
+        if (before.status === client_1.AssignmentStatus.DISPATCHED &&
+            dto.status === client_1.AssignmentStatus.PENDING) {
+            this.assertRecallAllowed(before);
+        }
         if (dto.status === client_1.AssignmentStatus.COMPLETED) {
             const report = await this.prisma.tourReport.findUnique({ where: { assignmentId: id } });
             if (!report || report.status !== 'VERIFIED') {

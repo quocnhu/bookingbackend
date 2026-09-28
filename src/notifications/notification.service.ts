@@ -34,10 +34,31 @@ export class NotificationService {
   }
 
   async findAll(userId: string, unreadOnly = false) {
-    return this.prisma.notification.findMany({
+    const notifications = await this.prisma.notification.findMany({
       where: { userId, ...(unreadOnly ? { read: false } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 50,
+    });
+    return this.attachSenders(notifications);
+  }
+
+  /** Gắn thông tin người gửi (nếu có) vào mỗi thông báo từ `data.fromUserId`. */
+  private async attachSenders(notifications: any[]): Promise<any[]> {
+    const senderIds = [
+      ...new Set(notifications.map((n) => (n.data as any)?.fromUserId).filter(Boolean)),
+    ];
+    if (senderIds.length === 0) return notifications;
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: senderIds } },
+      select: { id: true, name: true, email: true },
+    });
+    const byId = new Map(users.map((u) => [u.id, u]));
+
+    return notifications.map((n) => {
+      const fromUserId = (n.data as any)?.fromUserId;
+      const sender = byId.get(fromUserId);
+      return sender ? { ...n, sender } : n;
     });
   }
 
@@ -129,13 +150,20 @@ export class NotificationService {
     }
 
     const type = dto.type ?? NotificationType.GENERAL;
+    const actorInfo = await this.prisma.user.findUnique({
+      where: { id: actor.id },
+      select: { id: true, name: true, email: true },
+    });
+    const sender = actorInfo ?? { id: actor.id, name: actor.name ?? actor.email ?? 'System', email: actor.email ?? null };
+
     const created: any[] = [];
     for (const userId of recipientIds) {
       const notif = await this.create(userId, type, dto.title, dto.body, {
         fromUserId: actor.id,
       });
-      this.gateway.notifyUser(userId, 'notification', notif);
-      created.push(notif);
+      const enriched = { ...notif, sender };
+      this.gateway.notifyUser(userId, 'notification', enriched);
+      created.push(enriched);
     }
 
     this.auditService.log({

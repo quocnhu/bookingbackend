@@ -18,8 +18,8 @@ const platform_express_1 = require("@nestjs/platform-express");
 const multer_1 = require("multer");
 const assignments_service_1 = require("./assignments.service");
 const assignment_dto_1 = require("./dto/assignment.dto");
-const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
-const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let AssignmentsController = class AssignmentsController {
     assignmentsService;
     constructor(assignmentsService) {

@@ -14,8 +14,8 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GmailController = void 0;
 const common_1 = require("@nestjs/common");
-const public_decorator_1 = require("@/common/decorators/public.decorator");
-const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
+const public_decorator_1 = require("../common/decorators/public.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const gmail_pubsub_service_1 = require("./gmail-pubsub.service");
 const gmail_connect_service_1 = require("./gmail-connect.service");
 const gmail_watch_service_1 = require("./gmail-watch.service");

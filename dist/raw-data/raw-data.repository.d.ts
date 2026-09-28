@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from "../prisma/prisma.service";
 export declare class RawDataRepository {
     private readonly prisma;
     constructor(prisma: PrismaService);
@@ -11,10 +11,10 @@ export declare class RawDataRepository {
         payload: Prisma.InputJsonValue;
     }): Prisma.Prisma__RawDataClient<{
         id: string;
-        status: string;
         createdAt: Date;
-        updatedAt: Date;
         email: string | null;
+        updatedAt: Date;
+        status: string;
         templateTag: string | null;
         sourceId: string;
         payload: Prisma.JsonValue;
@@ -22,10 +22,10 @@ export declare class RawDataRepository {
     }, never, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
     findById(id: string): Prisma.Prisma__RawDataClient<{
         id: string;
-        status: string;
         createdAt: Date;
-        updatedAt: Date;
         email: string | null;
+        updatedAt: Date;
+        status: string;
         templateTag: string | null;
         sourceId: string;
         payload: Prisma.JsonValue;
@@ -33,10 +33,10 @@ export declare class RawDataRepository {
     } | null, null, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
     findBySourceId(sourceId: string): Prisma.Prisma__RawDataClient<{
         id: string;
-        status: string;
         createdAt: Date;
-        updatedAt: Date;
         email: string | null;
+        updatedAt: Date;
+        status: string;
         templateTag: string | null;
         sourceId: string;
         payload: Prisma.JsonValue;
@@ -44,10 +44,10 @@ export declare class RawDataRepository {
     } | null, null, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
     updateStatus(id: string, status: string, extra?: Prisma.RawDataUpdateInput): Prisma.Prisma__RawDataClient<{
         id: string;
-        status: string;
         createdAt: Date;
-        updatedAt: Date;
         email: string | null;
+        updatedAt: Date;
+        status: string;
         templateTag: string | null;
         sourceId: string;
         payload: Prisma.JsonValue;
@@ -55,10 +55,10 @@ export declare class RawDataRepository {
     }, never, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
     updatePayload(id: string, payload: Prisma.InputJsonValue): Prisma.Prisma__RawDataClient<{
         id: string;
-        status: string;
         createdAt: Date;
-        updatedAt: Date;
         email: string | null;
+        updatedAt: Date;
+        status: string;
         templateTag: string | null;
         sourceId: string;
         payload: Prisma.JsonValue;
@@ -66,10 +66,10 @@ export declare class RawDataRepository {
     }, never, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
     markParsed(id: string, bookingId: string): Prisma.Prisma__RawDataClient<{
         id: string;
-        status: string;
         createdAt: Date;
-        updatedAt: Date;
         email: string | null;
+        updatedAt: Date;
+        status: string;
         templateTag: string | null;
         sourceId: string;
         payload: Prisma.JsonValue;

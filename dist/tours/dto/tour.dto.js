@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.QueryTourDto = exports.ReorderGalleryDto = exports.UpdateItineraryDto = exports.ItineraryItemDto = exports.UpdateTourDto = exports.TourTypePriceDto = exports.CreateTourDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
-const pagination_dto_1 = require("@/common/dto/pagination.dto");
+const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const client_1 = require("@prisma/client");
 class CreateTourDto {
     name;

@@ -18,8 +18,8 @@ export declare class GmailController {
     } | {
         handled: number;
         duplicates: number;
+        ignored: number;
         nextHistoryId: string | null;
-        ignored?: undefined;
         received: boolean;
     }>;
     connect(res: Response, accountId?: string): void;

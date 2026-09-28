@@ -812,6 +812,8 @@ async function main() {
       email: 'hello@sunshine-travel.vn',
       taxId: '0317412086',
       website: 'https://sunshine-travel.vn',
+      rootLatitude: 10.76557640959363,
+      rootLongitude: 106.70411045421818,
     },
   });
   console.log(`✅ Seeded company profile`);

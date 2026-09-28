@@ -45,8 +45,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TransportationProvidersService = void 0;
 const common_1 = require("@nestjs/common");
 const bcrypt = __importStar(require("bcrypt"));
-const prisma_service_1 = require("@/prisma/prisma.service");
-const audit_service_1 = require("@/audit/audit.service");
+const prisma_service_1 = require("../prisma/prisma.service");
+const audit_service_1 = require("../audit/audit.service");
 const client_1 = require("@prisma/client");
 let TransportationProvidersService = class TransportationProvidersService {
     prisma;

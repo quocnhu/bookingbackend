@@ -13,11 +13,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BookingService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
-const prisma_service_1 = require("@/prisma/prisma.service");
-const audit_service_1 = require("@/audit/audit.service");
-const booking_normalizer_service_1 = require("@/parsing/booking-normalizer.service");
-const assignment_board_service_1 = require("@/queues/assignment-board.service");
-const assignment_queue_1 = require("@/queues/assignment.queue");
+const prisma_service_1 = require("../prisma/prisma.service");
+const audit_service_1 = require("../audit/audit.service");
+const booking_normalizer_service_1 = require("../parsing/booking-normalizer.service");
+const assignment_board_service_1 = require("../queues/assignment-board.service");
+const assignment_queue_1 = require("../queues/assignment.queue");
 let BookingService = BookingService_1 = class BookingService {
     prisma;
     auditService;

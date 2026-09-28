@@ -10,6 +10,7 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { AssignmentBoardService } from './assignment-board.service';
+import { AutoCrewService } from './auto-crew.service';
 import { ASSIGN_QUEUE } from './queue.constants';
 import { AssignJobData } from './assignment.queue';
 
@@ -31,6 +32,7 @@ export class AssignmentProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly board: AssignmentBoardService,
     private readonly auditService: AuditService,
+    private readonly autoCrew: AutoCrewService,
   ) {
     super();
   }
@@ -76,6 +78,7 @@ export class AssignmentProcessor extends WorkerHost {
         },
         changedBy: null,
       });
+      await this.assignCrew(bus.id);
       return {
         status: 'CREATED_BUS',
         bookingId,
@@ -100,12 +103,27 @@ export class AssignmentProcessor extends WorkerHost {
     this.logger.log(
       `Auto-assigned booking ${booking.bookingRef} -> bus ${candidate.code ?? candidate.id}`,
     );
+    await this.assignCrew(candidate.id);
     return {
       status: 'ASSIGNED',
       bookingId,
       bookingRef: booking.bookingRef,
       assignmentId: candidate.id,
     };
+  }
+
+  /** Điền crew (HDV + tài xế) còn thiếu cho bus — auto-crew không bao giờ override gán thủ công. */
+  private async assignCrew(assignmentId: string) {
+    try {
+      const { assigned } = await this.autoCrew.assignCrewForBus(assignmentId);
+      if (assigned) {
+        this.logger.log(`Auto-assigned crew for bus ${assignmentId}`);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Auto-crew skipped for bus ${assignmentId}: ${(error as Error).message}`,
+      );
+    }
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -120,7 +138,7 @@ export class AssignmentProcessor extends WorkerHost {
     startDate.setUTCHours(0, 0, 0, 0);
     const durationDays = booking.tour?.durationDays ?? 1;
     const endDate = new Date(
-      startDate.getTime() + Math.max(1, durationDays) * 86400000,
+      startDate.getTime() + Math.max(1, durationDays - 1) * 86400000,
     );
     const label = booking.tourType === TourType.PRIVATE_TOUR ? 'Priv' : 'Group';
     const existing = await this.prisma.assignment.findMany({
@@ -131,6 +149,13 @@ export class AssignmentProcessor extends WorkerHost {
       .map((a) => parseInt((a.code ?? '').split('-')[1]?.trim() ?? '0', 10))
       .filter((n) => !Number.isNaN(n));
     const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
+    // Ưu tiên gắn xe của Company Fleet (nếu còn khả dụng cùng ngày) để tận dụng
+    // tài sản công ty trước khi thuê ngoài — xe công ty phí 0 VND (priceOverride = 0).
+    const companyVehicle = await this.findCompanyVehicle(
+      booking,
+      startDate,
+      endDate,
+    );
     return this.prisma.assignment.create({
       data: {
         code: `${label} Bus - ${nextNumber}`,
@@ -143,7 +168,32 @@ export class AssignmentProcessor extends WorkerHost {
         durationDays,
         totalPax: booking.totalPax ?? 0,
         createdWho: 'Auto-Assign System',
+        vehicleId: companyVehicle?.id ?? null,
+        providerId: companyVehicle?.providerId ?? null,
+        priceOverride: companyVehicle?.provider?.isCompany ? 0 : undefined,
       },
+    });
+  }
+
+  /** Tìm xe của Company Fleet còn rảnh trong khoảng [startDate, endDate] và đủ sức chứa. */
+  private async findCompanyVehicle(booking: any, startDate: Date, endDate: Date) {
+    const pax = booking.totalPax ?? 1;
+    return this.prisma.vehicle.findFirst({
+      where: {
+        capacity: { gte: pax },
+        provider: { isCompany: true },
+        assignments: {
+          none: {
+            startDate: { lte: endDate },
+            endDate: { gte: startDate },
+            status: {
+              notIn: [AssignmentStatus.CANCELED, AssignmentStatus.COMPLETED],
+            },
+          },
+        },
+      },
+      orderBy: [{ capacity: 'asc' }],
+      select: { id: true, providerId: true, provider: { select: { isCompany: true } } },
     });
   }
 
@@ -156,7 +206,16 @@ export class AssignmentProcessor extends WorkerHost {
         startDate: { lte: booking.startingDate },
         endDate: { gte: booking.startingDate },
       },
-      include: { bookings: true, vehicle: true },
+      include: {
+        bookings: true,
+        vehicle: {
+          select: {
+            id: true,
+            capacity: true,
+            provider: { select: { isCompany: true } },
+          },
+        },
+      },
       orderBy: [{ startDate: 'asc' }],
     });
 
@@ -178,8 +237,11 @@ export class AssignmentProcessor extends WorkerHost {
     const matches = candidates.filter((a) => typeOk(a) && capOk(a));
     if (matches.length === 0) return null;
 
-    // Ưu tiên bus đúng tourType nhất, rồi bus còn ít chỗ nhất (fit chặt).
+    // Ưu tiên: bus của Company Fleet (xe công ty) > đúng tourType > còn ít chỗ nhất.
     matches.sort((a, b) => {
+      const aCompany = a.vehicle?.provider?.isCompany ? 0 : 1;
+      const bCompany = b.vehicle?.provider?.isCompany ? 0 : 1;
+      if (aCompany !== bCompany) return aCompany - bCompany;
       const aExact = a.tourType === booking.tourType ? 0 : 1;
       const bExact = b.tourType === booking.tourType ? 0 : 1;
       if (aExact !== bExact) return aExact - bExact;

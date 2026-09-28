@@ -4,6 +4,7 @@ exports.validateBookingFields = validateBookingFields;
 const SOURCES = new Set([
     'airbnb',
     'booking-com',
+    'getyourguide',
     'tripadvisor',
     'website',
     'manual',

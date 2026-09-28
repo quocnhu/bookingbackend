@@ -10,12 +10,14 @@ exports.QueuesModule = void 0;
 const common_1 = require("@nestjs/common");
 const bullmq_1 = require("@nestjs/bullmq");
 const config_1 = require("@nestjs/config");
-const audit_module_1 = require("@/audit/audit.module");
+const audit_module_1 = require("../audit/audit.module");
+const leaves_module_1 = require("../leaves/leaves.module");
 const assignment_board_service_1 = require("./assignment-board.service");
 const assignment_queue_1 = require("./assignment.queue");
 const assignment_processor_1 = require("./assignment.processor");
+const auto_crew_service_1 = require("./auto-crew.service");
 const queue_constants_1 = require("./queue.constants");
-const parsing_queue_1 = require("@/parsing/parsing.queue");
+const parsing_queue_1 = require("../parsing/parsing.queue");
 let QueuesModule = class QueuesModule {
 };
 exports.QueuesModule = QueuesModule;
@@ -24,6 +26,7 @@ exports.QueuesModule = QueuesModule = __decorate([
     (0, common_1.Module)({
         imports: [
             audit_module_1.AuditModule,
+            leaves_module_1.LeavesModule,
             bullmq_1.BullModule.forRootAsync({
                 inject: [config_1.ConfigService],
                 useFactory: (config) => ({
@@ -40,8 +43,8 @@ exports.QueuesModule = QueuesModule = __decorate([
             }),
             bullmq_1.BullModule.registerQueue({ name: queue_constants_1.BOOKING_MANUAL_QUEUE }, { name: parsing_queue_1.PARSE_QUEUE }, { name: queue_constants_1.ASSIGN_QUEUE }),
         ],
-        providers: [assignment_board_service_1.AssignmentBoardService, assignment_queue_1.AssignmentQueue, assignment_processor_1.AssignmentProcessor],
-        exports: [bullmq_1.BullModule, assignment_board_service_1.AssignmentBoardService, assignment_queue_1.AssignmentQueue],
+        providers: [assignment_board_service_1.AssignmentBoardService, assignment_queue_1.AssignmentQueue, assignment_processor_1.AssignmentProcessor, auto_crew_service_1.AutoCrewService],
+        exports: [bullmq_1.BullModule, assignment_board_service_1.AssignmentBoardService, assignment_queue_1.AssignmentQueue, auto_crew_service_1.AutoCrewService],
     })
 ], QueuesModule);
 //# sourceMappingURL=queues.module.js.map

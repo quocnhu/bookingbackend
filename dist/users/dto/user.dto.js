@@ -11,8 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.QueryUserDto = exports.UpdateUserRoleDto = exports.UpdateUserDto = exports.CreateUserDto = void 0;
 const class_validator_1 = require("class-validator");
-const pagination_dto_1 = require("@/common/dto/pagination.dto");
-const is_safe_url_validator_1 = require("@/common/validators/is-safe-url.validator");
+const pagination_dto_1 = require("../../common/dto/pagination.dto");
+const is_safe_url_validator_1 = require("../../common/validators/is-safe-url.validator");
 const client_1 = require("@prisma/client");
 class CreateUserDto {
     email;

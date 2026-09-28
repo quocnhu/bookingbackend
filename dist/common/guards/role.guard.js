@@ -12,9 +12,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RoleGuard = void 0;
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
-const roles_decorator_1 = require("@/common/decorators/roles.decorator");
-const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
-const public_decorator_1 = require("@/common/decorators/public.decorator");
+const roles_decorator_1 = require("../decorators/roles.decorator");
+const permissions_decorator_1 = require("../decorators/permissions.decorator");
+const public_decorator_1 = require("../decorators/public.decorator");
 const client_1 = require("@prisma/client");
 let RoleGuard = class RoleGuard {
     reflector;

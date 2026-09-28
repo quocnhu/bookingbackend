@@ -14,7 +14,7 @@ exports.BookingManualProcessor = void 0;
 const common_1 = require("@nestjs/common");
 const bullmq_1 = require("@nestjs/bullmq");
 const booking_service_1 = require("./booking.service");
-const queue_constants_1 = require("@/queues/queue.constants");
+const queue_constants_1 = require("../queues/queue.constants");
 let BookingManualProcessor = BookingManualProcessor_1 = class BookingManualProcessor extends bullmq_1.WorkerHost {
     bookingService;
     logger = new common_1.Logger(BookingManualProcessor_1.name);

@@ -15,7 +15,7 @@ export interface BookingFields {
   action: ParsedAction;
   /** Mã xác nhận (bookingRef / confirmationCode) — key upsert cùng source. */
   bookingRef: string;
-  /** 'airbnb' | 'booking-com' | 'tripadvisor' | 'website' | 'manual' */
+  /** 'airbnb' | 'booking-com' | 'getyourguide' | 'tripadvisor' | 'website' | 'manual' */
   source: string;
   channel?: BookingProvider;
   status?: BookingStatus;
@@ -46,6 +46,7 @@ export interface ValidationResult {
 const SOURCES = new Set([
   'airbnb',
   'booking-com',
+  'getyourguide',
   'tripadvisor',
   'website',
   'manual',

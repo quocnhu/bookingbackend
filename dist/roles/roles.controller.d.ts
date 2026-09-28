@@ -19,14 +19,12 @@ export declare class RolesController {
         })[];
         users: ({
             user: {
+                role: import("@prisma/client").$Enums.RoleType;
                 id: string;
                 createdAt: Date;
-                updatedAt: Date;
                 name: string | null;
-                providerId: string | null;
-                email: string;
-                role: import("@prisma/client").$Enums.RoleType;
                 authProvider: import("@prisma/client").$Enums.AuthProvider;
+                email: string;
                 avatarUrl: string | null;
                 passwordHash: string | null;
                 isActive: boolean;
@@ -35,6 +33,8 @@ export declare class RolesController {
                 lockoutUntil: Date | null;
                 userType: string | null;
                 storageQuotaMb: number;
+                providerId: string | null;
+                updatedAt: Date;
             };
         } & {
             userId: string;
@@ -43,16 +43,16 @@ export declare class RolesController {
     } & {
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         description: string | null;
         isSystem: boolean;
     }>;
     create(dto: CreateRoleDto): Promise<{
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         description: string | null;
         isSystem: boolean;
     }>;
@@ -70,14 +70,12 @@ export declare class RolesController {
         })[];
         users: ({
             user: {
+                role: import("@prisma/client").$Enums.RoleType;
                 id: string;
                 createdAt: Date;
-                updatedAt: Date;
                 name: string | null;
-                providerId: string | null;
-                email: string;
-                role: import("@prisma/client").$Enums.RoleType;
                 authProvider: import("@prisma/client").$Enums.AuthProvider;
+                email: string;
                 avatarUrl: string | null;
                 passwordHash: string | null;
                 isActive: boolean;
@@ -86,6 +84,8 @@ export declare class RolesController {
                 lockoutUntil: Date | null;
                 userType: string | null;
                 storageQuotaMb: number;
+                providerId: string | null;
+                updatedAt: Date;
             };
         } & {
             userId: string;
@@ -94,8 +94,8 @@ export declare class RolesController {
     } & {
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         description: string | null;
         isSystem: boolean;
     }>;

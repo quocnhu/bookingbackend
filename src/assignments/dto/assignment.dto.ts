@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsIn,
@@ -299,4 +300,30 @@ export class SettlementSummaryDto {
   @IsOptional()
   @IsString()
   driverId?: string;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  unpaidOnly?: boolean;
+}
+
+export class ExportGuidePaymentDto {
+  @IsString()
+  guideId: string;
+
+  @IsDateString()
+  fromDate: string;
+
+  @IsDateString()
+  toDate: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class GuidePaymentPeriodsQueryDto {
+  @IsOptional()
+  @IsString()
+  guideId?: string;
 }

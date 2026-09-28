@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import {
   AssignBookingsDto,
   CreateAssignmentDto,
+  ExportGuidePaymentDto,
   FinalizeAssignmentDto,
   QueryAssignmentDto,
   SubmitTourReportDto,
@@ -20,6 +21,10 @@ import { NotificationsGateway } from '@/notifications/notifications.gateway';
 import { LeavesService } from '@/leaves/leaves.service';
 import { STORAGE } from '@/storage';
 import type { FileStorage } from '@/storage';
+
+/** Dispatch Board: cho phép xem lại N ngày trước. Phải khớp với
+ *  isOutsideLoadedWindow trong frontend/components/dispatch-board/index.tsx. */
+const BOARD_LOOKBACK_DAYS = 30;
 
 @Injectable()
 export class AssignmentsService {
@@ -64,17 +69,20 @@ export class AssignmentsService {
     const maxDate = new Date(startOfToday);
     maxDate.setDate(maxDate.getDate() + 90);
 
+    // Nhìn lại 30 ngày trước để xem được chuyến đã chạy xong.
+    const minDate = new Date(startOfToday);
+    minDate.setDate(minDate.getDate() - BOARD_LOOKBACK_DAYS);
+
     const where: any = {
-      // Còn mở (chưa hoàn thành/hủy): COMPLETED/CANCELED không còn trên board.
-      status: {
-        notIn: [AssignmentStatus.CANCELED, AssignmentStatus.COMPLETED],
-      },
+      // Không lọc COMPLETED/CANCELED: cần thấy chuyến đã xong để tra lại
+      // ngày quá khứ. Frontend lọc theo ngày đang chọn.
+      //
       // Board hiển thị chuyến đang/chưa diễn ra hôm nay:
       // - đã bắt đầu trước hôm nay nhưng vẫn kéo dài qua hôm nay (multi-day),
       // - bắt đầu hôm nay,
       // - hoặc sắp tới trong 90 ngày.
       startDate: { lte: maxDate },
-      endDate: { gte: startOfToday },
+      endDate: { gte: minDate },
     };
     // Provider/crew roles chỉ thấy dữ liệu của chính họ.
     if (actor.role !== RoleType.ADMIN && actor.role !== RoleType.OFFICE) {
@@ -89,7 +97,7 @@ export class AssignmentsService {
       where,
       include: this.include,
       orderBy: [{ startDate: 'asc' }],
-      take: 200,
+      take: 500,
     });
 
     return items.map((a) => {
@@ -279,15 +287,20 @@ export class AssignmentsService {
     return { from, to, guides, drivers };
   }
 
-  /** Dispatch (xuất bến) toàn bộ chuyến PENDING trên Dispatch Board. */
+  /** Dispatch (xuất bến) toàn bộ chuyến PENDING đang hoạt động HÔM NAY.
+   *  Không bao giờ dispatch chuyến tương lai (chỉ chuyến có ngày khởi hành hôm nay
+   *  hoặc multi-day đang diễn ra qua hôm nay). */
   async dispatchAllBoard(): Promise<{ dispatched: number }> {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setHours(23, 59, 59, 999);
 
     const items = await this.prisma.assignment.findMany({
       where: {
         status: AssignmentStatus.PENDING,
-        startDate: { gte: startOfToday },
+        startDate: { lte: endOfToday },
+        endDate: { gte: startOfToday },
       },
       select: { id: true },
     });
@@ -384,6 +397,31 @@ export class AssignmentsService {
     }
   }
 
+  /** Luật "xe công ty = 0 VND": nếu assignment gắn xe/nhà xe của Company Fleet
+   *  (TransportationProvider.isCompany) thì phí xe buộc = 0, không cho nhập giá. */
+  private async resolvePriceOverride(dto: {
+    providerId?: string | null;
+    vehicleId?: string | null;
+    priceOverride?: number | null;
+  }): Promise<number | null> {
+    const provId = dto.providerId ?? null;
+    let isCompany = false;
+    if (provId) {
+      const p = await this.prisma.transportationProvider.findUnique({
+        where: { id: provId },
+        select: { isCompany: true },
+      });
+      isCompany = p?.isCompany ?? false;
+    } else if (dto.vehicleId) {
+      const v = await this.prisma.vehicle.findUnique({
+        where: { id: dto.vehicleId },
+        select: { provider: { select: { isCompany: true } } },
+      });
+      isCompany = v?.provider?.isCompany ?? false;
+    }
+    return isCompany ? 0 : (dto.priceOverride ?? null);
+  }
+
   /** Tính các thông tin hiển thị trên Dispatch Board cho 1 assignment. */
   private decorateBoardCard(a: any) {
     const totalPax =
@@ -470,7 +508,7 @@ export class AssignmentsService {
         guideId: dto.guideId,
         status: dto.status,
         sequenceIndex: dto.sequenceIndex,
-        priceOverride: dto.priceOverride,
+        priceOverride: await this.resolvePriceOverride(dto),
         tripNotes: dto.tripNotes,
         createdWho: actor?.name ?? actor?.email ?? 'System',
       },
@@ -511,7 +549,11 @@ export class AssignmentsService {
         guideId: dto.guideId,
         status: dto.status,
         sequenceIndex: dto.sequenceIndex,
-        priceOverride: dto.priceOverride,
+        priceOverride: await this.resolvePriceOverride({
+          providerId: dto.providerId !== undefined ? dto.providerId : before.providerId,
+          vehicleId: dto.vehicleId !== undefined ? dto.vehicleId : before.vehicleId,
+          priceOverride: dto.priceOverride,
+        }),
         tripNotes: dto.tripNotes,
       },
     });
@@ -525,9 +567,52 @@ export class AssignmentsService {
     return this.findOne(id);
   }
 
+  /** Dispatch chỉ được thực hiện với chuyến hoạt động HÔM NAY
+   *  (khởi hành hôm nay hoặc multi-day đang diễn ra qua hôm nay).
+   *  Chặn admin dispatch trước ngày khởi hành — "dispatch only today". */
+  private assertDispatchableToday(assignment: any) {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setHours(23, 59, 59, 999);
+    const start = new Date(assignment.startDate);
+    const end = new Date(assignment.endDate ?? assignment.startDate);
+    if (start.getTime() > endOfToday.getTime() || end.getTime() < startOfToday.getTime()) {
+      const label = `${start.getDate()}/${start.getMonth() + 1}/${start.getFullYear()}`;
+      throw new BadRequestException(
+        `Cannot dispatch "${assignment.code ?? 'Bus'}" (starts ${label}) — only tours active today can be dispatched. Future departures must wait until their tour day.`,
+      );
+    }
+  }
+
+  /** Recall (DISPATCHED → PENDING) locked sau 05:00 sáng ngày khởi hành.
+   *  Trước đó backend cho phép người điều hành rút lại chuyến để xếp lại. */
+  private assertRecallAllowed(assignment: any) {
+    const cutoff = new Date(assignment.startDate);
+    cutoff.setHours(5, 0, 0, 0);
+    if (Date.now() > cutoff.getTime()) {
+      throw new BadRequestException(
+        `Recall locked — the 05:00 cutoff has passed for "${assignment.code ?? 'Bus'}". The tour is considered departed; cancel it instead if needed.`,
+      );
+    }
+  }
+
   async updateStatus(id: string, dto: UpdateAssignmentStatusDto) {
     const before = await this.findOne(id);
     if (dto.status === before.status) return before;
+
+    // ── Guard: Dispatch only happens for tours active TODAY ──
+    if (dto.status === AssignmentStatus.DISPATCHED) {
+      this.assertDispatchableToday(before);
+    }
+    // ── Guard: Recall (DISPATCHED → PENDING) is locked after 05:00 on the
+    // departure day — the bus is considered en route. ──
+    if (
+      before.status === AssignmentStatus.DISPATCHED &&
+      dto.status === AssignmentStatus.PENDING
+    ) {
+      this.assertRecallAllowed(before);
+    }
 
     // ── Guard: COMPLETED requires a verified TourReport ──
     if (dto.status === AssignmentStatus.COMPLETED) {
@@ -1347,9 +1432,13 @@ await this.prisma.$transaction(async (tx) => {
 
     const where: any = {
       status: { not: AssignmentStatus.CANCELED },
-      OR: [{ driverId: actor.id }, { guideId: actor.id }],
       endDate: { gte: cutoff },
     };
+    if (actor.role === RoleType.TRANSPORT_PROVIDER) {
+      where.providerId = actor.providerId;
+    } else {
+      where.OR = [{ driverId: actor.id }, { guideId: actor.id }];
+    }
 
     const items = await this.prisma.assignment.findMany({
       where,
@@ -1402,13 +1491,18 @@ await this.prisma.$transaction(async (tx) => {
     const start = new Date(y, m - 1, 1);
     const end = new Date(y, m, 0, 23, 59, 59, 999);
 
+    const where: any = {
+      status: { not: AssignmentStatus.CANCELED },
+      startDate: { lte: end },
+      endDate: { gte: start },
+    };
+    if (actor.role === RoleType.TRANSPORT_PROVIDER) {
+      where.providerId = actor.providerId;
+    } else {
+      where.OR = [{ driverId: actor.id }, { guideId: actor.id }];
+    }
     const items = await this.prisma.assignment.findMany({
-      where: {
-        status: { not: AssignmentStatus.CANCELED },
-        OR: [{ driverId: actor.id }, { guideId: actor.id }],
-        startDate: { lte: end },
-        endDate: { gte: start },
-      },
+      where,
       include: {
         vehicle: { select: { plateNumber: true } },
         driver: { select: { id: true, name: true } },
@@ -1490,6 +1584,7 @@ await this.prisma.$transaction(async (tx) => {
           include: { category: true },
         },
         vehicle: { select: { plateNumber: true } },
+        tourReport: { select: { guidePaidAt: true } },
       },
       orderBy: { endDate: 'asc' },
     });
@@ -1514,6 +1609,8 @@ await this.prisma.$transaction(async (tx) => {
         collected,
         paid,
         net,
+        isPaid: !!a.tourReport?.guidePaidAt,
+        paidAt: a.tourReport?.guidePaidAt ?? null,
         items: a.settlements.map((s) => ({
           id: s.id,
           category: s.category?.name ?? s.customCategoryName ?? 'Other',
@@ -1528,6 +1625,22 @@ await this.prisma.$transaction(async (tx) => {
     const totalPaid = lines.reduce((s, l) => s + l.paid, 0);
     const totalNet = totalCollected - totalPaid;
 
+    const paidLines = lines.filter((l) => l.isPaid);
+    const unpaidLines = lines.filter((l) => !l.isPaid);
+    const sumNet = (ls: typeof lines) => ls.reduce((s, l) => s + l.net, 0);
+    const lastPaidAt =
+      paidLines.reduce<number | null>((max, l) => {
+        const ts = l.paidAt ? new Date(l.paidAt).getTime() : 0;
+        return max !== null && ts <= max ? max : ts;
+      }, null) ?? null;
+
+    const periods = await this.prisma.guidePaymentPeriod.findMany({
+      where: { guideId: actor.id },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    const toNumber = (v: unknown) => Number(v ?? 0);
+
     return {
       guideType,
       startDate: start,
@@ -1537,7 +1650,22 @@ await this.prisma.$transaction(async (tx) => {
         totalCollected,
         totalPaid,
         totalNet,
+        paidNet: sumNet(paidLines),
+        unpaidNet: sumNet(unpaidLines),
+        lastPaidAt: lastPaidAt ? new Date(lastPaidAt) : null,
       },
+      periods: periods.map((p) => ({
+        id: p.id,
+        fromDate: p.fromDate,
+        toDate: p.toDate,
+        tourCount: p.tourCount,
+        guideReturnsToCompany: toNumber(p.guideReturnsToCompany),
+        companyReturnsToGuide: toNumber(p.companyReturnsToGuide),
+        totalNet: toNumber(p.totalNet),
+        note: p.note,
+        createdByName: p.createdByName,
+        createdAt: p.createdAt,
+      })),
       lines,
     };
   }
@@ -1556,6 +1684,7 @@ await this.prisma.$transaction(async (tx) => {
     to: string,
     guideId?: string,
     driverId?: string,
+    unpaidOnly = false,
   ) {
     const gte = new Date(from);
     const lte = new Date(to);
@@ -1566,6 +1695,7 @@ await this.prisma.$transaction(async (tx) => {
     const where: any = {
       tourReport: { is: { finalizedAt: { gte, lte } } },
     };
+    if (unpaidOnly) where.tourReport.is.guidePaidAt = null;
     if (guideId) where.guideId = guideId;
     if (driverId) where.driverId = driverId;
 
@@ -1634,6 +1764,8 @@ await this.prisma.$transaction(async (tx) => {
         servicesTotal: toNumber(a.tourReport?.servicesTotal),
         netAmount: netOf(a),
         settlementFlow: a.tourReport?.settlementFlow ?? null,
+        isPaid: !!a.tourReport?.guidePaidAt,
+        guidePaidAt: a.tourReport?.guidePaidAt ?? null,
         places,
       };
     });
@@ -1662,7 +1794,196 @@ await this.prisma.$transaction(async (tx) => {
         },
       },
       lines,
+      guidePayments: guideId ? await this.buildGuidePaymentInfo(guideId) : null,
     };
+  }
+
+  // ─── Guide payment periods (Kỳ thanh toán cho HDV) ──────────────────
+
+  private guardAccounting(actor: AuthenticatedUser) {
+    if (actor.role !== RoleType.ADMIN && actor.role !== RoleType.OFFICE) {
+      throw new ForbiddenException('Only accounting/management (ADMIN/OFFICE) can manage guide payments');
+    }
+  }
+
+  /** Watermark + lịch sử các kỳ đã thanh toán cho 1 HDV. */
+  private async buildGuidePaymentInfo(guideId: string) {
+    const periods = await this.prisma.guidePaymentPeriod.findMany({
+      where: { guideId },
+      orderBy: { toDate: 'desc' },
+      take: 100,
+    });
+    const toNumber = (v: unknown) => Number(v ?? 0);
+    const mapped = periods.map((p) => ({
+      id: p.id,
+      fromDate: p.fromDate,
+      toDate: p.toDate,
+      tourCount: p.tourCount,
+      guideReturnsToCompany: toNumber(p.guideReturnsToCompany),
+      companyReturnsToGuide: toNumber(p.companyReturnsToGuide),
+      totalNet: toNumber(p.totalNet),
+      note: p.note,
+      createdByName: p.createdByName,
+      createdAt: p.createdAt,
+    }));
+    const lastPaidTo = mapped[0]?.toDate ?? null;
+    const nextFrom = lastPaidTo
+      ? ((d) => { d.setDate(d.getDate() + 1); d.setHours(0, 0, 0, 0); return d; })(new Date(lastPaidTo))
+      : null;
+    return { periods: mapped, lastPaidTo, nextFrom };
+  }
+
+  /**
+   * Kế toán export một kỳ thanh toán cho HDV trên khoảng [fromDate, toDate]:
+   * tất cả tour finalized trong kỳ chưa paid sẽ bị đánh dấu guidePaidAt = now
+   * (watermark) + ghi 1 GuidePaymentPeriod làm lịch sử.
+   * Lần sau tính/export tiếp từ ngày sau lastPaidTo.
+   */
+  async exportGuidePayment(actor: AuthenticatedUser, dto: ExportGuidePaymentDto) {
+    this.guardAccounting(actor);
+
+    const from = new Date(dto.fromDate);
+    const to = new Date(dto.toDate + 'T23:59:59.999');
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+      throw new BadRequestException('Invalid payment period');
+    }
+
+    const guide = await this.prisma.user.findUnique({ where: { id: dto.guideId } });
+    if (!guide || guide.role !== RoleType.TOUR_GUIDE) {
+      throw new NotFoundException('Tour guide not found');
+    }
+
+    const assignments = await this.prisma.assignment.findMany({
+      where: {
+        guideId: dto.guideId,
+        status: AssignmentStatus.COMPLETED,
+        tourReport: { is: { finalizedAt: { gte: from, lte: to }, netAmount: { not: null } } },
+      },
+      include: {
+        tourReport: true,
+        vehicle: { select: { plateNumber: true } },
+        guide: { select: { id: true, name: true } },
+      },
+      orderBy: { tourReport: { finalizedAt: 'asc' } },
+    });
+
+    const unpaid = assignments.filter((a) => !a.tourReport?.guidePaidAt);
+    const alreadyPaidCount = assignments.length - unpaid.length;
+    if (unpaid.length === 0) {
+      throw new ConflictException(
+        'All settled tours in this period are already paid for this guide — try a range after the last paid period',
+      );
+    }
+
+    const toNumber = (v: unknown) => Number(v ?? 0);
+    const isPayFlow = (a: (typeof assignments)[number]) =>
+      (a.tourReport?.settlementFlow ?? null) === FeeFlowType.PAY_MONEY;
+    let guideReturnsToCompany = 0;
+    let companyReturnsToGuide = 0;
+    for (const a of unpaid) {
+      const net = toNumber(a.tourReport?.netAmount);
+      if (isPayFlow(a)) companyReturnsToGuide += Math.abs(net);
+      else guideReturnsToCompany += net;
+    }
+    const totalNet = guideReturnsToCompany - companyReturnsToGuide;
+
+    const paidAt = new Date();
+    const unpaidIds = unpaid.map((a) => a.id);
+    await this.prisma.tourReport.updateMany({
+      where: { assignmentId: { in: unpaidIds } },
+      data: {
+        guidePaidAt: paidAt,
+        guidePaidById: actor.id,
+        guidePaidByName: actor.name,
+      },
+    });
+
+    const period = await this.prisma.guidePaymentPeriod.create({
+      data: {
+        guideId: dto.guideId,
+        fromDate: from,
+        toDate: to,
+        tourCount: unpaid.length,
+        guideReturnsToCompany,
+        companyReturnsToGuide,
+        totalNet,
+        note: dto.note,
+        createdById: actor.id,
+        createdByName: actor.name,
+      },
+    });
+
+    await this.auditService.log({
+      entityType: 'GuidePaymentPeriod',
+      entityId: period.id,
+      action: 'EXPORT',
+      changedBy: actor.name,
+      afterData: {
+        guideId: dto.guideId,
+        fromDate: dto.fromDate,
+        toDate: dto.toDate,
+        tourCount: unpaid.length,
+        guideReturnsToCompany,
+        companyReturnsToGuide,
+        totalNet,
+      },
+    });
+
+    return {
+      period: {
+        id: period.id,
+        guideId: period.guideId,
+        guideName: guide.name ?? guide.email,
+        fromDate: period.fromDate,
+        toDate: period.toDate,
+        tourCount: period.tourCount,
+        guideReturnsToCompany: Number(period.guideReturnsToCompany),
+        companyReturnsToGuide: Number(period.companyReturnsToGuide),
+        totalNet: Number(period.totalNet),
+        note: period.note,
+        createdAt: period.createdAt,
+      },
+      exportedCount: unpaid.length,
+      alreadyPaidCount,
+      lines: unpaid.map((a) => ({
+        id: a.id,
+        code: a.code,
+        tourName: a.tourName ?? a.code ?? 'Tour',
+        vehiclePlate: a.vehicle?.plateNumber ?? null,
+        endDate: a.endDate,
+        netAmount: toNumber(a.tourReport?.netAmount),
+        settlementFlow: a.tourReport?.settlementFlow ?? null,
+        guidePaidAt: paidAt,
+      })),
+    };
+  }
+
+  /** Lịch sử các kỳ thanh toán đã export (accounting). */
+  async listGuidePaymentPeriods(actor: AuthenticatedUser, guideId?: string) {
+    this.guardAccounting(actor);
+    const where: any = {};
+    if (guideId) where.guideId = guideId;
+    const periods = await this.prisma.guidePaymentPeriod.findMany({
+      where,
+      include: { guide: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+    });
+    const toNumber = (v: unknown) => Number(v ?? 0);
+    return periods.map((p) => ({
+      id: p.id,
+      guideId: p.guideId,
+      guideName: p.guide?.name ?? p.guide?.email ?? null,
+      fromDate: p.fromDate,
+      toDate: p.toDate,
+      tourCount: p.tourCount,
+      guideReturnsToCompany: toNumber(p.guideReturnsToCompany),
+      companyReturnsToGuide: toNumber(p.companyReturnsToGuide),
+      totalNet: toNumber(p.totalNet),
+      note: p.note,
+      createdByName: p.createdByName,
+      createdAt: p.createdAt,
+    }));
   }
 
   async findMyFleet(actor: AuthenticatedUser, startDate?: string, endDate?: string) {

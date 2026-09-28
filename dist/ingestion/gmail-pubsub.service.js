@@ -18,24 +18,28 @@ var GmailPubSubService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GmailPubSubService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const ioredis_1 = __importDefault(require("ioredis"));
-const prisma_service_1 = require("@/prisma/prisma.service");
-const raw_data_service_1 = require("@/raw-data/raw-data.service");
-const parsing_queue_1 = require("@/parsing/parsing.queue");
-const redis_constants_1 = require("@/common/redis/redis.constants");
+const prisma_service_1 = require("../prisma/prisma.service");
+const raw_data_service_1 = require("../raw-data/raw-data.service");
+const parsing_queue_1 = require("../parsing/parsing.queue");
+const redis_constants_1 = require("../common/redis/redis.constants");
 const gmail_auth_provider_1 = require("./gmail-auth.provider");
 let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
     prisma;
     auth;
     rawDataService;
     parsingQueue;
+    config;
     redis;
     logger = new common_1.Logger(GmailPubSubService_1.name);
-    constructor(prisma, auth, rawDataService, parsingQueue, redis) {
+    allowedSendersCache = null;
+    constructor(prisma, auth, rawDataService, parsingQueue, config, redis) {
         this.prisma = prisma;
         this.auth = auth;
         this.rawDataService = rawDataService;
         this.parsingQueue = parsingQueue;
+        this.config = config;
         this.redis = redis;
     }
     async handlePush(payload) {
@@ -62,6 +66,7 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
             .filter((id, index, arr) => arr.indexOf(id) === index);
         let handled = 0;
         let duplicates = 0;
+        let ignored = 0;
         for (const messageId of messageIds) {
             const claimed = await this.redis.set((0, redis_constants_1.dedupKey)(messageId), '1', 'EX', redis_constants_1.DEDUP_TTL_SECONDS, 'NX');
             if (!claimed) {
@@ -70,6 +75,11 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
             }
             try {
                 const mail = await this.fetchMessage(gmail, messageId, emailAddress);
+                if (!this.isAllowedSender(mail.from)) {
+                    ignored++;
+                    this.logger.log(`Ignored mail "${mail.subject}" from "${mail.from}" — sender not in MAIL_ALLOWED_SENDERS`);
+                    continue;
+                }
                 console.log('[ingestion] parsed mail:', {
                     messageId: mail.messageId,
                     emailAddress: mail.emailAddress,
@@ -110,7 +120,7 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
                 data: { lastHistoryId: String(nextHistoryId) },
             });
         }
-        return { handled, duplicates, nextHistoryId: nextHistoryId ?? null };
+        return { handled, duplicates, ignored, nextHistoryId: nextHistoryId ?? null };
     }
     async testConnection(accountId) {
         const account = await this.prisma.gmailAccount.findUnique({
@@ -172,6 +182,32 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
         }
         return html.trim();
     }
+    get allowedSenders() {
+        if (!this.allowedSendersCache) {
+            const raw = this.config.get('MAIL_ALLOWED_SENDERS') ??
+                'tripadvisor.com,getyourguide.com,viator.com';
+            this.allowedSendersCache = new Set(raw
+                .split(/[,\s;]+/)
+                .map((s) => s.trim().toLowerCase().replace(/^@/, ''))
+                .filter(Boolean));
+        }
+        return this.allowedSendersCache;
+    }
+    isAllowedSender(fromRaw) {
+        const tokens = this.allowedSenders;
+        if (tokens.size === 0)
+            return true;
+        const emailMatch = fromRaw.match(/<([^<>@]+\@[^<>]+)>/i);
+        const email = (emailMatch ? emailMatch[1] : fromRaw).toLowerCase().trim();
+        for (const token of tokens) {
+            if (email === token ||
+                email.endsWith('@' + token) ||
+                email.endsWith('.' + token)) {
+                return true;
+            }
+        }
+        return false;
+    }
     tagTemplate(mail) {
         const from = mail.from.toLowerCase();
         const subject = mail.subject.toLowerCase();
@@ -180,6 +216,10 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
             tag = 'airbnb';
         else if (from.includes('booking.com') || from.includes('@booking.com'))
             tag = 'booking-com';
+        else if (from.includes('getyourguide.com') || subject.includes('getyourguide'))
+            tag = 'getyourguide';
+        else if (from.includes('viator.com') || subject.includes('viator'))
+            tag = 'viator';
         else if (from.includes('tripadvisor.com'))
             tag = 'tripadvisor';
         else if (subject.includes('tripadvisor'))
@@ -192,11 +232,12 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
 exports.GmailPubSubService = GmailPubSubService;
 exports.GmailPubSubService = GmailPubSubService = GmailPubSubService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __param(4, (0, common_1.Inject)(redis_constants_1.REDIS_CLIENT)),
+    __param(5, (0, common_1.Inject)(redis_constants_1.REDIS_CLIENT)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         gmail_auth_provider_1.GmailAuthService,
         raw_data_service_1.RawDataService,
         parsing_queue_1.ParsingQueue,
+        config_1.ConfigService,
         ioredis_1.default])
 ], GmailPubSubService);
 //# sourceMappingURL=gmail-pubsub.service.js.map

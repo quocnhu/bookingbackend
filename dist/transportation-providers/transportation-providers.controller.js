@@ -16,8 +16,8 @@ exports.TransportationProvidersController = void 0;
 const common_1 = require("@nestjs/common");
 const transportation_providers_service_1 = require("./transportation-providers.service");
 const transportation_provider_dto_1 = require("./dto/transportation-provider.dto");
-const permissions_decorator_1 = require("@/common/decorators/permissions.decorator");
-const current_user_decorator_1 = require("@/common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let TransportationProvidersController = class TransportationProvidersController {
     transportationProvidersService;
     constructor(transportationProvidersService) {

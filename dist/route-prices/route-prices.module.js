@@ -10,7 +10,7 @@ exports.RoutePricesModule = void 0;
 const common_1 = require("@nestjs/common");
 const route_prices_controller_1 = require("./route-prices.controller");
 const route_prices_service_1 = require("./route-prices.service");
-const audit_module_1 = require("@/audit/audit.module");
+const audit_module_1 = require("../audit/audit.module");
 let RoutePricesModule = class RoutePricesModule {
 };
 exports.RoutePricesModule = RoutePricesModule;
