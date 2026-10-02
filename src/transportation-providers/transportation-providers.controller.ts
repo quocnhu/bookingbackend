@@ -62,13 +62,21 @@ export class TransportationProvidersController {
 
   @Post(':providerId/drivers')
   @Permissions('provider-driver.assign')
-  assignDriver(@Param('providerId') providerId: string, @Body() dto: AssignDriverToProviderDto) {
-    return this.transportationProvidersService.assignDriver(providerId, dto);
+  assignDriver(
+    @Param('providerId') providerId: string,
+    @Body() dto: AssignDriverToProviderDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.transportationProvidersService.assignDriver(actor, providerId, dto);
   }
 
   @Delete(':providerId/drivers/:userId')
   @Permissions('provider-driver.unassign')
-  unassignDriver(@Param('providerId') providerId: string, @Param('userId') userId: string) {
-    return this.transportationProvidersService.unassignDriver(providerId, userId);
+  unassignDriver(
+    @Param('providerId') providerId: string,
+    @Param('userId') userId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.transportationProvidersService.unassignDriver(actor, providerId, userId);
   }
 }

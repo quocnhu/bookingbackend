@@ -35,6 +35,9 @@ let AssignmentsController = class AssignmentsController {
     findBoard(actor) {
         return this.assignmentsService.findBoard(actor);
     }
+    getBoardMode() {
+        return this.assignmentsService.getBoardMode();
+    }
     setBoardOrigin(dto) {
         return this.assignmentsService.setBoardOrigin(dto.origin);
     }
@@ -98,8 +101,8 @@ let AssignmentsController = class AssignmentsController {
     addTourMoney(id, dto, actor) {
         return this.accountingService.addTourMoney(actor, id, dto);
     }
-    reverseTourMoney(id, settlementId, dto, actor) {
-        return this.accountingService.reverseTourMoney(actor, id, settlementId, dto);
+    deleteTourMoney(id, settlementId, actor) {
+        return this.accountingService.deleteTourMoney(actor, id, settlementId);
     }
     finalize(id, dto, actor) {
         return this.assignmentsService.finalize(id, dto, actor);
@@ -123,6 +126,13 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "findBoard", null);
+__decorate([
+    (0, common_1.Get)('board/mode'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "getBoardMode", null);
 __decorate([
     (0, common_1.Put)('board/origin'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),
@@ -310,15 +320,14 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "addTourMoney", null);
 __decorate([
-    (0, common_1.Post)(':id/money/:settlementId/reverse'),
+    (0, common_1.Delete)(':id/money/:settlementId'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('settlementId')),
-    __param(2, (0, common_1.Body)()),
-    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, accounting_dto_1.ReverseTourMoneyDto, Object]),
+    __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", void 0)
-], AssignmentsController.prototype, "reverseTourMoney", null);
+], AssignmentsController.prototype, "deleteTourMoney", null);
 __decorate([
     (0, common_1.Put)(':id/finalize'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),

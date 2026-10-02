@@ -72,14 +72,14 @@ export declare class TransportationProvidersController {
     deleteVehicle(id: string, actor: AuthenticatedUser): Promise<{
         message: string;
     }>;
-    assignDriver(providerId: string, dto: AssignDriverToProviderDto): Promise<{
+    assignDriver(providerId: string, dto: AssignDriverToProviderDto, actor: AuthenticatedUser): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
         id: string;
         name: string | null;
         email: string;
         providerId: string | null;
     }>;
-    unassignDriver(providerId: string, userId: string): Promise<{
+    unassignDriver(providerId: string, userId: string, actor: AuthenticatedUser): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
         id: string;
         name: string | null;

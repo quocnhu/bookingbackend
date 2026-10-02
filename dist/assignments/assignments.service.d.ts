@@ -2,7 +2,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { AssignBookingsDto, CreateAssignmentDto, FinalizeAssignmentDto, QueryAssignmentDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, VerifyTourReportDto } from './dto/assignment.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
-import { AssignmentOrigin } from '@prisma/client';
+import { AssignmentOrigin, Prisma } from '@prisma/client';
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 import { AssignmentBoardService } from "../queues/assignment-board.service";
 import { NotificationService } from "../notifications/notification.service";
@@ -110,9 +110,15 @@ export declare class AssignmentsService {
     }>;
     dispatchAllBoard(): Promise<{
         dispatched: number;
+        skipped: number;
+        skippedOnLeave: number;
+    }>;
+    getBoardMode(): Promise<{
+        mode: AssignmentOrigin;
     }>;
     setBoardOrigin(origin: AssignmentOrigin): Promise<{
         updated: number;
+        mode: import("@prisma/client").$Enums.AssignmentOrigin;
     }>;
     private assertCrewAvailableForDates;
     private assertProviderOwnsAssignment;
@@ -140,8 +146,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -150,7 +156,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -160,7 +166,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -169,7 +175,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -250,13 +256,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     create(dto: CreateAssignmentDto, actor?: AuthenticatedUser): Promise<{
@@ -280,8 +286,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -290,7 +296,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -300,7 +306,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -309,7 +315,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -390,13 +396,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     update(id: string, dto: UpdateAssignmentDto): Promise<{
@@ -420,8 +426,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -430,7 +436,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -440,7 +446,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -449,7 +455,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -530,16 +536,17 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     private assertDispatchableToday;
+    private assertCrewAssigned;
     private assertRecallAllowed;
     updateStatus(id: string, dto: UpdateAssignmentStatusDto): Promise<{
         vehicle: {
@@ -562,8 +569,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -572,7 +579,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -582,7 +589,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -591,7 +598,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -672,13 +679,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     private sendStatusNotifications;
@@ -703,8 +710,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -713,7 +720,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -723,7 +730,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -732,7 +739,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -813,13 +820,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     removeBooking(id: string, bookingId: string): Promise<{
@@ -843,8 +850,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -853,7 +860,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -863,7 +870,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -872,7 +879,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -953,13 +960,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     reorderBookings(id: string, bookingIds: string[]): Promise<{
@@ -983,8 +990,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -993,7 +1000,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -1003,7 +1010,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1012,7 +1019,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -1093,13 +1100,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     moveBooking(fromAssignmentId: string, bookingId: string, toAssignmentId: string): Promise<{
@@ -1123,8 +1130,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -1133,7 +1140,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -1143,7 +1150,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1152,7 +1159,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -1233,13 +1240,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     private notifyMoveBooking;
@@ -1265,8 +1272,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -1275,7 +1282,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -1285,7 +1292,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1294,7 +1301,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -1375,13 +1382,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     submitTourReport(id: string, dto: SubmitTourReportDto, actor: AuthenticatedUser): Promise<{
@@ -1397,8 +1404,8 @@ export declare class AssignmentsService {
         actualPax: number | null;
         pickupNotes: string | null;
         distanceKm: number | null;
-        fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-        tollParking: import("@prisma/client/runtime/library").Decimal | null;
+        fuelCost: Prisma.Decimal | null;
+        tollParking: Prisma.Decimal | null;
         verifiedById: string | null;
         verifiedByName: string | null;
         verifiedAt: Date | null;
@@ -1407,7 +1414,7 @@ export declare class AssignmentsService {
         finalizedByName: string | null;
         finalizedAt: Date | null;
         settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-        netAmount: import("@prisma/client/runtime/library").Decimal | null;
+        netAmount: Prisma.Decimal | null;
         moneyVerifiedById: string | null;
         moneyVerifiedByName: string | null;
         moneyVerifiedAt: Date | null;
@@ -1417,7 +1424,7 @@ export declare class AssignmentsService {
         moneyRejectedById: string | null;
         moneyRejectedByName: string | null;
         moneyRejectionReason: string | null;
-        evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+        evidenceImages: Prisma.JsonValue | null;
     }>;
     uploadReportImage(id: string, file: Express.Multer.File, actor: AuthenticatedUser): Promise<{
         name: string;
@@ -1448,8 +1455,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -1458,7 +1465,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -1468,7 +1475,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1477,7 +1484,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -1558,13 +1565,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     finalize(id: string, dto: FinalizeAssignmentDto, actor: AuthenticatedUser): Promise<{
@@ -1588,8 +1595,8 @@ export declare class AssignmentsService {
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
-            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
-            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            fuelCost: Prisma.Decimal | null;
+            tollParking: Prisma.Decimal | null;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -1598,7 +1605,7 @@ export declare class AssignmentsService {
             finalizedByName: string | null;
             finalizedAt: Date | null;
             settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            netAmount: Prisma.Decimal | null;
             moneyVerifiedById: string | null;
             moneyVerifiedByName: string | null;
             moneyVerifiedAt: Date | null;
@@ -1608,7 +1615,7 @@ export declare class AssignmentsService {
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
             moneyRejectionReason: string | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+            evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1617,7 +1624,7 @@ export declare class AssignmentsService {
         } | null;
         bookings: ({
             tour: {
-                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+                adultPrice: Prisma.Decimal | null;
             } | null;
             movedFromBus: {
                 vehicle: {
@@ -1698,13 +1705,13 @@ export declare class AssignmentsService {
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
-        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        pickupInfo: Prisma.JsonValue | null;
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
-        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
     }>;
     findMyAssignments(actor: AuthenticatedUser): Promise<any[]>;

@@ -25,12 +25,6 @@ export declare class VerifyTourMoneyDto {
 export declare class RejectMoneyDto {
     reason: string;
 }
-export declare class ReverseSettlementDto {
-    note: string;
-}
-export declare class ReverseTourMoneyDto {
-    note?: string;
-}
 export declare class CreateSettlementDto {
     amount: number;
     note?: string;

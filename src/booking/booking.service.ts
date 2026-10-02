@@ -175,6 +175,10 @@ async upsert(
    * After writing a booking (new / updated from the pipeline):
    * - CANCELLED booking → remove it from the current trip (if any).
    * - still-valid booking with no trip yet → enqueue auto-assign (Stage 3).
+   *   (The worker itself honors the global MANUAL toggle, so every booking is
+   *   always enqueued — the mode decision lives in one place: the processor.)
+   * EXTENSION POINT (auto/manual): to skip the queue per channel/source (e.g.
+   * manual-only channels), add the condition here as needed.
    */
   private async postWrite(booking: Booking) {
     if (booking.status === BookingStatus.CANCELED) {

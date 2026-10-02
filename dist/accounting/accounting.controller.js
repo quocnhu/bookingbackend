@@ -37,8 +37,8 @@ let AccountingController = class AccountingController {
     updateSettlement(id, dto, actor) {
         return this.accountingService.updateSettlement(actor, id, dto);
     }
-    reverseSettlement(id, dto, actor) {
-        return this.accountingService.reverseSettlement(actor, id, dto);
+    deleteSettlement(id, actor) {
+        return this.accountingService.deleteSettlement(actor, id);
     }
     verificationQueue(actor) {
         return this.accountingService.verificationQueue(actor);
@@ -111,14 +111,13 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "updateSettlement", null);
 __decorate([
-    (0, common_1.Post)('settlements/:id/reverse'),
+    (0, common_1.Delete)('settlements/:id'),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
-    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
-], AccountingController.prototype, "reverseSettlement", null);
+], AccountingController.prototype, "deleteSettlement", null);
 __decorate([
     (0, common_1.Get)('verification-queue'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),

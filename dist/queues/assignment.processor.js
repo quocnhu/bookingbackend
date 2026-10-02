@@ -18,6 +18,7 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const assignment_board_service_1 = require("./assignment-board.service");
 const auto_crew_service_1 = require("./auto-crew.service");
+const notifications_gateway_1 = require("../notifications/notifications.gateway");
 const queue_constants_1 = require("./queue.constants");
 const BUS_MAX_PAX = 12;
 function toDateKey(d) {
@@ -28,13 +29,15 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
     board;
     auditService;
     autoCrew;
+    gateway;
     logger = new common_1.Logger(AssignmentProcessor_1.name);
-    constructor(prisma, board, auditService, autoCrew) {
+    constructor(prisma, board, auditService, autoCrew, gateway) {
         super();
         this.prisma = prisma;
         this.board = board;
         this.auditService = auditService;
         this.autoCrew = autoCrew;
+        this.gateway = gateway;
     }
     async process(job) {
         const { bookingId } = job.data;
@@ -54,6 +57,13 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             };
         if (!booking.startingDate)
             return { skipped: true, reason: 'NO_START_DATE' };
+        const modeRow = await this.prisma.systemSetting.findUnique({
+            where: { key: 'assignMode' },
+        });
+        if (modeRow?.value === client_1.AssignmentOrigin.MANUAL) {
+            this.logger.log(`Manual mode — booking ${booking.bookingRef} stays PENDING for manual assign`);
+            return { skipped: true, reason: 'MANUAL_MODE' };
+        }
         const candidate = await this.findCandidate(booking);
         if (!candidate) {
             const bus = await this.createBusForBooking(booking);
@@ -74,6 +84,7 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
                 changedBy: null,
             });
             await this.assignCrew(bus.id);
+            this.gateway.notifyAll('board:refresh', { assignmentId: bus.id, action: 'auto_create_bus' });
             return {
                 status: 'CREATED_BUS',
                 bookingId,
@@ -94,6 +105,7 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
         });
         this.logger.log(`Auto-assigned booking ${booking.bookingRef} -> bus ${candidate.code ?? candidate.id}`);
         await this.assignCrew(candidate.id);
+        this.gateway.notifyAll('board:refresh', { assignmentId: candidate.id, action: 'auto_assign' });
         return {
             status: 'ASSIGNED',
             bookingId,
@@ -235,10 +247,11 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
 exports.AssignmentProcessor = AssignmentProcessor;
 exports.AssignmentProcessor = AssignmentProcessor = AssignmentProcessor_1 = __decorate([
     (0, common_1.Injectable)(),
-    (0, bullmq_1.Processor)(queue_constants_1.ASSIGN_QUEUE, { concurrency: 5 }),
+    (0, bullmq_1.Processor)(queue_constants_1.ASSIGN_QUEUE, { concurrency: 1 }),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         assignment_board_service_1.AssignmentBoardService,
         audit_service_1.AuditService,
-        auto_crew_service_1.AutoCrewService])
+        auto_crew_service_1.AutoCrewService,
+        notifications_gateway_1.NotificationsGateway])
 ], AssignmentProcessor);
 //# sourceMappingURL=assignment.processor.js.map

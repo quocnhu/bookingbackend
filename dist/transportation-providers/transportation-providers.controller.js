@@ -47,11 +47,11 @@ let TransportationProvidersController = class TransportationProvidersController 
     deleteVehicle(id, actor) {
         return this.transportationProvidersService.deleteVehicle(actor, id);
     }
-    assignDriver(providerId, dto) {
-        return this.transportationProvidersService.assignDriver(providerId, dto);
+    assignDriver(providerId, dto, actor) {
+        return this.transportationProvidersService.assignDriver(actor, providerId, dto);
     }
-    unassignDriver(providerId, userId) {
-        return this.transportationProvidersService.unassignDriver(providerId, userId);
+    unassignDriver(providerId, userId, actor) {
+        return this.transportationProvidersService.unassignDriver(actor, providerId, userId);
     }
 };
 exports.TransportationProvidersController = TransportationProvidersController;
@@ -129,8 +129,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('provider-driver.assign'),
     __param(0, (0, common_1.Param)('providerId')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, transportation_provider_dto_1.AssignDriverToProviderDto]),
+    __metadata("design:paramtypes", [String, transportation_provider_dto_1.AssignDriverToProviderDto, Object]),
     __metadata("design:returntype", void 0)
 ], TransportationProvidersController.prototype, "assignDriver", null);
 __decorate([
@@ -138,8 +139,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('provider-driver.unassign'),
     __param(0, (0, common_1.Param)('providerId')),
     __param(1, (0, common_1.Param)('userId')),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", void 0)
 ], TransportationProvidersController.prototype, "unassignDriver", null);
 exports.TransportationProvidersController = TransportationProvidersController = __decorate([

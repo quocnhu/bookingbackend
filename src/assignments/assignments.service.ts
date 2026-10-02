@@ -23,9 +23,11 @@ import {
   AssignmentOrigin,
   AssignmentStatus,
   BookingStatus,
+  FeeFlowType,
   GuideType,
   LeaveStatus,
   NotificationType,
+  Prisma,
   RoleType,
 } from '@prisma/client';
 import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
@@ -331,7 +333,11 @@ export class AssignmentsService {
   /** Dispatches (departs) all PENDING trips that are active TODAY.
    *  Never dispatches future trips (only trips departing today or multi-day
    *  trips still running through today). */
-  async dispatchAllBoard(): Promise<{ dispatched: number }> {
+  async dispatchAllBoard(): Promise<{
+    dispatched: number;
+    skipped: number;
+    skippedOnLeave: number;
+  }> {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date(startOfToday);
@@ -343,11 +349,35 @@ export class AssignmentsService {
         startDate: { lte: endOfToday },
         endDate: { gte: startOfToday },
       },
-      select: { id: true },
+      select: { id: true, guideId: true, driverId: true, startDate: true, endDate: true },
     });
-    if (items.length === 0) return { dispatched: 0 };
+    if (items.length === 0)
+      return { dispatched: 0, skipped: 0, skippedOnLeave: 0 };
 
-    const ids = items.map((a) => a.id);
+    // Buses without crew cannot depart — they would get stuck at Accounting
+    // verification (the guide is the money payee).
+    const withCrew = items.filter((a) => a.guideId && a.driverId);
+    const skipped = items.length - withCrew.length;
+
+    // Crew on leave on the trip dates cannot depart either.
+    const ready: typeof withCrew = [];
+    let skippedOnLeave = 0;
+    for (const a of withCrew) {
+      try {
+        await this.assertCrewAvailableForDates(
+          a.guideId,
+          a.driverId,
+          a.startDate,
+          a.endDate,
+        );
+        ready.push(a);
+      } catch {
+        skippedOnLeave += 1;
+      }
+    }
+    if (ready.length === 0) return { dispatched: 0, skipped, skippedOnLeave };
+
+    const ids = ready.map((a) => a.id);
     await this.prisma.$transaction([
       this.prisma.assignment.updateMany({
         where: { id: { in: ids } },
@@ -361,25 +391,52 @@ export class AssignmentsService {
 
     await this.auditService.log({
       entityType: 'Assignment',
-      entityId: items.map((a) => a.id).join(','),
+      entityId: ids.join(','),
       action: 'DISPATCH_ALL',
-      afterData: { count: items.length },
+      afterData: { count: ids.length, skipped, skippedOnLeave },
     });
-    return { dispatched: items.length };
+    return { dispatched: ids.length, skipped, skippedOnLeave };
   }
 
-  /** Changes the creation source (Manual/Auto) for all trips currently on the Dispatch Board. */
+  /** Global auto-assign switch for the Dispatch Board (persisted in SystemSetting). */
+  async getBoardMode(): Promise<{ mode: AssignmentOrigin }> {
+    const row = await this.prisma.systemSetting.upsert({
+      where: { key: 'assignMode' },
+      update: {},
+      create: { key: 'assignMode', value: AssignmentOrigin.AUTO_ASSIGN },
+    });
+    return {
+      mode:
+        row.value === AssignmentOrigin.MANUAL
+          ? AssignmentOrigin.MANUAL
+          : AssignmentOrigin.AUTO_ASSIGN,
+    };
+  }
+
+  /** Changes the creation source (Manual/Auto) for all trips currently on the
+   *  Dispatch Board AND persists it as the global mode, so the switch and the
+   *  trip statuses stay in sync — and new bookings follow the chosen mode.
+   *  EXTENSION POINT (auto/manual): add finer modes here as needed, e.g.
+   *  per-date or per-tour modes (`assignMode:<tourId>`), without touching callers. */
   async setBoardOrigin(origin: AssignmentOrigin) {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-    const result = await this.prisma.assignment.updateMany({
-      where: {
-        status: { not: AssignmentStatus.CANCELED },
-        startDate: { gte: startOfToday },
-      },
-      data: { origin },
-    });
-    return { updated: result.count };
+    const [result] = await this.prisma.$transaction([
+      this.prisma.assignment.updateMany({
+        where: {
+          status: { not: AssignmentStatus.CANCELED },
+          startDate: { gte: startOfToday },
+        },
+        data: { origin },
+      }),
+      this.prisma.systemSetting.upsert({
+        where: { key: 'assignMode' },
+        update: { value: origin },
+        create: { key: 'assignMode', value: origin },
+      }),
+    ]);
+    this.gateway.notifyAll('board:refresh', { action: 'origin_changed' });
+    return { updated: result.count, mode: origin };
   }
 
   /**
@@ -684,14 +741,28 @@ export class AssignmentsService {
     }
   }
 
-  /** Recall (DISPATCHED → PENDING) is locked after 05:00 on the departure day.
+  /** A bus cannot depart without crew — the guide is the money payee and the
+   *  driver drives. Without them the trip gets stuck at Accounting verification. */
+  private assertCrewAssigned(assignment: any) {
+    const missing: string[] = [];
+    if (!assignment.guideId) missing.push('tour guide');
+    if (!assignment.driverId) missing.push('driver');
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Cannot dispatch "${assignment.code ?? 'Bus'}" — assign a ${missing.join(' and ')} first.`,
+      );
+    }
+  }
+
+  /** Recall (DISPATCHED → PENDING) is locked after 06:30 on the departure day —
+   *  by then the guide may already have seen the assignment.
    *  Before that the backend lets the operator pull a trip back to reassign it. */
   private assertRecallAllowed(assignment: any) {
     const cutoff = new Date(assignment.startDate);
-    cutoff.setHours(5, 0, 0, 0);
+    cutoff.setHours(6, 30, 0, 0);
     if (Date.now() > cutoff.getTime()) {
       throw new BadRequestException(
-        `Recall locked — the 05:00 cutoff has passed for "${assignment.code ?? 'Bus'}". The tour is considered departed; cancel it instead if needed.`,
+        `Recall locked — the 06:30 cutoff has passed for "${assignment.code ?? 'Bus'}". The tour is considered departed; cancel it instead if needed.`,
       );
     }
   }
@@ -703,8 +774,18 @@ export class AssignmentsService {
     // ── Guard: Dispatch only happens for tours active TODAY ──
     if (dto.status === AssignmentStatus.DISPATCHED) {
       this.assertDispatchableToday(before);
+      this.assertCrewAssigned(before);
+      // The assigned crew must actually be available on the trip dates
+      // (no approved leave) — assignment-time checks can be stale if leave
+      // was approved after the crew was picked.
+      await this.assertCrewAvailableForDates(
+        before.guideId,
+        before.driverId,
+        before.startDate,
+        before.endDate,
+      );
     }
-    // ── Guard: Recall (DISPATCHED → PENDING) is locked after 05:00 on the
+    // ── Guard: Recall (DISPATCHED → PENDING) is locked after 06:30 on the
     // departure day — the bus is considered en route. ──
     if (
       before.status === AssignmentStatus.DISPATCHED &&
@@ -713,7 +794,9 @@ export class AssignmentsService {
       this.assertRecallAllowed(before);
     }
 
-    // ── Guard: COMPLETED requires a verified TourReport ──
+    // ── Guard: COMPLETED requires a verified TourReport AND locked money.
+    // (Without the money check, a trip could read COMPLETED while Accounting
+    // still has it in the verification queue — an inconsistent state.)
     if (dto.status === AssignmentStatus.COMPLETED) {
       const report = await this.prisma.tourReport.findUnique({
         where: { assignmentId: id },
@@ -721,6 +804,11 @@ export class AssignmentsService {
       if (!report || report.status !== 'VERIFIED') {
         throw new BadRequestException(
           'Cannot mark COMPLETED without a verified tour report. Guide must submit → Admin verifies → Then mark COMPLETED.',
+        );
+      }
+      if (!report.moneyVerifiedAt) {
+        throw new BadRequestException(
+          'Cannot mark COMPLETED before Accounting locks the money. Verify the money sheet in the Accounting Room first.',
         );
       }
     }
@@ -1185,6 +1273,17 @@ export class AssignmentsService {
       where: { assignmentId: id },
     });
 
+    // A report needs at least one money entry — tell the user to add
+    // Collect/Expense lines first instead of submitting an empty sheet.
+    const entryCount = await this.prisma.settlement.count({
+      where: { assignmentId: id },
+    });
+    if (entryCount === 0) {
+      throw new BadRequestException(
+        'Add at least one Collect/Expense entry before submitting the report to Accounting.',
+      );
+    }
+
     const report = await this.prisma.tourReport.upsert({
       where: { assignmentId: id },
       update: {
@@ -1372,6 +1471,113 @@ export class AssignmentsService {
       },
     });
 
+    // Verify on the bus does BOTH steps when possible, so it stays in sync
+    // with the verification queue (same trip verified from either place):
+    // 1. content verified (above) — always.
+    // 2. money locked + trip completed — when the sheet is lockable
+    //    (entries exist, guide assigned, not previously returned).
+    // Otherwise the trip stays VERIFYING and Accounting finishes the money
+    // in the queue.
+    if (dto.status === 'VERIFIED' && report.moneyVerifiedAt) {
+      // Money was already locked earlier (e.g. from the queue) — just close out.
+      await this.prisma.$transaction([
+        this.prisma.assignment.update({
+          where: { id },
+          data: { status: AssignmentStatus.COMPLETED },
+        }),
+        this.prisma.tourReport.update({
+          where: { id: report.id },
+          data: {
+            finalizedById: actor.id,
+            finalizedByName: actor.name,
+            finalizedAt: new Date(),
+          },
+        }),
+      ]);
+    } else if (
+      dto.status === 'VERIFIED' &&
+      !report.moneyVerifiedAt &&
+      !report.moneyRejectedAt
+    ) {
+      // Money still open — try to lock it right here so one Verify finishes
+      // everything (same rules as the Accounting queue: needs entries + guide).
+      const lines = await this.prisma.settlement.findMany({
+        where: { assignmentId: id },
+        include: { category: { select: { flowType: true } } },
+      });
+      let collected = 0;
+      let paid = 0;
+      for (const r of lines) {
+        const amount = Number(r.amount);
+        if (r.category?.flowType === FeeFlowType.COLLECT_MONEY)
+          collected += amount;
+        else paid += amount;
+      }
+      const round2 = (v: number) => Math.round(v * 100) / 100;
+      // Guide is still required (the payee), and at least one entry must
+      // exist — the UI tells the user to add entries first.
+      if (lines.length > 0 && assignment.guideId) {
+        const net = round2(collected - paid);
+        const flow =
+          collected >= paid ? FeeFlowType.COLLECT_MONEY : FeeFlowType.PAY_MONEY;
+        const now = new Date();
+        await this.prisma.$transaction([
+          this.prisma.tourReport.update({
+            where: { id: report.id },
+            data: {
+              settlementFlow: flow,
+              netAmount: new Prisma.Decimal(net),
+              moneyPayableToId: assignment.guideId,
+              moneyVerifiedById: actor.id,
+              moneyVerifiedByName: actor.name ?? null,
+              moneyVerifiedAt: now,
+              moneyVerificationNote: dto.verificationNotes ?? null,
+              moneyRejectedAt: null,
+              moneyRejectedById: null,
+              moneyRejectedByName: null,
+              moneyRejectionReason: null,
+              finalizedById: actor.id,
+              finalizedByName: actor.name,
+              finalizedAt: now,
+            },
+          }),
+          this.prisma.assignment.update({
+            where: { id },
+            data: {
+              status: AssignmentStatus.COMPLETED,
+              reportVerifierId: actor.id,
+            },
+          }),
+        ]);
+        await this.auditService.log({
+          entityType: 'TourReport',
+          entityId: report.id,
+          action: 'VERIFY_MONEY',
+          afterData: {
+            netAmount: net,
+            flow,
+            payableToId: assignment.guideId,
+            fromBoardVerify: true,
+          },
+          changedBy: actor.id,
+        });
+        const payeeName =
+          (assignment as any).guide?.name ?? assignment.guideId;
+        if (report.submittedById) {
+          const notif = await this.notificationService.create(
+            report.submittedById,
+            NotificationType.MONEY_VERIFIED,
+            `✅ Money sheet "${assignment.code}" has been confirmed`,
+            `Accounting has checked the money for trip ${assignment.tourName ?? ''} and locked the money for ${payeeName}.`,
+            { assignmentId: id },
+          );
+          this.gateway.notifyUser(report.submittedById, 'notification', notif);
+        }
+      }
+      // else: no entries or no guide yet — stays VERIFYING; add entries /
+      // assign crew first, then verify (Accounting can finish in the queue).
+    }
+
     if (dto.status === 'REJECTED') {
       // Rejected → reset the verifier so the guide can resubmit; the bus shows the "Need to verify again" tag.
       await this.prisma.assignment.update({
@@ -1414,6 +1620,10 @@ export class AssignmentsService {
       changedBy: actor.id,
     });
 
+    this.gateway.notifyAll('board:refresh', {
+      assignmentId: id,
+      action: `verify_report_${dto.status}`,
+    });
     return this.findOne(id);
   }
 

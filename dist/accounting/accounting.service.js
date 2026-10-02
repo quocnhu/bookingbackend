@@ -231,6 +231,9 @@ let AccountingService = class AccountingService {
         });
         if (!existing)
             throw new common_1.NotFoundException('Settlement not found');
+        if (existing.createdById !== actor.id && actor.role !== client_1.RoleType.ADMIN) {
+            throw new common_1.ForbiddenException('You can only edit an entry you added');
+        }
         if (existing.reversedBy) {
             throw new common_1.ConflictException('Entry was reversed — create a new entry');
         }
@@ -256,63 +259,68 @@ let AccountingService = class AccountingService {
         });
         return updated;
     }
-    async reverseTourMoney(actor, assignmentId, settlementId, dto) {
+    async deleteTourMoney(actor, assignmentId, settlementId) {
         await this.assertOwnTour(assignmentId, actor);
         const entry = await this.prisma.settlement.findUnique({
             where: { id: settlementId },
-            select: { assignmentId: true, createdById: true },
+            include: { reversedBy: { select: { id: true } } },
         });
         if (!entry || entry.assignmentId !== assignmentId) {
             throw new common_1.NotFoundException('This entry does not belong to this trip');
         }
-        if (actor.role !== client_1.RoleType.ADMIN &&
-            actor.role !== client_1.RoleType.OFFICE &&
-            entry.createdById !== actor.id) {
-            throw new common_1.ForbiddenException('You can only reverse an entry you added');
+        if (entry.createdById !== actor.id && actor.role !== client_1.RoleType.ADMIN) {
+            throw new common_1.ForbiddenException('You can only delete an entry you added');
+        }
+        if (entry.reversedBy) {
+            throw new common_1.ConflictException('Cannot delete a reversed entry');
+        }
+        if (entry.reversesId) {
+            throw new common_1.ConflictException('Cannot delete a reversal entry');
         }
         await this.assertTourMutable(assignmentId);
-        return this.reverseSettlementCore(actor, settlementId, {
-            note: dto.note ?? 'Guide/driver self-reversal',
+        const deleted = await this.prisma.settlement.delete({
+            where: { id: settlementId },
         });
+        await this.audit.log({
+            entityType: 'Settlement',
+            entityId: settlementId,
+            action: 'DELETE',
+            beforeData: entry,
+            changedBy: actor.id,
+        });
+        return deleted;
     }
-    async reverseSettlement(actor, id, dto) {
-        this.assertAccounting(actor, 'accounting.settlement.reverse');
-        return this.reverseSettlementCore(actor, id, dto);
-    }
-    async reverseSettlementCore(actor, id, dto) {
+    async deleteSettlement(actor, id) {
+        this.assertAccounting(actor, 'accounting.settlement.delete');
         const original = await this.prisma.settlement.findUnique({
             where: { id },
             include: { reversedBy: { select: { id: true } } },
         });
         if (!original)
             throw new common_1.NotFoundException('Settlement not found');
-        if (original.reversedBy) {
-            throw new common_1.ConflictException('Entry was already reversed');
+        if (original.createdById !== actor.id && actor.role !== client_1.RoleType.ADMIN) {
+            throw new common_1.ForbiddenException('You can only delete an entry you added');
         }
-        const reversal = await this.prisma.$transaction(async (tx) => {
-            const created = await tx.settlement.create({
-                data: {
-                    amount: new client_1.Prisma.Decimal(-num(original.amount)),
-                    note: `Reversal: ${dto.note}`,
-                    assignmentId: original.assignmentId,
-                    bookingId: original.bookingId,
-                    categoryId: original.categoryId,
-                    createdById: actor.id,
-                    createdByName: actor.name ?? null,
-                    reversesId: original.id,
-                },
-            });
-            await this.audit.log({
-                entityType: 'Settlement',
-                entityId: created.id,
-                action: 'REVERSE',
-                beforeData: original,
-                afterData: created,
-                changedBy: actor.id,
-            });
-            return created;
+        if (original.reversedBy) {
+            throw new common_1.ConflictException('Cannot delete a reversed entry');
+        }
+        if (original.reversesId) {
+            throw new common_1.ConflictException('Cannot delete a reversal entry; delete the original instead');
+        }
+        if (original.assignmentId) {
+            await this.assertTourMutable(original.assignmentId);
+        }
+        const deleted = await this.prisma.settlement.delete({
+            where: { id },
         });
-        return reversal;
+        await this.audit.log({
+            entityType: 'Settlement',
+            entityId: id,
+            action: 'DELETE',
+            beforeData: original,
+            changedBy: actor.id,
+        });
+        return deleted;
     }
     sumRows(rows) {
         let collected = 0;
@@ -349,16 +357,28 @@ let AccountingService = class AccountingService {
     }
     async verificationQueue(actor) {
         this.assertAccounting(actor);
+        const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
         const assignments = await this.prisma.assignment.findMany({
             where: {
-                status: client_1.AssignmentStatus.COMPLETED,
-                tourReport: {
-                    is: {
-                        finalizedAt: { not: null },
-                        moneyVerifiedAt: null,
-                        moneyRejectedAt: null,
+                OR: [
+                    {
+                        tourReport: {
+                            is: {
+                                status: { in: ['SUBMITTED', 'VERIFIED'] },
+                                moneyVerifiedAt: null,
+                                moneyRejectedAt: null,
+                            },
+                        },
                     },
-                },
+                    {
+                        tourReport: {
+                            is: {
+                                status: 'VERIFIED',
+                                moneyVerifiedAt: { gte: sevenDaysAgo },
+                            },
+                        },
+                    },
+                ],
             },
             include: {
                 tourReport: true,
@@ -367,21 +387,22 @@ let AccountingService = class AccountingService {
                 driver: { select: { id: true, name: true } },
                 _count: { select: { settlements: true } },
             },
-            orderBy: { tourReport: { finalizedAt: 'asc' } },
+            orderBy: { tourReport: { submittedAt: 'asc' } },
         });
         const now = Date.now();
         const items = await Promise.all(assignments.map(async (a) => {
             const net = await this.computeNet(a.id);
-            const ageDays = a.tourReport?.finalizedAt
-                ? Math.floor((now - +a.tourReport.finalizedAt) / 86_400_000)
+            const ageDays = a.tourReport?.submittedAt
+                ? Math.floor((now - +a.tourReport.submittedAt) / 86_400_000)
                 : 0;
             return {
                 assignmentId: a.id,
                 code: a.code,
                 tourName: a.tourName,
                 tourType: a.tourType,
-                finalizedAt: a.tourReport?.finalizedAt ?? null,
+                submittedAt: a.tourReport?.submittedAt ?? null,
                 reportStatus: a.tourReport?.status ?? null,
+                moneyVerifiedAt: a.tourReport?.moneyVerifiedAt ?? null,
                 guide: a.guide,
                 driver: a.driver,
                 plateNumber: a.vehicle?.plateNumber,
@@ -392,7 +413,11 @@ let AccountingService = class AccountingService {
                     const person = a.guide?.id === d.id ? a.guide : a.driver;
                     return person ? { ...person, basis: d.basis } : null;
                 })(),
-                ...net,
+                net: net.net,
+                flow: net.flow,
+                collected: net.collected,
+                paid: net.paid,
+                entryCount: net.entryCount,
                 waitingDays: ageDays,
             };
         }));
@@ -406,8 +431,8 @@ let AccountingService = class AccountingService {
         });
         if (!assignment)
             throw new common_1.NotFoundException('Assignment not found');
-        if (!assignment.tourReport?.finalizedAt) {
-            throw new common_1.ConflictException('Tour is not closed yet (no finalizedAt)');
+        if (!assignment.tourReport?.submittedAt) {
+            throw new common_1.ConflictException('Tour report has not been submitted yet');
         }
         if (assignment.tourReport.moneyVerifiedAt) {
             throw new common_1.ConflictException('Tour money was already verified and locked');
@@ -425,7 +450,7 @@ let AccountingService = class AccountingService {
         await this.assertPayable(payableToId);
         const net = await this.computeNet(assignmentId);
         if (net.entryCount === 0) {
-            throw new common_1.ConflictException('Tour has no settlement entries — add amounts before verifying');
+            throw new common_1.ConflictException('Tour has no settlement entries — add at least one Collect/Expense entry before verifying');
         }
         const now = new Date();
         const updated = await this.prisma.$transaction(async (tx) => {
@@ -475,6 +500,10 @@ let AccountingService = class AccountingService {
             },
             changedBy: actor.id,
         });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId,
+            action: 'money_verified',
+        });
         return { ...updated, net, payableToId };
     }
     async payeeName(userId) {
@@ -494,7 +523,7 @@ let AccountingService = class AccountingService {
         this.gateway.notifyUser(to, 'notification', notif);
     }
     async rejectMoney(assignmentId, dto, actor) {
-        this.assertAccounting(actor);
+        this.assertAccounting(actor, 'accounting.money.reject');
         const assignment = await this.prisma.assignment.findUnique({
             where: { id: assignmentId },
             include: { tourReport: true },
@@ -504,8 +533,8 @@ let AccountingService = class AccountingService {
         if (!assignment.tourReport) {
             throw new common_1.NotFoundException('This tour has no submitted money sheet');
         }
-        if (!assignment.tourReport.finalizedAt) {
-            throw new common_1.ConflictException('Tour is not closed yet (no finalizedAt)');
+        if (!assignment.tourReport.submittedAt) {
+            throw new common_1.ConflictException('Tour report has not been submitted yet');
         }
         if (assignment.tourReport.moneyVerifiedAt) {
             throw new common_1.ConflictException('Tour money was already verified and locked');
@@ -534,6 +563,10 @@ let AccountingService = class AccountingService {
                 reason: dto.reason,
             },
             changedBy: actor.id,
+        });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId,
+            action: 'money_rejected',
         });
         return updated;
     }

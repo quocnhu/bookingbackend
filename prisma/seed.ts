@@ -168,8 +168,8 @@ const DEFAULT_PERMISSIONS: Array<{
     group: 'Accounting',
   },
   {
-    code: 'accounting.settlement.reverse',
-    name: 'Đảo khoản thu/chi',
+    code: 'accounting.settlement.delete',
+    name: 'Xoá khoản thu/chi',
     group: 'Accounting',
   },
   {
@@ -932,7 +932,7 @@ async function main() {
     'accounting.read',
     'accounting.settlement.create',
     'accounting.settlement.update',
-    'accounting.settlement.reverse',
+    'accounting.settlement.delete',
     'accounting.category.create',
     'accounting.money.verify',
     'accounting.money.reject',
@@ -941,8 +941,8 @@ async function main() {
   ]);
   console.log(`✅ Seeded ACCOUNTING role`);
 
-  // 3.5 TRANSPORT_PROVIDER role — self-manages its own transport provider (cannot assign/unassign drivers,
-  // cannot see company users/data — every query must be scoped by providerId).
+  // 3.5 TRANSPORT_PROVIDER role — self-manages its own transport provider
+  // (cannot see company users/data — every query must be scoped by providerId).
   const providerRole = await prisma.role.upsert({
     where: { name: 'TRANSPORT_PROVIDER' },
     update: {},
@@ -963,6 +963,8 @@ async function main() {
     'vehicle.delete',
     'driver.create',
     'driver.update',
+    'provider-driver.assign',
+    'provider-driver.unassign',
     'route-price.create',
     'route-price.update',
   ];

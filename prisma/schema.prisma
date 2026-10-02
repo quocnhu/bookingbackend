@@ -271,6 +271,14 @@ model CompanyProfile {
   updatedAt     DateTime @updatedAt
 }
 
+// ─── SYSTEM SETTINGS (global switches, e.g. dispatch board assign mode) ─
+// Singleton rows keyed by `key` — upserted on read so the row always exists.
+model SystemSetting {
+  key       String   @id // e.g. "assignMode"
+  value     String // e.g. "AUTO_ASSIGN" | "MANUAL"
+  updatedAt DateTime @updatedAt
+}
+
 // ─── TOUR & LOGISTICS ────────────────────────────────────────────────
 model Tour {
   id           String   @id @default(uuid())

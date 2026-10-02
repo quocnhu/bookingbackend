@@ -11,6 +11,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { AssignmentBoardService } from './assignment-board.service';
 import { AutoCrewService } from './auto-crew.service';
+import { NotificationsGateway } from '@/notifications/notifications.gateway';
 import { ASSIGN_QUEUE } from './queue.constants';
 import { AssignJobData } from './assignment.queue';
 
@@ -30,7 +31,10 @@ function toDateKey(d: Date): string {
  * admin can assign it manually on the Dispatch Board.
  */
 @Injectable()
-@Processor(ASSIGN_QUEUE, { concurrency: 5 })
+// Concurrency 1 on purpose: findCandidate → createBus must never interleave,
+// otherwise two bookings for the same tour+date each create their own bus
+// (and compute the same bus number) instead of sharing one.
+@Processor(ASSIGN_QUEUE, { concurrency: 1 })
 export class AssignmentProcessor extends WorkerHost {
   private readonly logger = new Logger(AssignmentProcessor.name);
 
@@ -39,6 +43,7 @@ export class AssignmentProcessor extends WorkerHost {
     private readonly board: AssignmentBoardService,
     private readonly auditService: AuditService,
     private readonly autoCrew: AutoCrewService,
+    private readonly gateway: NotificationsGateway,
   ) {
     super();
   }
@@ -60,6 +65,23 @@ export class AssignmentProcessor extends WorkerHost {
       };
     if (!booking.startingDate)
       return { skipped: true, reason: 'NO_START_DATE' };
+
+    // Manual mode: the board toggle is off — leave the booking PENDING so the
+    // admin drags it onto a bus by hand instead of auto-creating one.
+    const modeRow = await this.prisma.systemSetting.findUnique({
+      where: { key: 'assignMode' },
+    });
+    if (modeRow?.value === AssignmentOrigin.MANUAL) {
+      this.logger.log(
+        `Manual mode — booking ${booking.bookingRef} stays PENDING for manual assign`,
+      );
+      return { skipped: true, reason: 'MANUAL_MODE' };
+    }
+    // EXTENSION POINT (auto/manual): add per-booking overrides here as needed,
+    // e.g. per-tour mode (SystemSetting key `assignMode:<tourId>`), auto-assign
+    // time windows (only auto-run 03:00–23:00), VIP-channel auto-pass, or
+    // admin-approval before a new bus is created. Return
+    // `{ skipped: true, reason: '<REASON>' }` to leave the booking PENDING.
 
     const candidate = await this.findCandidate(booking);
     // No open trip (PENDING/DRAFT) on the same date → automatically create a new
@@ -86,6 +108,7 @@ export class AssignmentProcessor extends WorkerHost {
         changedBy: null,
       });
       await this.assignCrew(bus.id);
+      this.gateway.notifyAll('board:refresh', { assignmentId: bus.id, action: 'auto_create_bus' });
       return {
         status: 'CREATED_BUS',
         bookingId,
@@ -111,6 +134,7 @@ export class AssignmentProcessor extends WorkerHost {
       `Auto-assigned booking ${booking.bookingRef} -> bus ${candidate.code ?? candidate.id}`,
     );
     await this.assignCrew(candidate.id);
+    this.gateway.notifyAll('board:refresh', { assignmentId: candidate.id, action: 'auto_assign' });
     return {
       status: 'ASSIGNED',
       bookingId,

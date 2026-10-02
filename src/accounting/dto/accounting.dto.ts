@@ -103,19 +103,6 @@ export class RejectMoneyDto {
   reason!: string;
 }
 
-export class ReverseSettlementDto {
-  @IsString()
-  @MaxLength(500)
-  note!: string;
-}
-
-export class ReverseTourMoneyDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(300)
-  note?: string;
-}
-
 export class CreateSettlementDto {
   @IsNumber()
   @Min(0.0000001)

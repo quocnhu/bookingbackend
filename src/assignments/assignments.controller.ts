@@ -14,10 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AssignmentsService } from './assignments.service';
 import { AccountingService } from '@/accounting/accounting.service';
-import {
-  CreateSettlementDto,
-  ReverseTourMoneyDto,
-} from '@/accounting/dto/accounting.dto';
+import { CreateSettlementDto } from '@/accounting/dto/accounting.dto';
 import {
   AssignBookingsDto,
   CreateAssignmentDto,
@@ -59,6 +56,12 @@ export class AssignmentsController {
   @Permissions('assignment.read')
   findBoard(@CurrentUser() actor: AuthenticatedUser) {
     return this.assignmentsService.findBoard(actor);
+  }
+
+  @Get('board/mode')
+  @Permissions('assignment.read')
+  getBoardMode() {
+    return this.assignmentsService.getBoardMode();
   }
 
   @Put('board/origin')
@@ -239,20 +242,14 @@ export class AssignmentsController {
     return this.accountingService.addTourMoney(actor, id, dto);
   }
 
-  /** Guide/driver reverses the entry they just added (only while the money is not yet locked). */
-  @Post(':id/money/:settlementId/reverse')
-  reverseTourMoney(
+  /** Guide/driver deletes an entry they just added (only while the money is not yet locked). */
+  @Delete(':id/money/:settlementId')
+  deleteTourMoney(
     @Param('id') id: string,
     @Param('settlementId') settlementId: string,
-    @Body() dto: ReverseTourMoneyDto,
     @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.accountingService.reverseTourMoney(
-      actor,
-      id,
-      settlementId,
-      dto,
-    );
+    return this.accountingService.deleteTourMoney(actor, id, settlementId);
   }
 
   @Put(':id/finalize')

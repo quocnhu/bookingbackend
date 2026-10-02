@@ -1,6 +1,6 @@
 import { AssignmentsService } from './assignments.service';
 import { AccountingService } from "../accounting/accounting.service";
-import { CreateSettlementDto, ReverseTourMoneyDto } from "../accounting/dto/accounting.dto";
+import { CreateSettlementDto } from "../accounting/dto/accounting.dto";
 import { AssignBookingsDto, CreateAssignmentDto, FinalizeAssignmentDto, MoveBookingDto, QueryAssignmentDto, ReorderBookingsDto, SetBoardOriginDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, VerifyTourReportDto } from './dto/assignment.dto';
 import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 export declare class AssignmentsController {
@@ -9,11 +9,17 @@ export declare class AssignmentsController {
     constructor(assignmentsService: AssignmentsService, accountingService: AccountingService);
     findAll(query: QueryAssignmentDto, actor: AuthenticatedUser): Promise<import("../common/dto/pagination.dto").PaginatedResult<any>>;
     findBoard(actor: AuthenticatedUser): Promise<any[]>;
+    getBoardMode(): Promise<{
+        mode: import("@prisma/client").AssignmentOrigin;
+    }>;
     setBoardOrigin(dto: SetBoardOriginDto): Promise<{
         updated: number;
+        mode: import("@prisma/client").$Enums.AssignmentOrigin;
     }>;
     dispatchAllBoard(): Promise<{
         dispatched: number;
+        skipped: number;
+        skippedOnLeave: number;
     }>;
     getBoardCrew(): Promise<{
         guides: {
@@ -1635,7 +1641,7 @@ export declare class AssignmentsController {
         createdByName: string | null;
         reversesId: string | null;
     }>;
-    reverseTourMoney(id: string, settlementId: string, dto: ReverseTourMoneyDto, actor: AuthenticatedUser): Promise<{
+    deleteTourMoney(id: string, settlementId: string, actor: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;

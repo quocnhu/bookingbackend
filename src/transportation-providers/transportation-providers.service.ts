@@ -64,6 +64,21 @@ export class TransportationProvidersService {
     return actor!.providerId;
   }
 
+  /** Driver roster freezes at 22:00 Vietnam time daily — providers must finish
+   *  assigning drivers before 10pm so the 4am auto crew+dispatch runs on a
+   *  settled roster. ADMIN stays exempt for emergencies. */
+  private assertBeforeRosterFreeze(actor?: AuthenticatedUser) {
+    if (actor?.role === RoleType.ADMIN) return;
+    const hcm = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }),
+    );
+    if (hcm.getHours() >= 22) {
+      throw new BadRequestException(
+        'Driver roster is frozen after 22:00 — changes resume tomorrow morning.',
+      );
+    }
+  }
+
   /** OFFICE/ADMIN see everything; TRANSPORT_PROVIDER only sees their own vehicles. */
   async findAll(actor?: AuthenticatedUser) {
     const [providers, contacts, drivers] = await Promise.all([
@@ -285,7 +300,9 @@ export class TransportationProvidersService {
     return { message: 'Vehicle deleted' };
   }
 
-  async assignDriver(providerId: string, dto: AssignDriverToProviderDto) {
+  async assignDriver(actor: AuthenticatedUser, providerId: string, dto: AssignDriverToProviderDto) {
+    if (this.isProvider(actor)) providerId = this.requireProviderId(actor);
+    this.assertBeforeRosterFreeze(actor);
     await this.ensureProviderOrFail(providerId);
     const driver = await this.prisma.user.findUnique({ where: { id: dto.userId } });
     if (!driver) throw new NotFoundException('Driver not found');
@@ -308,7 +325,9 @@ export class TransportationProvidersService {
     return updated;
   }
 
-  async unassignDriver(providerId: string, userId: string) {
+  async unassignDriver(actor: AuthenticatedUser, providerId: string, userId: string) {
+    if (this.isProvider(actor)) providerId = this.requireProviderId(actor);
+    this.assertBeforeRosterFreeze(actor);
     await this.ensureProviderOrFail(providerId);
     const driver = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!driver) throw new NotFoundException('Driver not found');

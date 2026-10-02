@@ -324,6 +324,10 @@ export class AccountingService {
       include: { reversedBy: { select: { id: true } } },
     });
     if (!existing) throw new NotFoundException('Settlement not found');
+    // Write-once for everyone except ADMIN: others can only edit their own line.
+    if (existing.createdById !== actor.id && actor.role !== RoleType.ADMIN) {
+      throw new ForbiddenException('You can only edit an entry you added');
+    }
     if (existing.reversedBy) {
       throw new ConflictException('Entry was reversed — create a new entry');
     }
@@ -351,86 +355,81 @@ export class AccountingService {
     return updated;
   }
 
-  /**
-   * Invariant: cash lines are never deleted. If something is wrong, create an
-   * offsetting (negative) line with the same note. This is allowed even after
-   * the money is locked — it is the only correction path.
-   */
-  /** A guide/driver reverses the entry THEY just added on that very trip. */
-  async reverseTourMoney(
+  /** A guide/driver deletes an entry THEY just added on that very trip (only
+   *  while the money is not yet locked). Historical reversal lines
+   *  (reversesId / reversedBy) are kept and cannot be deleted. */
+  async deleteTourMoney(
     actor: AuthenticatedUser,
     assignmentId: string,
     settlementId: string,
-    dto: { note?: string },
   ) {
     await this.assertOwnTour(assignmentId, actor);
     const entry = await this.prisma.settlement.findUnique({
       where: { id: settlementId },
-      select: { assignmentId: true, createdById: true },
+      include: { reversedBy: { select: { id: true } } },
     });
     if (!entry || entry.assignmentId !== assignmentId) {
       throw new NotFoundException('This entry does not belong to this trip');
     }
-    if (
-      actor.role !== RoleType.ADMIN &&
-      actor.role !== RoleType.OFFICE &&
-      entry.createdById !== actor.id
-    ) {
-      throw new ForbiddenException('You can only reverse an entry you added');
+    // Write-once for everyone except ADMIN: others can only delete their own line.
+    // Correct via a new adjusting entry, or Return the sheet for resubmission.
+    if (entry.createdById !== actor.id && actor.role !== RoleType.ADMIN) {
+      throw new ForbiddenException('You can only delete an entry you added');
+    }
+    if (entry.reversedBy) {
+      throw new ConflictException('Cannot delete a reversed entry');
+    }
+    if (entry.reversesId) {
+      throw new ConflictException('Cannot delete a reversal entry');
     }
     await this.assertTourMutable(assignmentId);
-    return this.reverseSettlementCore(actor, settlementId, {
-      note: dto.note ?? 'Guide/driver self-reversal',
+    const deleted = await this.prisma.settlement.delete({
+      where: { id: settlementId },
     });
+    await this.audit.log({
+      entityType: 'Settlement',
+      entityId: settlementId,
+      action: 'DELETE',
+      beforeData: entry,
+      changedBy: actor.id,
+    });
+    return deleted;
   }
 
-  async reverseSettlement(
-    actor: AuthenticatedUser,
-    id: string,
-    dto: { note: string },
-  ) {
-    this.assertAccounting(actor, 'accounting.settlement.reverse');
-    return this.reverseSettlementCore(actor, id, dto);
-  }
-
-  private async reverseSettlementCore(
-    actor: AuthenticatedUser,
-    id: string,
-    dto: { note: string },
-  ) {
+  async deleteSettlement(actor: AuthenticatedUser, id: string) {
+    this.assertAccounting(actor, 'accounting.settlement.delete');
     const original = await this.prisma.settlement.findUnique({
       where: { id },
       include: { reversedBy: { select: { id: true } } },
     });
     if (!original) throw new NotFoundException('Settlement not found');
+    // Write-once for everyone except ADMIN: others can only delete their own line.
+    if (original.createdById !== actor.id && actor.role !== RoleType.ADMIN) {
+      throw new ForbiddenException('You can only delete an entry you added');
+    }
     if (original.reversedBy) {
-      throw new ConflictException('Entry was already reversed');
+      throw new ConflictException('Cannot delete a reversed entry');
+    }
+    if (original.reversesId) {
+      throw new ConflictException('Cannot delete a reversal entry; delete the original instead');
+    }
+    // Locked money is immutable — deletions would let live rows drift away
+    // from the locked netAmount. Correct mistakes before locking.
+    if (original.assignmentId) {
+      await this.assertTourMutable(original.assignmentId);
     }
 
-    const reversal = await this.prisma.$transaction(async (tx: Tx) => {
-      const created = await tx.settlement.create({
-        data: {
-          amount: new Prisma.Decimal(-num(original.amount)),
-          note: `Reversal: ${dto.note}`,
-          assignmentId: original.assignmentId,
-          bookingId: original.bookingId,
-          categoryId: original.categoryId,
-          createdById: actor.id,
-          createdByName: actor.name ?? null,
-          reversesId: original.id,
-        },
-      });
-      await this.audit.log({
-        entityType: 'Settlement',
-        entityId: created.id,
-        action: 'REVERSE',
-        beforeData: original,
-        afterData: created,
-        changedBy: actor.id,
-      });
-      return created;
+    const deleted = await this.prisma.settlement.delete({
+      where: { id },
     });
-    return reversal;
+    await this.audit.log({
+      entityType: 'Settlement',
+      entityId: id,
+      action: 'DELETE',
+      beforeData: original,
+      changedBy: actor.id,
+    });
+    return deleted;
   }
 
   // ── Compute the net for one trip from its Settlement lines ──────────────────
@@ -500,16 +499,31 @@ export class AccountingService {
 
   async verificationQueue(actor: AuthenticatedUser) {
     this.assertAccounting(actor);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
     const assignments = await this.prisma.assignment.findMany({
       where: {
-        status: AssignmentStatus.COMPLETED,
-        tourReport: {
-          is: {
-            finalizedAt: { not: null },
-            moneyVerifiedAt: null,
-            moneyRejectedAt: null,
+        OR: [
+          // Pending money verification: report submitted (or content-verified by
+          // admin), money not yet locked or returned.
+          {
+            tourReport: {
+              is: {
+                status: { in: ['SUBMITTED', 'VERIFIED'] },
+                moneyVerifiedAt: null,
+                moneyRejectedAt: null,
+              },
+            },
           },
-        },
+          // Recently money-locked: show confirmation badge in actions (no review button)
+          {
+            tourReport: {
+              is: {
+                status: 'VERIFIED',
+                moneyVerifiedAt: { gte: sevenDaysAgo },
+              },
+            },
+          },
+        ],
       },
       include: {
         tourReport: true,
@@ -518,35 +532,38 @@ export class AccountingService {
         driver: { select: { id: true, name: true } },
         _count: { select: { settlements: true } },
       },
-      orderBy: { tourReport: { finalizedAt: 'asc' } },
+      orderBy: { tourReport: { submittedAt: 'asc' } },
     });
 
     const now = Date.now();
     const items = await Promise.all(
       assignments.map(async (a) => {
         const net = await this.computeNet(a.id);
-        const ageDays = a.tourReport?.finalizedAt
-          ? Math.floor((now - +a.tourReport.finalizedAt) / 86_400_000)
+        const ageDays = a.tourReport?.submittedAt
+          ? Math.floor((now - +a.tourReport.submittedAt) / 86_400_000)
           : 0;
         return {
           assignmentId: a.id,
           code: a.code,
           tourName: a.tourName,
           tourType: a.tourType,
-          finalizedAt: a.tourReport?.finalizedAt ?? null,
+          submittedAt: a.tourReport?.submittedAt ?? null,
           reportStatus: a.tourReport?.status ?? null,
+          moneyVerifiedAt: a.tourReport?.moneyVerifiedAt ?? null,
           guide: a.guide,
           driver: a.driver,
           plateNumber: a.vehicle?.plateNumber,
-          // By default it will be settled to this person if Accounting does not change it —
-          // surfacing it avoids a silent "wrong person paid" mistake.
           suggestedPayableTo: (() => {
             const d = this.resolveDefaultPayee(a);
             if (!d) return null;
             const person = a.guide?.id === d.id ? a.guide : a.driver;
             return person ? { ...person, basis: d.basis } : null;
           })(),
-          ...net,
+          net: net.net,
+          flow: net.flow,
+          collected: net.collected,
+          paid: net.paid,
+          entryCount: net.entryCount,
           waitingDays: ageDays,
         };
       }),
@@ -570,8 +587,8 @@ export class AccountingService {
       include: { tourReport: true },
     });
     if (!assignment) throw new NotFoundException('Assignment not found');
-    if (!assignment.tourReport?.finalizedAt) {
-      throw new ConflictException('Tour is not closed yet (no finalizedAt)');
+    if (!assignment.tourReport?.submittedAt) {
+      throw new ConflictException('Tour report has not been submitted yet');
     }
     if (assignment.tourReport.moneyVerifiedAt) {
       throw new ConflictException('Tour money was already verified and locked');
@@ -597,10 +614,12 @@ export class AccountingService {
     }
     await this.assertPayable(payableToId);
 
+    // A report needs at least one money entry — the notice is shown to the
+    // user on the submit/verify screens; this guard is the final backstop.
     const net = await this.computeNet(assignmentId);
     if (net.entryCount === 0) {
       throw new ConflictException(
-        'Tour has no settlement entries — add amounts before verifying',
+        'Tour has no settlement entries — add at least one Collect/Expense entry before verifying',
       );
     }
 
@@ -657,6 +676,10 @@ export class AccountingService {
       } as Prisma.InputJsonValue,
       changedBy: actor.id,
     });
+    this.gateway.notifyAll('board:refresh', {
+      assignmentId,
+      action: 'money_verified',
+    });
     return { ...updated, net, payableToId };
   }
 
@@ -705,7 +728,7 @@ export class AccountingService {
     dto: RejectMoneyDto,
     actor: AuthenticatedUser,
   ) {
-    this.assertAccounting(actor);
+    this.assertAccounting(actor, 'accounting.money.reject');
 
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
@@ -715,8 +738,8 @@ export class AccountingService {
     if (!assignment.tourReport) {
       throw new NotFoundException('This tour has no submitted money sheet');
     }
-    if (!assignment.tourReport.finalizedAt) {
-      throw new ConflictException('Tour is not closed yet (no finalizedAt)');
+    if (!assignment.tourReport.submittedAt) {
+      throw new ConflictException('Tour report has not been submitted yet');
     }
     if (assignment.tourReport.moneyVerifiedAt) {
       throw new ConflictException('Tour money was already verified and locked');
@@ -750,6 +773,10 @@ export class AccountingService {
       changedBy: actor.id,
     });
 
+    this.gateway.notifyAll('board:refresh', {
+      assignmentId,
+      action: 'money_rejected',
+    });
     return updated;
   }
 

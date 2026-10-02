@@ -179,9 +179,7 @@ export declare class AccountingService {
         createdByName: string | null;
         reversesId: string | null;
     }>;
-    reverseTourMoney(actor: AuthenticatedUser, assignmentId: string, settlementId: string, dto: {
-        note?: string;
-    }): Promise<{
+    deleteTourMoney(actor: AuthenticatedUser, assignmentId: string, settlementId: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -194,9 +192,7 @@ export declare class AccountingService {
         createdByName: string | null;
         reversesId: string | null;
     }>;
-    reverseSettlement(actor: AuthenticatedUser, id: string, dto: {
-        note: string;
-    }): Promise<{
+    deleteSettlement(actor: AuthenticatedUser, id: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -209,23 +205,17 @@ export declare class AccountingService {
         createdByName: string | null;
         reversesId: string | null;
     }>;
-    private reverseSettlementCore;
     private sumRows;
     private computeNet;
     private resolveDefaultPayee;
     verificationQueue(actor: AuthenticatedUser): Promise<{
-        waitingDays: number;
-        collected: number;
-        paid: number;
-        net: number;
-        flow: "COLLECT_MONEY" | "PAY_MONEY";
-        entryCount: number;
         assignmentId: string;
         code: string | null;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
-        finalizedAt: Date | null;
+        submittedAt: Date | null;
         reportStatus: import("@prisma/client").$Enums.TourReportStatus | null;
+        moneyVerifiedAt: Date | null;
         guide: {
             id: string;
             name: string | null;
@@ -240,6 +230,12 @@ export declare class AccountingService {
             id: string;
             name: string | null;
         } | null;
+        net: number;
+        flow: "COLLECT_MONEY" | "PAY_MONEY";
+        collected: number;
+        paid: number;
+        entryCount: number;
+        waitingDays: number;
     }[]>;
     verifyTourMoney(actor: AuthenticatedUser, assignmentId: string, dto: VerifyTourMoneyDto): Promise<{
         net: {
@@ -644,12 +640,12 @@ export declare class AccountingService {
         id: string;
         createdAt: Date;
         note: string | null;
+        createdById: string;
+        createdByName: string | null;
         payeeType: import("@prisma/client").$Enums.PayeeType;
         fromDate: Date;
         toDate: Date;
         personId: string;
-        createdById: string;
-        createdByName: string | null;
         payeeName: string | null;
         tourCount: number;
         personReturnsToCompany: Prisma.Decimal;

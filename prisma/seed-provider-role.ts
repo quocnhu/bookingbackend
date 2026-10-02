@@ -11,6 +11,8 @@ const PROVIDER_ROLE_PERMISSIONS = [
   'vehicle.delete',
   'driver.create',
   'driver.update',
+  'provider-driver.assign',
+  'provider-driver.unassign',
   'route-price.create',
   'route-price.update',
 ];

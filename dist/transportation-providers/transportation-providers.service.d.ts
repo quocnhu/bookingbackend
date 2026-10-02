@@ -12,6 +12,7 @@ export declare class TransportationProvidersService {
     private isProvider;
     private providerScope;
     private requireProviderId;
+    private assertBeforeRosterFreeze;
     findAll(actor?: AuthenticatedUser): Promise<{
         id: string;
         name: string;
@@ -81,14 +82,14 @@ export declare class TransportationProvidersService {
     deleteVehicle(actor: AuthenticatedUser, id: string): Promise<{
         message: string;
     }>;
-    assignDriver(providerId: string, dto: AssignDriverToProviderDto): Promise<{
+    assignDriver(actor: AuthenticatedUser, providerId: string, dto: AssignDriverToProviderDto): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
         id: string;
         name: string | null;
         email: string;
         providerId: string | null;
     }>;
-    unassignDriver(providerId: string, userId: string): Promise<{
+    unassignDriver(actor: AuthenticatedUser, providerId: string, userId: string): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
         id: string;
         name: string | null;

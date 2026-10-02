@@ -88,6 +88,14 @@ let TransportationProvidersService = class TransportationProvidersService {
         }
         return actor.providerId;
     }
+    assertBeforeRosterFreeze(actor) {
+        if (actor?.role === client_1.RoleType.ADMIN)
+            return;
+        const hcm = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+        if (hcm.getHours() >= 22) {
+            throw new common_1.BadRequestException('Driver roster is frozen after 22:00 — changes resume tomorrow morning.');
+        }
+    }
     async findAll(actor) {
         const [providers, contacts, drivers] = await Promise.all([
             this.prisma.transportationProvider.findMany({
@@ -299,7 +307,10 @@ let TransportationProvidersService = class TransportationProvidersService {
         });
         return { message: 'Vehicle deleted' };
     }
-    async assignDriver(providerId, dto) {
+    async assignDriver(actor, providerId, dto) {
+        if (this.isProvider(actor))
+            providerId = this.requireProviderId(actor);
+        this.assertBeforeRosterFreeze(actor);
         await this.ensureProviderOrFail(providerId);
         const driver = await this.prisma.user.findUnique({ where: { id: dto.userId } });
         if (!driver)
@@ -322,7 +333,10 @@ let TransportationProvidersService = class TransportationProvidersService {
         });
         return updated;
     }
-    async unassignDriver(providerId, userId) {
+    async unassignDriver(actor, providerId, userId) {
+        if (this.isProvider(actor))
+            providerId = this.requireProviderId(actor);
+        this.assertBeforeRosterFreeze(actor);
         await this.ensureProviderOrFail(providerId);
         const driver = await this.prisma.user.findUnique({ where: { id: userId } });
         if (!driver)

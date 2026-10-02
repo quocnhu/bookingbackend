@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -69,13 +70,12 @@ export class AccountingController {
     return this.accountingService.updateSettlement(actor, id, dto);
   }
 
-  @Post('settlements/:id/reverse')
-  reverseSettlement(
+  @Delete('settlements/:id')
+  deleteSettlement(
     @Param('id') id: string,
-    @Body() dto: { note: string },
     @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.accountingService.reverseSettlement(actor, id, dto);
+    return this.accountingService.deleteSettlement(actor, id);
   }
 
   // ── Sub-tab 2: verification queue ──

@@ -85,9 +85,7 @@ export declare class AccountingController {
         createdByName: string | null;
         reversesId: string | null;
     }>;
-    reverseSettlement(id: string, dto: {
-        note: string;
-    }, actor: AuthenticatedUser): Promise<{
+    deleteSettlement(id: string, actor: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -101,18 +99,13 @@ export declare class AccountingController {
         reversesId: string | null;
     }>;
     verificationQueue(actor: AuthenticatedUser): Promise<{
-        waitingDays: number;
-        collected: number;
-        paid: number;
-        net: number;
-        flow: "COLLECT_MONEY" | "PAY_MONEY";
-        entryCount: number;
         assignmentId: string;
         code: string | null;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
-        finalizedAt: Date | null;
+        submittedAt: Date | null;
         reportStatus: import("@prisma/client").$Enums.TourReportStatus | null;
+        moneyVerifiedAt: Date | null;
         guide: {
             id: string;
             name: string | null;
@@ -127,6 +120,12 @@ export declare class AccountingController {
             id: string;
             name: string | null;
         } | null;
+        net: number;
+        flow: "COLLECT_MONEY" | "PAY_MONEY";
+        collected: number;
+        paid: number;
+        entryCount: number;
+        waitingDays: number;
     }[]>;
     verifyTourMoney(assignmentId: string, dto: VerifyTourMoneyDto, actor: AuthenticatedUser): Promise<{
         net: {
@@ -530,12 +529,12 @@ export declare class AccountingController {
         id: string;
         createdAt: Date;
         note: string | null;
+        createdById: string;
+        createdByName: string | null;
         payeeType: import("@prisma/client").$Enums.PayeeType;
         fromDate: Date;
         toDate: Date;
         personId: string;
-        createdById: string;
-        createdByName: string | null;
         payeeName: string | null;
         tourCount: number;
         personReturnsToCompany: import("@prisma/client/runtime/library").Decimal;
