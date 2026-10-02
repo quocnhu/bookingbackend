@@ -8,12 +8,12 @@ import {
 export type ParsedAction = 'CREATE' | 'CANCEL';
 
 /**
- * Fields đã được parser extract — ánh xạ 1-1 với model Prisma Booking
- * (+ action/source để phân nhánh xử lý). Validate trước khi upsert.
+ * Fields already extracted by the parser — map 1-1 to the Prisma Booking model
+ * (+ action/source to branch the processing). Validate before upserting.
  */
 export interface BookingFields {
   action: ParsedAction;
-  /** Mã xác nhận (bookingRef / confirmationCode) — key upsert cùng source. */
+  /** Confirmation code (bookingRef / confirmationCode) — upsert key together with source. */
   bookingRef: string;
   /** 'airbnb' | 'booking-com' | 'getyourguide' | 'tripadvisor' | 'website' | 'manual' */
   source: string;
@@ -53,8 +53,8 @@ const SOURCES = new Set([
 ]);
 
 /**
- * Validate fields từ parser (bước 15-16 trong .md).
- * Không có bookingRef (confirmation code) hoặc source -> parse_failed.
+ * Validate fields from the parser (steps 15-16 in .md).
+ * No bookingRef (confirmation code) or source -> parse_failed.
  */
 export function validateBookingFields(fields: BookingFields): ValidationResult {
   const errors: string[] = [];

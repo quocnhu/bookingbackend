@@ -30,7 +30,8 @@ let AuditService = class AuditService {
                 },
             });
         }
-        catch {
+        catch (e) {
+            console.error('[audit] failed to write audit log:', e?.message);
         }
     }
 };

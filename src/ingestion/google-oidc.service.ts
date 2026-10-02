@@ -11,8 +11,8 @@ interface OidcPayload {
 @Injectable()
 export class GoogleOidcService {
   /**
-   * Verify Google OIDC JWT từ header Authorization của Pub/Sub push.
-   * Kiểm tra issuer accounts.google.com + aud = topic/subscription + chưa hết hạn.
+   * Verify the Google OIDC JWT from the Pub/Sub push Authorization header.
+   * Checks the issuer accounts.google.com + aud = topic/subscription + not yet expired.
    */
   async verifyIdToken(token: string): Promise<OidcPayload> {
     const allowedAuds = this.getAllowedAudiences();

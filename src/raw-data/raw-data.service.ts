@@ -5,8 +5,8 @@ import { RawDataRepository } from './raw-data.repository';
 import { RAW_DATA_STATUS, RawDataStatus } from './raw-data.entity';
 
 /**
- * Service nghiệp vụ cho rawData: tạo bản ghi từ ingestion và
- * chuyển trạng thái từ parsing worker.
+ * Business service for rawData: creates records from ingestion and
+ * transitions state from the parsing worker.
  */
 @Injectable()
 export class RawDataService {
@@ -50,7 +50,7 @@ export class RawDataService {
     await this.repository.markParsed(id, bookingId);
   }
 
-  /** Lưu payload sau khi parser làm giàu (payload.booking). */
+  /** Persist the payload after the parser enriches it (payload.booking). */
   async updatePayload(id: string, payload: Record<string, unknown>) {
     await this.repository.updatePayload(id, payload as Prisma.InputJsonValue);
   }

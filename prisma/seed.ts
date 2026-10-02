@@ -1,5 +1,11 @@
 import 'dotenv/config';
-import { PrismaClient, AuthProvider, RoleType, TourType } from '@prisma/client';
+import {
+  PrismaClient,
+  AuthProvider,
+  FeeFlowType,
+  RoleType,
+  TourType,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -14,7 +20,12 @@ const GALLERY_SHOTS = 3;
  * Generate a local thumbnail image for a tour and return the public URL.
  * Stored at uploads/tours/{tourId}/thumbnail.webp, served by backend at /uploads.
  */
-async function seedThumbnail(tourId: string, code: string, name: string, accent: { from: string; to: string }): Promise<string> {
+async function seedThumbnail(
+  tourId: string,
+  code: string,
+  name: string,
+  accent: { from: string; to: string },
+): Promise<string> {
   const folder = path.join(UPLOADS_ROOT, 'tours', tourId);
   await fs.promises.mkdir(folder, { recursive: true });
   const escapeXml = (s: string) =>
@@ -36,16 +47,23 @@ async function seedThumbnail(tourId: string, code: string, name: string, accent:
     `<text x="400" y="340" font-family="Arial, sans-serif" font-size="22" fill="rgba(255,255,255,0.9)" text-anchor="middle">${escapeXml(name)}</text>` +
     `</svg>`;
   const file = path.join(folder, 'thumbnail.webp');
-  await sharp(Buffer.from(svg)).resize(800, 600).webp({ quality: 85 }).toFile(file);
+  await sharp(Buffer.from(svg))
+    .resize(800, 600)
+    .webp({ quality: 85 })
+    .toFile(file);
   const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
   return `${backendUrl}/uploads/tours/${tourId}/thumbnail.webp`;
 }
 
 /**
- * Folder-based gallery: ghi các ảnh placeholder cục bộ vào thư mục ảnh của tour
- * (uploads/tours/{tourId}/gallery). Không cần bản ghi DB — frontend đọc thẳng folder.
+ * Folder-based gallery: writes local placeholder images into the tour's image folder
+ * (uploads/tours/{tourId}/gallery). No DB records needed — the frontend reads the folder directly.
  */
-async function seedGalleryImages(tourId: string, code: string, count = GALLERY_SHOTS) {
+async function seedGalleryImages(
+  tourId: string,
+  code: string,
+  count = GALLERY_SHOTS,
+) {
   const folder = path.join(UPLOADS_ROOT, 'tours', tourId, 'gallery');
   await fs.promises.mkdir(folder, { recursive: true });
   const palettes = [
@@ -66,12 +84,19 @@ async function seedGalleryImages(tourId: string, code: string, count = GALLERY_S
       `<text x="600" y="400" font-family="Arial, sans-serif" font-size="76" font-weight="700" fill="#ffffff" text-anchor="middle">${code}</text>` +
       `<text x="600" y="462" font-family="Arial, sans-serif" font-size="30" fill="rgba(255,255,255,0.85)" text-anchor="middle">Photo ${i + 1}</text>` +
       `</svg>`;
-    const file = path.join(folder, `${String(i).padStart(3, '0')}-seed-${i}.webp`);
+    const file = path.join(
+      folder,
+      `${String(i).padStart(3, '0')}-seed-${i}.webp`,
+    );
     await sharp(Buffer.from(svg)).webp({ quality: 90 }).toFile(file);
   }
 }
 
-const DEFAULT_PERMISSIONS: Array<{ code: string; name: string; group: string }> = [
+const DEFAULT_PERMISSIONS: Array<{
+  code: string;
+  name: string;
+  group: string;
+}> = [
   { code: 'dashboard.read', name: 'Xem dashboard', group: 'Dashboard' },
   { code: 'booking.read', name: 'Xem booking', group: 'Booking' },
   { code: 'booking.create', name: 'Tạo booking', group: 'Booking' },
@@ -81,11 +106,16 @@ const DEFAULT_PERMISSIONS: Array<{ code: string; name: string; group: string }> 
   { code: 'assignment.create', name: 'Tạo assignment', group: 'Assignment' },
   { code: 'assignment.update', name: 'Sửa assignment', group: 'Assignment' },
   { code: 'assignment.delete', name: 'Xoá assignment', group: 'Assignment' },
-  { code: 'settlement.read', name: 'Xem settlement', group: 'Settlement' },
-  { code: 'settlement.create', name: 'Tạo settlement', group: 'Settlement' },
-  { code: 'settlement.update', name: 'Sửa settlement', group: 'Settlement' },
-  { code: 'settlement.approve', name: 'Duyệt settlement', group: 'Settlement' },
-  { code: 'settlement.delete', name: 'Xoá settlement', group: 'Settlement' },
+  {
+    code: 'booking.note.update',
+    name: 'Sửa ghi chú booking của chuyến mình',
+    group: 'Assignment',
+  },
+  {
+    code: 'assignment.tour-report.submit',
+    name: 'Nộp báo cáo chuyến đi',
+    group: 'Assignment',
+  },
   { code: 'company.read', name: 'Xem hồ sơ công ty', group: 'Company' },
   { code: 'company.update', name: 'Cập nhật hồ sơ công ty', group: 'Company' },
   { code: 'tour.create', name: 'Tạo tour', group: 'Tour' },
@@ -109,11 +139,97 @@ const DEFAULT_PERMISSIONS: Array<{ code: string; name: string; group: string }> 
   { code: 'vehicle.create', name: 'Tạo xe (provider)', group: 'Vehicle' },
   { code: 'vehicle.update', name: 'Sửa xe (provider)', group: 'Vehicle' },
   { code: 'vehicle.delete', name: 'Xoá xe (provider)', group: 'Vehicle' },
-  { code: 'provider.create', name: 'Tạo transportation provider', group: 'Provider' },
+  {
+    code: 'provider.create',
+    name: 'Tạo transportation provider',
+    group: 'Provider',
+  },
   { code: 'driver.create', name: 'Tạo tài xế', group: 'Provider Driver' },
   { code: 'driver.update', name: 'Sửa tài xế', group: 'Provider Driver' },
-  { code: 'provider-driver.assign', name: 'Gán tài xế vào provider', group: 'Provider Driver' },
-  { code: 'provider-driver.unassign', name: 'Gỡ tài xế khỏi provider', group: 'Provider Driver' },
+  {
+    code: 'provider-driver.assign',
+    name: 'Gán tài xế vào provider',
+    group: 'Provider Driver',
+  },
+  {
+    code: 'provider-driver.unassign',
+    name: 'Gỡ tài xế khỏi provider',
+    group: 'Provider Driver',
+  },
+  { code: 'accounting.read', name: 'Xem Accounting Room', group: 'Accounting' },
+  {
+    code: 'accounting.settlement.create',
+    name: 'Thêm khoản thu/chi',
+    group: 'Accounting',
+  },
+  {
+    code: 'accounting.settlement.update',
+    name: 'Sửa khoản thu/chi',
+    group: 'Accounting',
+  },
+  {
+    code: 'accounting.settlement.reverse',
+    name: 'Đảo khoản thu/chi',
+    group: 'Accounting',
+  },
+  {
+    code: 'accounting.category.create',
+    name: 'Tạo danh mục thu/chi',
+    group: 'Accounting',
+  },
+  {
+    code: 'accounting.money.verify',
+    name: 'Xác minh & khoá tiền chuyến',
+    group: 'Accounting',
+  },
+  {
+    code: 'accounting.money.reject',
+    name: 'Trả lại bảng kê thu/chi',
+    group: 'Accounting',
+  },
+  {
+    code: 'accounting.period.export',
+    name: 'Xuất kỳ thanh toán',
+    group: 'Accounting',
+  },
+  {
+    code: 'accounting.period.void',
+    name: 'Huỷ kỳ thanh toán đã xuất',
+    group: 'Accounting',
+  },
+];
+
+/** Default settlement categories. flowType decides who owes whom. */
+const DEFAULT_SETTLEMENT_CATEGORIES: Array<{
+  code: string;
+  name: string;
+  flowType: FeeFlowType;
+}> = [
+  {
+    code: 'COLLECT_ON_BEHALF',
+    name: 'Thu hộ COD',
+    flowType: FeeFlowType.COLLECT_MONEY,
+  },
+  {
+    code: 'CUSTOMER_PAYMENT',
+    name: 'Thu tiền khách',
+    flowType: FeeFlowType.COLLECT_MONEY,
+  },
+  {
+    code: 'GUIDE_COMMISSION',
+    name: 'Hoa hồng HDV',
+    flowType: FeeFlowType.COLLECT_MONEY,
+  },
+  { code: 'VEHICLE_FEE', name: 'Phí xe', flowType: FeeFlowType.PAY_MONEY },
+  { code: 'DRIVER_PAY', name: 'Lương tài xế', flowType: FeeFlowType.PAY_MONEY },
+  {
+    code: 'RESTAURANT',
+    name: 'Tiền nhà hàng',
+    flowType: FeeFlowType.PAY_MONEY,
+  },
+  { code: 'TOLL_FEE', name: 'Phí cầu đường', flowType: FeeFlowType.PAY_MONEY },
+  { code: 'FUEL', name: 'Nhiên liệu', flowType: FeeFlowType.PAY_MONEY },
+  { code: 'OTHERS', name: 'Khác', flowType: FeeFlowType.PAY_MONEY },
 ];
 
 interface TourSeed {
@@ -157,7 +273,8 @@ interface TourSeed {
 const IMG = (file: string, alt: string) =>
   `<img src="http://localhost:4000/uploads/seeds/${file}.jpg" alt="${alt}" />`;
 
-const UL = (items: string[]) => `<ul>${items.map((i) => `<li>${i}</li>`).join('')}</ul>`;
+const UL = (items: string[]) =>
+  `<ul>${items.map((i) => `<li>${i}</li>`).join('')}</ul>`;
 const P = (text: string) => `<p>${text}</p>`;
 const INSURANCE = () =>
   `<p>All guests are covered by <strong>travel insurance</strong> during the tour itinerary. Personal belongings are the guest's own responsibility.</p>` +
@@ -190,24 +307,32 @@ const VIETNAM_TOURS: TourSeed[] = [
     transportation: 'AC private car + walking',
     mapQuery: 'Hoan Kiem Lake, Hanoi',
     overview:
-      P('Step into more than 1,000 years of Hanoi history on this private half-day walk through the city’s soul.') +
+      P(
+        'Step into more than 1,000 years of Hanoi history on this private half-day walk through the city’s soul.',
+      ) +
       UL([
         'Guided tour of the 36 ancient streets of the Old Quarter',
         'Hoan Kiem Lake, Ngoc Son Temple and the iconic red Huc Bridge',
         'Temple of Literature — Vietnam’s first national university',
         'Traditional water puppet show to close the day',
       ]),
-    highlights:
-      UL([
-        'Private guide dedicated to your group only',
-        'Skip the crowds with a carefully paced itinerary',
-        'Local street-food recommendation list included',
-        'All entrance fees covered',
-      ]),
-    includedServices:
-      UL(['Private licensed guide', 'All entrance tickets', 'Bottled water', 'Hotel pickup & drop-off in the Old Quarter']),
-    excludedServices:
-      UL(['Meals & beverages', 'Personal expenses', 'Gratuities (optional)']),
+    highlights: UL([
+      'Private guide dedicated to your group only',
+      'Skip the crowds with a carefully paced itinerary',
+      'Local street-food recommendation list included',
+      'All entrance fees covered',
+    ]),
+    includedServices: UL([
+      'Private licensed guide',
+      'All entrance tickets',
+      'Bottled water',
+      'Hotel pickup & drop-off in the Old Quarter',
+    ]),
+    excludedServices: UL([
+      'Meals & beverages',
+      'Personal expenses',
+      'Gratuities (optional)',
+    ]),
     regulations: REGULATIONS(),
     insurancePolicy: INSURANCE(),
     gallery: [
@@ -220,8 +345,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 0,
         title: 'Pick-up & Old Quarter walking tour',
-        description:
-          `<p>Meet your <strong>private guide</strong> at the hotel lobby and wander through the 36 ancient streets of the Old Quarter.</p>${IMG('hanoi-oldquarter', 'Hanoi Old Quarter streets')}`,
+        description: `<p>Meet your <strong>private guide</strong> at the hotel lobby and wander through the 36 ancient streets of the Old Quarter.</p>${IMG('hanoi-oldquarter', 'Hanoi Old Quarter streets')}`,
         timeSlot: '08:00',
         location: 'Old Quarter, Hanoi',
       },
@@ -229,8 +353,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 1,
         title: 'Hoan Kiem Lake & Ngoc Son Temple',
-        description:
-          `<p>Enjoy the red <em>Huc Bridge</em> and the legendary turtle tower in the heart of Hanoi.</p>${IMG('hanoi-hoan-kiem', 'Hoan Kiem Lake, Hanoi')}`,
+        description: `<p>Enjoy the red <em>Huc Bridge</em> and the legendary turtle tower in the heart of Hanoi.</p>${IMG('hanoi-hoan-kiem', 'Hoan Kiem Lake, Hanoi')}`,
         timeSlot: '09:30',
         location: 'Hoan Kiem Lake, Hanoi',
       },
@@ -238,8 +361,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 2,
         title: 'Temple of Literature visit',
-        description:
-          `<p>Vietnam's first national university, a peaceful complex of courtyards and pavilions.</p>${IMG('hanoi-temple', 'Temple of Literature, Hanoi')}`,
+        description: `<p>Vietnam's first national university, a peaceful complex of courtyards and pavilions.</p>${IMG('hanoi-temple', 'Temple of Literature, Hanoi')}`,
         timeSlot: '11:00',
         location: 'Temple of Literature, Hanoi',
       },
@@ -247,8 +369,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 3,
         title: 'Water puppet show & drop-off',
-        description:
-          `<p>Wrap up the day with a traditional <strong>water puppet show</strong> before returning to your hotel.</p>${IMG('water-puppet', 'Vietnamese water puppet show')}`,
+        description: `<p>Wrap up the day with a traditional <strong>water puppet show</strong> before returning to your hotel.</p>${IMG('water-puppet', 'Vietnamese water puppet show')}`,
         timeSlot: '15:00',
         location: 'Thang Long Theatre, Hanoi',
       },
@@ -268,24 +389,33 @@ const VIETNAM_TOURS: TourSeed[] = [
     transportation: 'Air-conditioned shuttle bus + deluxe cruise',
     mapQuery: 'Tuan Chau Marina, Ha Long',
     overview:
-      P('Sail through thousands of limestone karsts on a full-day cruise around UNESCO-listed Ha Long Bay.') +
+      P(
+        'Sail through thousands of limestone karsts on a full-day cruise around UNESCO-listed Ha Long Bay.',
+      ) +
       UL([
         'Deluxe cruise with welcome drink and sun deck',
         'Sung Sot Cave and Ti Top Island',
         'Kayaking among the karsts',
         'Buffet lunch and sunset party on board',
       ]),
-    highlights:
-      UL([
-        'Cave exploration at Sung Sot (Surprise Cave)',
-        'Panoramic view from Ti Top Island',
-        'Kayaking session included',
-        'Full safety briefing before every activity',
-      ]),
-    includedServices:
-      UL(['Hotel shuttle transfer', 'Deluxe cruise with lunch', 'All entrance fees', 'Kayaking equipment', 'English-speaking guide']),
-    excludedServices:
-      UL(['Personal expenses', 'Drinks on board (pay locally)', 'Gratuities']),
+    highlights: UL([
+      'Cave exploration at Sung Sot (Surprise Cave)',
+      'Panoramic view from Ti Top Island',
+      'Kayaking session included',
+      'Full safety briefing before every activity',
+    ]),
+    includedServices: UL([
+      'Hotel shuttle transfer',
+      'Deluxe cruise with lunch',
+      'All entrance fees',
+      'Kayaking equipment',
+      'English-speaking guide',
+    ]),
+    excludedServices: UL([
+      'Personal expenses',
+      'Drinks on board (pay locally)',
+      'Gratuities',
+    ]),
     regulations: REGULATIONS(),
     insurancePolicy: INSURANCE(),
     gallery: [
@@ -298,8 +428,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 0,
         title: 'Depart Hanoi & board cruise',
-        description:
-          `<p>Shuttle bus picks you up from your hotel. Board the <strong>deluxe cruise</strong> and enjoy a welcome drink.</p>${IMG('halong-bay', 'Ha Long Bay cruise ship')}`,
+        description: `<p>Shuttle bus picks you up from your hotel. Board the <strong>deluxe cruise</strong> and enjoy a welcome drink.</p>${IMG('halong-bay', 'Ha Long Bay cruise ship')}`,
         timeSlot: '08:00',
         location: 'Tuan Chau Marina, Ha Long',
       },
@@ -307,8 +436,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 1,
         title: 'Sung Sot Cave (Surprise Cave)',
-        description:
-          `<p>Explore the largest and most magnificent cave in Ha Long Bay.</p>${IMG('halong-cave', 'Sung Sot Cave, Ha Long Bay')}`,
+        description: `<p>Explore the largest and most magnificent cave in Ha Long Bay.</p>${IMG('halong-cave', 'Sung Sot Cave, Ha Long Bay')}`,
         timeSlot: '11:30',
         location: 'Sung Sot Cave, Ha Long Bay',
       },
@@ -316,8 +444,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 2,
         title: 'Kayaking & Ti Top Island',
-        description:
-          `<p>Paddle through the limestone karsts, then climb Ti Top Island for a panoramic view.</p>${IMG('halong-kayak', 'Kayaking in Ha Long Bay')}`,
+        description: `<p>Paddle through the limestone karsts, then climb Ti Top Island for a panoramic view.</p>${IMG('halong-kayak', 'Kayaking in Ha Long Bay')}`,
         timeSlot: '14:00',
         location: 'Ti Top Island, Ha Long Bay',
       },
@@ -325,8 +452,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 3,
         title: 'Sunset party & return to Hanoi',
-        description:
-          `<p>Relax on the sundeck with fresh fruit and a sunset toast before the ride home.</p>${IMG('halong-sunset', 'Sunset over Ha Long Bay')}`,
+        description: `<p>Relax on the sundeck with fresh fruit and a sunset toast before the ride home.</p>${IMG('halong-sunset', 'Sunset over Ha Long Bay')}`,
         timeSlot: '17:30',
         location: 'Tuan Chau Marina, Ha Long',
       },
@@ -346,24 +472,29 @@ const VIETNAM_TOURS: TourSeed[] = [
     transportation: 'AC coach + rowing boat',
     mapQuery: 'Tam Coc, Ninh Binh',
     overview:
-      P('Two days through the ancient capital and the breathtaking waterways of the “Ha Long Bay on land”.') +
+      P(
+        'Two days through the ancient capital and the breathtaking waterways of the “Ha Long Bay on land”.',
+      ) +
       UL([
         'Hoa Lu ancient capital and Trang An boat complex',
         'Tam Coc sampan ride through three caves',
         'Mua Cave viewpoint with 360° panorama',
         'Homestay-style overnight in the countryside',
       ]),
-    highlights:
-      UL([
-        'Trang An — UNESCO World Heritage boat complex',
-        '500 steps to the Mua Cave dragon viewpoint',
-        'Bicycle ride through rice paddies',
-        'Small group of max 12 travellers',
-      ]),
-    includedServices:
-      UL(['2-day AC coach transfer', 'Overnight accommodation', 'All boat & entrance tickets', 'Breakfast, lunch & dinner (Day 2 lunch)', 'Bicycle rental']),
-    excludedServices:
-      UL(['Personal expenses', 'Drinks', 'Gratuities']),
+    highlights: UL([
+      'Trang An — UNESCO World Heritage boat complex',
+      '500 steps to the Mua Cave dragon viewpoint',
+      'Bicycle ride through rice paddies',
+      'Small group of max 12 travellers',
+    ]),
+    includedServices: UL([
+      '2-day AC coach transfer',
+      'Overnight accommodation',
+      'All boat & entrance tickets',
+      'Breakfast, lunch & dinner (Day 2 lunch)',
+      'Bicycle rental',
+    ]),
+    excludedServices: UL(['Personal expenses', 'Drinks', 'Gratuities']),
     regulations: REGULATIONS(),
     insurancePolicy: INSURANCE(),
     gallery: [
@@ -376,8 +507,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 0,
         title: 'Visit Hoa Lu ancient capital',
-        description:
-          `<p>Cycle through rice paddies and visit the temples of the Dinh and Le dynasties.</p>${IMG('ninhbinh-hoalu', 'Hoa Lu ancient capital')}`,
+        description: `<p>Cycle through rice paddies and visit the temples of the Dinh and Le dynasties.</p>${IMG('ninhbinh-hoalu', 'Hoa Lu ancient capital')}`,
         timeSlot: '09:00',
         location: 'Hoa Lu, Ninh Binh',
       },
@@ -385,8 +515,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 1,
         title: 'Tam Coc boat ride',
-        description:
-          `<p>Row through the <em>"Halong Bay on land"</em> with three limestone caves along the river.</p>${IMG('ninhbinh-tamcoc', 'Tam Coc boat ride, Ninh Binh')}`,
+        description: `<p>Row through the <em>"Halong Bay on land"</em> with three limestone caves along the river.</p>${IMG('ninhbinh-tamcoc', 'Tam Coc boat ride, Ninh Binh')}`,
         timeSlot: '11:30',
         location: 'Tam Coc, Ninh Binh',
       },
@@ -394,8 +523,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 2,
         title: 'Mua Cave viewpoint',
-        description:
-          `<p>Climb 500 stone steps for a stunning panorama of the Ngo Dong river valley.</p>${IMG('ninhbinh-muacave', 'Mua Cave viewpoint, Ninh Binh')}`,
+        description: `<p>Climb 500 stone steps for a stunning panorama of the Ngo Dong river valley.</p>${IMG('ninhbinh-muacave', 'Mua Cave viewpoint, Ninh Binh')}`,
         timeSlot: '15:00',
         location: 'Mua Cave, Ninh Binh',
       },
@@ -403,8 +531,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 2,
         orderIndex: 0,
         title: 'Trang An boat complex',
-        description:
-          `<p>Glide through the <strong>Trang An scenic landscape complex</strong>, a UNESCO World Heritage site of caves and temples.</p>${IMG('ninhbinh-trang-an', 'Trang An boat complex, Ninh Binh')}`,
+        description: `<p>Glide through the <strong>Trang An scenic landscape complex</strong>, a UNESCO World Heritage site of caves and temples.</p>${IMG('ninhbinh-trang-an', 'Trang An boat complex, Ninh Binh')}`,
         timeSlot: '08:30',
         location: 'Trang An, Ninh Binh',
       },
@@ -412,8 +539,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 2,
         orderIndex: 1,
         title: 'Bich Dong Pagoda',
-        description:
-          `<p>Climb the stone steps of the ancient pagoda set into a limestone mountain.</p>${IMG('ninhbinh-bichdong', 'Bich Dong Pagoda, Ninh Binh')}`,
+        description: `<p>Climb the stone steps of the ancient pagoda set into a limestone mountain.</p>${IMG('ninhbinh-bichdong', 'Bich Dong Pagoda, Ninh Binh')}`,
         timeSlot: '11:00',
         location: 'Bich Dong Pagoda, Ninh Binh',
       },
@@ -442,22 +568,25 @@ const VIETNAM_TOURS: TourSeed[] = [
     transportation: 'Walking tour + private car',
     mapQuery: 'Hoi An Ancient Town',
     overview:
-      P('Wander the lantern-lit streets of the 400-year-old UNESCO trading port of Hoi An.') +
+      P(
+        'Wander the lantern-lit streets of the 400-year-old UNESCO trading port of Hoi An.',
+      ) +
       UL([
         'Japanese Covered Bridge and historic shophouses',
         'Hands-on silk lantern making workshop',
         'Night market and river lantern release',
       ]),
-    highlights:
-      UL([
-        'Private evening tour when the town glows',
-        'Make your own silk lantern to keep',
-        'Sample local cao lầu noodles',
-      ]),
-    includedServices:
-      UL(['Private guide', 'Lantern workshop materials', 'Entrance to Old Town attractions']),
-    excludedServices:
-      UL(['Dinner', 'Personal expenses', 'Gratuities']),
+    highlights: UL([
+      'Private evening tour when the town glows',
+      'Make your own silk lantern to keep',
+      'Sample local cao lầu noodles',
+    ]),
+    includedServices: UL([
+      'Private guide',
+      'Lantern workshop materials',
+      'Entrance to Old Town attractions',
+    ]),
+    excludedServices: UL(['Dinner', 'Personal expenses', 'Gratuities']),
     regulations: REGULATIONS(),
     insurancePolicy: INSURANCE(),
     gallery: [
@@ -470,8 +599,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 0,
         title: 'Japanese Covered Bridge & Old Town',
-        description:
-          `<p>Discover the 400-year-old trading town and its iconic <strong>Japanese Bridge</strong>.</p>${IMG('hoian-bridge', 'Japanese Covered Bridge, Hoi An')}`,
+        description: `<p>Discover the 400-year-old trading town and its iconic <strong>Japanese Bridge</strong>.</p>${IMG('hoian-bridge', 'Japanese Covered Bridge, Hoi An')}`,
         timeSlot: '16:00',
         location: 'Hoi An Ancient Town',
       },
@@ -479,8 +607,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 1,
         title: 'Lantern making workshop',
-        description:
-          `<p>Make your own silk lantern at a local artisan's house.</p>${IMG('hoian-lantern', 'Lantern making workshop, Hoi An')}`,
+        description: `<p>Make your own silk lantern at a local artisan's house.</p>${IMG('hoian-lantern', 'Lantern making workshop, Hoi An')}`,
         timeSlot: '18:00',
         location: 'Hoi An Old Town',
       },
@@ -488,8 +615,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 2,
         title: 'Night market & river lantern release',
-        description:
-          `<p>Stroll the night market and release a lantern on the <em>Thu Bon river</em>.</p>${IMG('hoian-night', 'Hoi An night market by the river')}`,
+        description: `<p>Stroll the night market and release a lantern on the <em>Thu Bon river</em>.</p>${IMG('hoian-night', 'Hoi An night market by the river')}`,
         timeSlot: '19:30',
         location: 'Hoi An Night Market',
       },
@@ -509,24 +635,33 @@ const VIETNAM_TOURS: TourSeed[] = [
     transportation: 'AC minivan + cable car',
     mapQuery: 'Golden Bridge, Ba Na Hills, Da Nang',
     overview:
-      P('Ride the world’s longest non-stop cable car to the French village and walk the famous Golden Bridge.') +
+      P(
+        'Ride the world’s longest non-stop cable car to the French village and walk the famous Golden Bridge.',
+      ) +
       UL([
         'Ba Na Hills cable car & French village',
         'Golden Bridge (Cau Vang) held by giant stone hands',
         'Marble Mountains & My Khe Beach',
         'Son Tra Peninsula & the Lady Buddha',
       ]),
-    highlights:
-      UL([
-        'Golden Bridge photo at the “hands of God”',
-        'Fantasy Park free-entrance zone',
-        'Ocean views from Son Tra Peninsula',
-        'Two full days with a professional guide',
-      ]),
-    includedServices:
-      UL(['AC minivan transfers', 'Ba Na Hills cable car tickets', 'Accommodation (1 night)', 'Breakfast', 'English-speaking guide']),
-    excludedServices:
-      UL(['Lunches & dinners', 'Personal expenses', 'Gratuities']),
+    highlights: UL([
+      'Golden Bridge photo at the “hands of God”',
+      'Fantasy Park free-entrance zone',
+      'Ocean views from Son Tra Peninsula',
+      'Two full days with a professional guide',
+    ]),
+    includedServices: UL([
+      'AC minivan transfers',
+      'Ba Na Hills cable car tickets',
+      'Accommodation (1 night)',
+      'Breakfast',
+      'English-speaking guide',
+    ]),
+    excludedServices: UL([
+      'Lunches & dinners',
+      'Personal expenses',
+      'Gratuities',
+    ]),
     regulations: REGULATIONS(),
     insurancePolicy: INSURANCE(),
     gallery: [
@@ -539,8 +674,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 0,
         title: 'Cable car up Ba Na Hills',
-        description:
-          `<p>Ride the world's longest non-stop cable car to the French village.</p>${IMG('danang-cable', 'Ba Na Hills cable car')}`,
+        description: `<p>Ride the world's longest non-stop cable car to the French village.</p>${IMG('danang-cable', 'Ba Na Hills cable car')}`,
         timeSlot: '08:30',
         location: 'Ba Na Hills, Da Nang',
       },
@@ -548,8 +682,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 1,
         title: 'Golden Bridge (Cau Vang)',
-        description:
-          `<p>Walk along the famous <strong>Golden Bridge</strong> held by giant stone hands.</p>${IMG('danang-goldenbridge', 'Golden Bridge, Ba Na Hills')}`,
+        description: `<p>Walk along the famous <strong>Golden Bridge</strong> held by giant stone hands.</p>${IMG('danang-goldenbridge', 'Golden Bridge, Ba Na Hills')}`,
         timeSlot: '10:00',
         location: 'Golden Bridge, Ba Na Hills',
       },
@@ -557,8 +690,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 2,
         title: 'Marble Mountains & My Khe Beach',
-        description:
-          `<p>Explore the Five Marble Mountains, then relax on <em>My Khe</em> beach on the way back.</p>${IMG('danang-marble', 'Marble Mountains, Da Nang')}`,
+        description: `<p>Explore the Five Marble Mountains, then relax on <em>My Khe</em> beach on the way back.</p>${IMG('danang-marble', 'Marble Mountains, Da Nang')}`,
         timeSlot: '14:00',
         location: 'Marble Mountains, Da Nang',
       },
@@ -566,8 +698,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 2,
         orderIndex: 0,
         title: 'Son Tra Peninsula & Linh Ung Pagoda',
-        description:
-          `<p>Drive up Monkey Mountain to the 67m-tall <strong>Linh Ung Pagoda</strong> and the Lady Buddha statue.</p>${IMG('danang-sontra', 'Linh Ung Pagoda, Son Tra Peninsula')}`,
+        description: `<p>Drive up Monkey Mountain to the 67m-tall <strong>Linh Ung Pagoda</strong> and the Lady Buddha statue.</p>${IMG('danang-sontra', 'Linh Ung Pagoda, Son Tra Peninsula')}`,
         timeSlot: '08:00',
         location: 'Son Tra Peninsula, Da Nang',
       },
@@ -575,8 +706,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 2,
         orderIndex: 1,
         title: 'Dragon Bridge & Han River',
-        description:
-          `<p>See Da Nang's iconic <strong>Dragon Bridge</strong> and walk the Han riverfront promenade.</p>${IMG('danang-dragon-bridge', 'Dragon Bridge, Da Nang')}`,
+        description: `<p>See Da Nang's iconic <strong>Dragon Bridge</strong> and walk the Han riverfront promenade.</p>${IMG('danang-dragon-bridge', 'Dragon Bridge, Da Nang')}`,
         timeSlot: '11:00',
         location: 'Dragon Bridge, Da Nang',
       },
@@ -584,8 +714,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 2,
         orderIndex: 2,
         title: 'My Khe Beach free time',
-        description:
-          `<p>Swim or relax on the white sands of <em>My Khe Beach</em> before the airport drop-off.</p>${IMG('danang-mykhe', 'My Khe Beach, Da Nang')}`,
+        description: `<p>Swim or relax on the white sands of <em>My Khe Beach</em> before the airport drop-off.</p>${IMG('danang-mykhe', 'My Khe Beach, Da Nang')}`,
         timeSlot: '15:00',
         location: 'My Khe Beach, Da Nang',
       },
@@ -606,8 +735,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 0,
         title: 'Cu Chi Tunnels morning tour',
-        description:
-          `<p>Crawl through the legendary underground tunnel network and try the local cassava snack.</p>${IMG('hcmc-cuchi', 'Cu Chi Tunnels, HCMC')}`,
+        description: `<p>Crawl through the legendary underground tunnel network and try the local cassava snack.</p>${IMG('hcmc-cuchi', 'Cu Chi Tunnels, HCMC')}`,
         timeSlot: '08:00',
         location: 'Cu Chi Tunnels, HCMC',
       },
@@ -615,8 +743,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 1,
         title: 'Ben Thanh Market & lunch',
-        description:
-          `<p>Sample street food and browse the historic <strong>Ben Thanh Market</strong>.</p>${IMG('hcmc-ben-thanh', 'Ben Thanh Market, HCMC')}`,
+        description: `<p>Sample street food and browse the historic <strong>Ben Thanh Market</strong>.</p>${IMG('hcmc-ben-thanh', 'Ben Thanh Market, HCMC')}`,
         timeSlot: '12:30',
         location: 'Ben Thanh Market, HCMC',
       },
@@ -624,8 +751,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 1,
         orderIndex: 2,
         title: 'Saigon landmarks walking tour',
-        description:
-          `<p>See Notre-Dame Cathedral, the Central Post Office and the Reunification Palace.</p>${IMG('hcmc-saigon', 'Notre-Dame Cathedral, HCMC')}`,
+        description: `<p>See Notre-Dame Cathedral, the Central Post Office and the Reunification Palace.</p>${IMG('hcmc-saigon', 'Notre-Dame Cathedral, HCMC')}`,
         timeSlot: '14:00',
         location: 'District 1, Ho Chi Minh City',
       },
@@ -633,8 +759,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 2,
         orderIndex: 0,
         title: 'Mekong Delta river cruise',
-        description:
-          `<p>Board a wooden boat in <strong>Ben Tre</strong> and cruise through coconut-fringed canals.</p>${IMG('mekong-bentre', 'Mekong Delta boat cruise, Ben Tre')}`,
+        description: `<p>Board a wooden boat in <strong>Ben Tre</strong> and cruise through coconut-fringed canals.</p>${IMG('mekong-bentre', 'Mekong Delta boat cruise, Ben Tre')}`,
         timeSlot: '08:00',
         location: 'Ben Tre, Mekong Delta',
       },
@@ -642,8 +767,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 2,
         orderIndex: 1,
         title: 'Coconut candy workshop & island lunch',
-        description:
-          `<p>Watch coconut candy being made on an island, then enjoy a riverside lunch.</p>${IMG('mekong-coconut', 'Coconut candy workshop, Mekong Delta')}`,
+        description: `<p>Watch coconut candy being made on an island, then enjoy a riverside lunch.</p>${IMG('mekong-coconut', 'Coconut candy workshop, Mekong Delta')}`,
         timeSlot: '12:00',
         location: 'Ben Tre, Mekong Delta',
       },
@@ -651,8 +775,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 2,
         orderIndex: 2,
         title: 'Return to Saigon',
-        description:
-          `<p>Drive back to the city through the lush delta countryside.</p>${IMG('mekong', 'Mekong Delta countryside')}`,
+        description: `<p>Drive back to the city through the lush delta countryside.</p>${IMG('mekong', 'Mekong Delta countryside')}`,
         timeSlot: '16:00',
         location: 'Ho Chi Minh City',
       },
@@ -660,8 +783,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 3,
         orderIndex: 0,
         title: 'War Remnants Museum',
-        description:
-          `<p>A moving museum documenting the Vietnam War with photographs and military hardware.</p>${IMG('hcmc-war-museum', 'War Remnants Museum, HCMC')}`,
+        description: `<p>A moving museum documenting the Vietnam War with photographs and military hardware.</p>${IMG('hcmc-war-museum', 'War Remnants Museum, HCMC')}`,
         timeSlot: '08:30',
         location: 'War Remnants Museum, HCMC',
       },
@@ -669,8 +791,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 3,
         orderIndex: 1,
         title: 'Chinatown & Binh Tay Market',
-        description:
-          `<p>Wander Cholon's narrow lanes and shop at the bustling <strong>Binh Tay Market</strong>.</p>${IMG('hcmc-chinatown', 'Binh Tay Market, Cholon HCMC')}`,
+        description: `<p>Wander Cholon's narrow lanes and shop at the bustling <strong>Binh Tay Market</strong>.</p>${IMG('hcmc-chinatown', 'Binh Tay Market, Cholon HCMC')}`,
         timeSlot: '11:00',
         location: 'Binh Tay Market, Cholon HCMC',
       },
@@ -678,8 +799,7 @@ const VIETNAM_TOURS: TourSeed[] = [
         dayNumber: 3,
         orderIndex: 2,
         title: 'Departure transfer / free time',
-        description:
-          `<p>Last-minute shopping in District 1 before your airport transfer.</p>${IMG('hcmc-airport', 'Tan Son Nhat Airport, HCMC')}`,
+        description: `<p>Last-minute shopping in District 1 before your airport transfer.</p>${IMG('hcmc-airport', 'Tan Son Nhat Airport, HCMC')}`,
         timeSlot: '14:00',
         location: 'Tan Son Nhat Airport, HCMC',
       },
@@ -688,6 +808,19 @@ const VIETNAM_TOURS: TourSeed[] = [
 ];
 
 async function main() {
+  /** Write the full permission set of a role, instead of only setting it at creation time. */
+  async function syncRolePermissions(roleId: string, codes: string[]) {
+    const ids = codes
+      .map((code) => permissionMap.get(code))
+      .filter((id): id is string => Boolean(id));
+    await prisma.rolePermission.deleteMany({ where: { roleId } });
+    if (ids.length) {
+      await prisma.rolePermission.createMany({
+        data: ids.map((permissionId) => ({ roleId, permissionId })),
+      });
+    }
+  }
+
   // 1. Permissions
   const permissionMap = new Map<string, string>();
   for (const p of DEFAULT_PERMISSIONS) {
@@ -700,11 +833,32 @@ async function main() {
   }
   console.log(`✅ Seeded ${DEFAULT_PERMISSIONS.length} permissions`);
 
-  // 2. ADMIN system role (gắn mọi permission)
+  // 1b. Default settlement categories
+  for (const c of DEFAULT_SETTLEMENT_CATEGORIES) {
+    await prisma.settlementCategory.upsert({
+      where: { code: c.code },
+      update: { name: c.name, flowType: c.flowType },
+      create: {
+        code: c.code,
+        name: c.name,
+        flowType: c.flowType,
+        isSystem: true,
+      },
+    });
+  }
+  console.log(
+    `✅ Seeded ${DEFAULT_SETTLEMENT_CATEGORIES.length} settlement categories`,
+  );
+
+  // 2. ADMIN system role (grants every permission)
   const adminRole = await prisma.role.upsert({
     where: { name: 'ADMIN' },
     update: {},
-    create: { name: 'ADMIN', description: 'System administrator', isSystem: true },
+    create: {
+      name: 'ADMIN',
+      description: 'System administrator',
+      isSystem: true,
+    },
   });
   await prisma.rolePermission.deleteMany({ where: { roleId: adminRole.id } });
   await prisma.rolePermission.createMany({
@@ -713,39 +867,82 @@ async function main() {
       permissionId,
     })),
   });
-  console.log(`✅ Seeded ADMIN system role (${permissionMap.size} permissions)`);
+  console.log(
+    `✅ Seeded ADMIN system role (${permissionMap.size} permissions)`,
+  );
 
-  // 3. OFFICE role (cơ bản)
-  await prisma.role.upsert({
+  // 3. OFFICE role (basic) — has NO money permissions.
+  const officeRole = await prisma.role.upsert({
     where: { name: 'OFFICE' },
     update: {},
     create: {
       name: 'OFFICE',
       description: 'Nhân viên văn phòng',
       isSystem: false,
-      permissions: {
-        create: [
-          'dashboard.read',
-          'booking.read',
-          'booking.create',
-          'booking.update',
-          'assignment.read',
-          'assignment.create',
-          'assignment.update',
-'settlement.read',
-          'company.read',
-          'tour.update',
-          'tour.itinerary.edit',
-        ]
-          .filter((code) => permissionMap.has(code))
-          .map((code) => ({ permissionId: permissionMap.get(code)! })),
-      },
     },
   });
+  await syncRolePermissions(officeRole.id, [
+    'dashboard.read',
+    'booking.read',
+    'booking.create',
+    'booking.update',
+    'assignment.read',
+    'assignment.create',
+    'assignment.update',
+    'company.read',
+    'tour.update',
+    'tour.itinerary.edit',
+  ]);
   console.log(`✅ Seeded OFFICE role`);
 
-  // 3.5 TRANSPORT_PROVIDER role — tự quản lý nhà xe của mình (KHÔNG gán/gỡ tài xế,
-  // không xem settlement/user của công ty — mọi query phải scope theo providerId).
+  // 3.1 TOUR_GUIDE role — only the tasks of a trip creator.
+  //
+  // Deliberately does NOT grant `assignment.update`: that permission also opens
+  // dispatch-all and PUT /assignments/:id, i.e. a guide could swap the guide/driver on the board.
+  // Also not granted `booking.read` because GET /bookings returns every passenger of the company.
+  // Guides see their own trips via /assignments/my-assignments (already self-limited).
+  const guideRole = await prisma.role.upsert({
+    where: { name: 'TOUR_GUIDE' },
+    update: {},
+    create: {
+      name: 'TOUR_GUIDE',
+      description:
+        'Hướng dẫn viên — nộp báo cáo, ghi chú và thu/hoàn tiền của chuyến mình',
+      isSystem: true,
+    },
+  });
+  await syncRolePermissions(guideRole.id, [
+    'assignment.tour-report.submit',
+    'booking.note.update',
+  ]);
+  console.log(`✅ Seeded TOUR_GUIDE role`);
+
+  // 3.2 ACCOUNTING role — Accounting Room. Assigned to specific OFFICE users,
+  // not to the whole office (money-lock & period-export permissions).
+  const accountingRole = await prisma.role.upsert({
+    where: { name: 'ACCOUNTING' },
+    update: {},
+    create: {
+      name: 'ACCOUNTING',
+      description: 'Phòng kế toán — kiểm tra, khoá tiền, xuất kỳ thanh toán',
+      isSystem: false,
+    },
+  });
+  await syncRolePermissions(accountingRole.id, [
+    'accounting.read',
+    'accounting.settlement.create',
+    'accounting.settlement.update',
+    'accounting.settlement.reverse',
+    'accounting.category.create',
+    'accounting.money.verify',
+    'accounting.money.reject',
+    'accounting.period.export',
+    'accounting.period.void',
+  ]);
+  console.log(`✅ Seeded ACCOUNTING role`);
+
+  // 3.5 TRANSPORT_PROVIDER role — self-manages its own transport provider (cannot assign/unassign drivers,
+  // cannot see company users/data — every query must be scoped by providerId).
   const providerRole = await prisma.role.upsert({
     where: { name: 'TRANSPORT_PROVIDER' },
     update: {},
@@ -755,7 +952,9 @@ async function main() {
       isSystem: false,
     },
   });
-  await prisma.rolePermission.deleteMany({ where: { roleId: providerRole.id } });
+  await prisma.rolePermission.deleteMany({
+    where: { roleId: providerRole.id },
+  });
   const PROVIDER_ROLE_PERMISSIONS = [
     'assignment.read',
     'assignment.create',
@@ -768,17 +967,23 @@ async function main() {
     'route-price.update',
   ];
   await prisma.rolePermission.createMany({
-    data: PROVIDER_ROLE_PERMISSIONS
-      .filter((code) => permissionMap.has(code))
-      .map((code) => ({ roleId: providerRole.id, permissionId: permissionMap.get(code)! })),
+    data: PROVIDER_ROLE_PERMISSIONS.filter((code) =>
+      permissionMap.has(code),
+    ).map((code) => ({
+      roleId: providerRole.id,
+      permissionId: permissionMap.get(code)!,
+    })),
   });
   console.log(
     `✅ Seeded TRANSPORT_PROVIDER role (${PROVIDER_ROLE_PERMISSIONS.filter((c) => permissionMap.has(c)).length} permissions)`,
   );
 
-  // 4. Admin user mặc định
+  // 4. Default admin user
   const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@booking.local';
-  const passwordHash = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD || 'admin123', 10);
+  const passwordHash = await bcrypt.hash(
+    process.env.SEED_ADMIN_PASSWORD || 'admin123',
+    10,
+  );
   const adminUser = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {},
@@ -791,16 +996,18 @@ async function main() {
       userType: 'admin',
     },
   });
-  // Gắn role ADMIN cho admin user
+  // Assign the ADMIN role to the admin user
   const hasAdminRole = await prisma.userRole.findFirst({
     where: { userId: adminUser.id, roleId: adminRole.id },
   });
   if (!hasAdminRole) {
-    await prisma.userRole.create({ data: { userId: adminUser.id, roleId: adminRole.id } });
+    await prisma.userRole.create({
+      data: { userId: adminUser.id, roleId: adminRole.id },
+    });
   }
   console.log(`✅ Seeded admin user: ${adminEmail} (password: admin123)`);
 
-  // 4.5 Hồ sơ công ty (bảng singleton — chỉ có 1 dòng cho phiếu quyết toán)
+  // 4.5 Company profile (singleton table — only 1 row for the settlement slip)
   await prisma.companyProfile.upsert({
     where: { id: 'default-company' },
     update: {},
@@ -862,7 +1069,10 @@ async function main() {
     });
 
     const thumbnailUrl = await seedThumbnail(tour.id, t.code, t.name, t.accent);
-    await prisma.tour.update({ where: { id: tour.id }, data: { thumbnailUrl } });
+    await prisma.tour.update({
+      where: { id: tour.id },
+      data: { thumbnailUrl },
+    });
 
     await prisma.tourItinerary.deleteMany({ where: { tourId: tour.id } });
     if (t.itineraries.length > 0) {
@@ -876,7 +1086,8 @@ async function main() {
   }
 }
 
-main()  .catch((e) => {
+main()
+  .catch((e) => {
     console.error(e);
     process.exit(1);
   })

@@ -3,8 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 
 /**
- * Thin wrapper quanh bảng rawData — nguồn sự thật bất biến (source of truth).
- * Mọi thao tác ghi/đọc pipeline đều đi qua repository này.
+ * Thin wrapper around the rawData table — the immutable source of truth.
+ * Every pipeline read/write operation goes through this repository.
  */
 @Injectable()
 export class RawDataRepository {
@@ -48,7 +48,7 @@ export class RawDataRepository {
     });
   }
 
-  /** Cập nhật payload đã được parser làm giàu (vd payload.booking). */
+  /** Update the payload enriched by the parser (e.g. payload.booking). */
   updatePayload(id: string, payload: Prisma.InputJsonValue) {
     return this.prisma.rawData.update({
       where: { id },
@@ -56,7 +56,7 @@ export class RawDataRepository {
     });
   }
 
-  /** Nối rawData → booking sau khi parse thành công (giúp replay được). */
+  /** Link rawData → booking after a successful parse (so it can be replayed). */
   markParsed(id: string, bookingId: string) {
     return this.prisma.rawData.update({
       where: { id },

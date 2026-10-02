@@ -225,7 +225,7 @@ let WebsiteParser = class WebsiteParser {
     normalizeDate(raw) {
         if (!raw)
             return undefined;
-        const date = new Date(raw);
+        const date = new Date(raw + '+07:00');
         return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
     }
 };

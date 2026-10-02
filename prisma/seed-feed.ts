@@ -8,7 +8,6 @@ import {
   AssignmentStatus,
   BookingStatus,
   AssignmentOrigin,
-  FeeFlowType,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { distanceFromRoot } from '../src/geo/distance';
@@ -112,8 +111,7 @@ function splitPax(count: number): number[] {
 }
 
 async function main() {
-  console.log('🔄 Clearing bookings, assignments, reports, settlements...');
-  await prisma.settlement.deleteMany();
+  console.log('🔄 Clearing bookings, assignments, reports...');
   await prisma.tourReport.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.assignment.deleteMany();
@@ -293,21 +291,6 @@ async function main() {
     },
   });
 
-  // ─── Settlement categories ────────────────────────────────────────────
-  const categories: Array<{ code: string; name: string; flowType: FeeFlowType }> = [
-    { code: 'COLLECT_ON_BEHALF', name: 'Thu hộ COD', flowType: FeeFlowType.COLLECT_MONEY },
-    { code: 'VEHICLE_FEE', name: 'Phí xe', flowType: FeeFlowType.PAY_MONEY },
-  ];
-  const catMap = new Map<string, string>();
-  for (const c of categories) {
-    const cat = await prisma.settlementCategory.upsert({
-      where: { code: c.code },
-      update: { name: c.name, flowType: c.flowType },
-      create: { ...c, isSystem: true },
-    });
-    catMap.set(c.code, cat.id);
-  }
-
   // ─── Tour cache ──────────────────────────────────────────────────────
   const tourCache = new Map<string, any>();
   const getTour = async (code: string) => {
@@ -361,7 +344,6 @@ async function main() {
     channel: (typeof CHANNELS)[number];
     tourType: TourType;
     tourCode: string;
-    collectAmount: number;
   }
 
   let seq = 0;
@@ -405,7 +387,6 @@ async function main() {
       channel: CHANNELS[Math.floor(Math.random() * CHANNELS.length)],
       tourType: TourType.GROUP_TOUR,
       tourCode,
-      collectAmount: 49,
     }));
     const crew = pickCrew(date, +tourCode.replace(/\D/g, '') + busNo);
 
@@ -442,7 +423,6 @@ async function main() {
       channel: CHANNELS[Math.floor(Math.random() * CHANNELS.length)],
       tourType: TourType.PRIVATE_TOUR,
       tourCode,
-      collectAmount: 25,
     }));
     const crew = pickCrew(date, +(tourCode.replace(/\D/g, '') + '3') + busNo * 2);
 
@@ -551,7 +531,6 @@ async function main() {
           paxDetail: `${b.pax} guest${b.pax > 1 ? 's' : ''}`,
           payment: 'PAID',
           assignmentId: assignment.id,
-          collectAmount: b.collectAmount,
           createdWho: b.channel === 'MANUAL' ? 'Seed Admin' : 'Pub-Sub System',
         },
       });
@@ -564,10 +543,8 @@ async function main() {
       data: { totalPax },
     });
 
-    // Completed tour lifecycle (chỉ cho quá khứ): verified report + settlement
+    // Completed tour lifecycle (chỉ cho quá khứ): tour report đã được xác minh
     if (bus.finalized) {
-      const servicesTotal = bus.bookings.reduce((s, b) => s + 20, 0);
-      const collectedAmount = bus.bookings.reduce((s, b) => s + b.collectAmount, 0);
       await prisma.tourReport.create({
         data: {
           assignmentId: assignment.id,
@@ -579,46 +556,11 @@ async function main() {
           verifiedById: accounting.id,
           verifiedByName: accounting.name,
           verifiedAt: dayStart,
-          collectedAmount,
-          servicesTotal,
-          netAmount: collectedAmount - servicesTotal,
-          settlementFlow: FeeFlowType.COLLECT_MONEY,
           finalizedById: accounting.id,
           finalizedByName: accounting.name,
           finalizedAt: dayStart,
         },
       });
-      const reportBookings = await prisma.booking.findMany({
-        where: { assignmentId: assignment.id, totalPax: { gt: 0 } },
-      });
-      for (const bk of reportBookings) {
-        await prisma.settlement.create({
-          data: {
-            amount: Number(bk.collectAmount ?? 0),
-            note: `Thu hộ COD — ${bk.customerName}`,
-            bookingId: bk.id,
-            assignmentId: assignment.id,
-            categoryId: catMap.get('COLLECT_ON_BEHALF'),
-            createdById: bus.guideId ?? accounting.id,
-          },
-        });
-      }
-      if (
-        bus.vehicleId &&
-        VEHICLE_LIST.filter((v) => v.providerId !== providers[0].id).some(
-          (v) => v.id === bus.vehicleId,
-        )
-      ) {
-        await prisma.settlement.create({
-          data: {
-            amount: 120,
-            note: `Phí xe — ${bus.code}`,
-            assignmentId: assignment.id,
-            categoryId: catMap.get('VEHICLE_FEE'),
-            createdById: bus.guideId ?? accounting.id,
-          },
-        });
-      }
     }
   }
 

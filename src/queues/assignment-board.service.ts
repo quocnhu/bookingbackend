@@ -4,16 +4,16 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { rootFromProfile, sortByRootDistance } from '@/geo/distance';
 
-/** Một chuyến xe (bus) chở tối đa 12 khách — theo bookingflow.md bước 3. */
+/** A trip (bus) carrying at most 12 passengers — per bookingflow.md step 3. */
 const BUS_MAX_PAX = 12;
 
 /**
- * Các thao tác "tay" trên Dispatch Board (KHÔNG tự động):
- * - Kéo-thả booking giữa các bus (reorder / move)
- * - Rút booking khỏi chuyến khi đơn bị hủy (unassign)
+ * Manual operations on the Dispatch Board (NOT automatic):
+ * - Drag and drop bookings between buses (reorder / move)
+ * - Remove a booking from a trip when the order is cancelled (unassign)
  *
- * Engine auto-assign đã bị gỡ — mỗi bus hiện chỉ gán bằng tay
- * (xem AssignmentOrigin.MANUAL / AUTO_ASSIGN).
+ * The auto-assign engine has been removed — each bus is currently assigned
+ * manually (see AssignmentOrigin.MANUAL / AUTO_ASSIGN).
  */
 @Injectable()
 export class AssignmentBoardService {
@@ -24,7 +24,7 @@ export class AssignmentBoardService {
     private readonly auditService: AuditService,
   ) {}
 
-  /** Hủy đơn → rút booking khỏi chuyến và xếp lại thứ tự chuyến đó. */
+  /** Cancel an order → remove the booking from the trip and re-sequence that trip. */
   async unassign(bookingId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
@@ -41,7 +41,7 @@ export class AssignmentBoardService {
     return { unassigned: true, assignmentId };
   }
 
-  /** Xếp lại thứ tự khách trong 1 bus (theo thứ tự list do admin kéo-thả). */
+  /** Re-sequence the passengers on a bus (per the order the admin dragged them into). */
   async reorder(assignmentId: string, bookingIds: string[]) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
@@ -70,7 +70,7 @@ export class AssignmentBoardService {
     return { reordered: true };
   }
 
-  /** Di chuyển booking từ bus này sang bus khác (kéo-thả). */
+  /** Move a booking from this bus to another bus (drag and drop). */
   async move(fromAssignmentId: string, bookingId: string, toAssignmentId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
@@ -122,8 +122,8 @@ export class AssignmentBoardService {
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
   /**
-   * Gắn booking vào chuyến (dùng bởi auto-assign queue Stage 3).
-   * Guard: booking đã có assignment khác → không gắn lần nữa.
+   * Attach a booking to a trip (used by auto-assign queue Stage 3).
+   * Guard: the booking already has another assignment → do not attach it again.
    */
   async attach(
     assignmentId: string,
@@ -167,9 +167,9 @@ export class AssignmentBoardService {
   }
 
   /**
-   * Tổng hợp lại thông tin chuyến (tourName/tourType/durationDays/totalPax)
-   * từ bookings. Booking thiếu lat/lng sẽ được dò từ bảng Coordinate theo
-   * hotelName/address và lưu ngược lại.
+   * Recalculate the trip summary (tourName/tourType/durationDays/totalPax)
+   * from its bookings. Bookings missing lat/lng are looked up in the Coordinate
+   * table by hotelName/address and written back.
    */
   private async refreshSummary(assignmentId: string) {
     const bookings = await this.prisma.booking.findMany({
@@ -221,7 +221,7 @@ export class AssignmentBoardService {
     });
   }
 
-  /** Đánh số lại paxSequence 1..n theo thứ tự hiện tại của chuyến. */
+  /** Renumber paxSequence 1..n following the trip's current order. */
   private async resequence(assignmentId: string) {
     const bookings = await this.prisma.booking.findMany({
       where: { assignmentId },
@@ -239,9 +239,9 @@ export class AssignmentBoardService {
   }
 
   /**
-   * Sắp xếp bookings trong bus theo khoảng cách tăng dần tới root coordinate
-   * (gần nhất lên đầu — thứ tự đón khách). Ghi lại paxSequence 1..n.
-   * Bookings thiếu toạ độ được đẩy xuống cuối danh sách.
+   * Sort the bookings on a bus by increasing distance to the root coordinate
+   * (nearest first — the passenger pickup order). Writes paxSequence 1..n back.
+   * Bookings without coordinates are pushed to the end of the list.
    */
   async geoSort(assignmentId: string) {
     const bookings = await this.prisma.booking.findMany({

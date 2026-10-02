@@ -314,10 +314,10 @@ let TripAdvisorParser = class TripAdvisorParser {
             if (month != null && year != null) {
                 const date = new Date(year, month, day, hour, minute);
                 if (!Number.isNaN(date.getTime()))
-                    return date.toISOString();
+                    return new Date(date.toISOString() + '+07:00').toISOString();
             }
         }
-        const plain = new Date(value);
+        const plain = new Date(value + '+07:00');
         return Number.isNaN(plain.getTime()) ? undefined : plain.toISOString();
     }
     monthIndex(name) {

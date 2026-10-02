@@ -9,9 +9,9 @@ import { PARSE_QUEUE, ParseJobData } from './parsing.queue';
 import { validateBookingFields } from './validation/booking-fields.schema';
 
 /**
- * BullMQ worker Stage 2 (theo .md bước 11-18):
- * load rawData → chọn parser theo templateTag → extract → validate → upsert booking.
- * Không khớp parser → unparsed; validate fail → parse_failed; OK → parsed + nối booking.
+ * BullMQ worker for Stage 2 (per .md steps 11-18):
+ * load rawData → pick parser by templateTag → extract → validate → upsert booking.
+ * No parser match → unparsed; validation failure → parse_failed; OK → parsed + link booking.
  */
 @Injectable()
 @Processor(PARSE_QUEUE, { concurrency: 10 })
@@ -63,7 +63,7 @@ export class ParsingProcessor extends WorkerHost {
       return { status: 'parse_failed', reason: validation.errors.join('; ') };
     }
 
-    // Parser có thể làm giàu payload.booking — lưu lại để rawData giữ dữ liệu đầy đủ.
+    // The parser may enrich payload.booking — save it back so rawData keeps the full data.
     if (payload.booking !== undefined) {
       await this.rawDataService.updatePayload(rawDataId, payload);
     }

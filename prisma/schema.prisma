@@ -34,49 +34,54 @@ enum PaymentStatus {
 }
 
 enum BookingStatus {
-  PENDING // Mới tạo / Chờ xếp xe
-  ASSIGNED // Đã xếp vào Chuyến xe (Assignment)
-  CANCELED // Hủy đơn
+  PENDING // Newly created / waiting for vehicle assignment
+  ASSIGNED // Assigned to a trip (Assignment)
+  CANCELED // Booking cancelled
 }
 
 enum AssignmentStatus {
-  DRAFT_ASSIGNED // Admin kéo-thả booking vào xe nhưng CHƯA dispatch
-  PENDING // Đã gán đủ Driver + Guide + Xe — chờ xuất bến
-  TRANSFERRED // Đã kéo-thả đổi xe/position — cần cập nhật realtime
-  DISPATCHED // Xe xuất bến
-  VERIFYING // HDV/Tài xế đã submit — chờ Admin/Kế toán xác minh
-  COMPLETED // Tour hoàn tất -> Kích hoạt Settlement
-  CANCELED // Hủy vận hành
+  DRAFT_ASSIGNED // Admin drag-drop booking onto a bus but NOT dispatched yet
+  PENDING // Driver + Guide + Vehicle all set — waiting to depart
+  TRANSFERRED // Drag-drop changed vehicle/position — needs realtime update
+  DISPATCHED // Bus departed
+  VERIFYING // Guide / driver submitted — waiting for Admin or Accounting to verify
+  COMPLETED // Tour finished
+  CANCELED // Operations cancelled
 }
 
 enum AssignmentOrigin {
-  MANUAL // Tạo bởi Admin thao tác tay (mặc định)
-  AUTO_ASSIGN // Tạo bởi engine Auto-Assign / queue
+  MANUAL // Created by Admin by hand (default)
+  AUTO_ASSIGN // Created by the Auto-Assign engine / queue
 }
 
 enum GuideType {
-  OFFICIAL // HDV Nội bộ (Tính lương kỳ)
-  FREELANCE // HDV Tự do (Quyết toán theo tour)
+  OFFICIAL // In-house guide (paid on a period basis)
+  FREELANCE // Freelance guide (settled per tour)
 }
 
-enum FeeFlowType {
-  COLLECT_MONEY // Thu tiền (ví dụ: Thu hộ COD)
-  PAY_MONEY // Chi tiền (ví dụ: Trả nhà hàng, phí xe)
+enum DriverType {
+  COMPANY // In-house company driver
+  FREELANCE // Freelance driver, settled per tour
 }
 
 enum TourReportStatus {
-  SUBMITTED // HDV gửi báo cáo sau tour — chờ kế toán xác minh
-  VERIFIED // Kế toán / quản lý xác minh hợp lệ → Tour COMPLETED
-  REJECTED // Bị từ chối — HDV cần gửi lại
+  SUBMITTED // Guide sent the report after the tour — waiting for Admin verification
+  VERIFIED // Admin / manager verified it as valid → Tour COMPLETED
+  REJECTED // Rejected — guide needs to resubmit
+}
+
+enum FeeFlowType {
+  COLLECT_MONEY // Collected on behalf — the trip creator owes the company
+  PAY_MONEY // Company pays — the company owes the trip creator
 }
 
 enum BookingProvider {
-  TRIPADVISOR // Tự động từ webhook / mail TripAdvisor
-  GETYOURGUIDE // Tự động từ Pub/Sub Gmail cho đơn GetYourGuide
-  AIRBNB // Tự động từ Pub/Sub Gmail cho đơn Airbnb
-  BOOKING_COM // Tự động từ Pub/Sub Gmail cho đơn Booking.com
-  WEBSITE // Tự động từ Pub/Sub Gmail cho đơn Website
-  MANUAL // Admin/Office tạo thủ công trên dashboard
+  TRIPADVISOR // Automatic from TripAdvisor webhook / mail
+  GETYOURGUIDE // Automatic from Gmail Pub/Sub for GetYourGuide bookings
+  AIRBNB // Automatic from Gmail Pub/Sub for Airbnb bookings
+  BOOKING_COM // Automatic from Gmail Pub/Sub for Booking.com bookings
+  WEBSITE // Automatic from Gmail Pub/Sub for Website bookings
+  MANUAL // Admin/Office created by hand on the dashboard
 }
 
 enum LeaveStatus {
@@ -85,12 +90,12 @@ enum LeaveStatus {
   REJECTED
 }
 
-// ─── RBAC — ROLES & PERMISSIONS (mục 2.3 PROCESS_FLOW) ────────────────
+// ─── RBAC — ROLES & PERMISSIONS (PROCESS_FLOW section 2.3) ─────────────
 model Role {
   id          String           @id @default(uuid())
   name        String           @unique
   description String?
-  isSystem    Boolean          @default(false) // ADMIN = system, không thể xóa
+  isSystem    Boolean          @default(false) // ADMIN = system, cannot be deleted
   permissions RolePermission[]
   users       UserRole[]
   createdAt   DateTime         @default(now())
@@ -99,9 +104,9 @@ model Role {
 
 model Permission {
   id        String           @id @default(uuid())
-  code      String           @unique // VD "booking.update", "user.delete"
+  code      String           @unique // e.g. "booking.update", "user.delete"
   name      String
-  group     String? // Nhóm hiển thị checkbox
+  group     String? // Group used to group the checkbox in the UI
   roleLinks RolePermission[]
   userLinks UserPermission[]
 }
@@ -145,16 +150,16 @@ model User {
   isActive     Boolean      @default(true)
   lastLogin    DateTime?
 
-  // Bảo mật: khóa tài khoản khi đăng nhập sai quá nhiều lần
+  // Security: lock the account after too many failed sign-in attempts
   failedLoginAttempts Int       @default(0)
   lockoutUntil        DateTime?
 
-  // RBAC (mục 2.3): roles + permissions riêng + phân loại bổ sung
+  // RBAC (section 2.3): separate roles + permissions, plus extra classification
   roles       UserRole[]
   permissions UserPermission[]
   userType    String?
 
-  // Drive: giới hạn dung lượng (MB). ADMIN = unlimited.
+  // Drive: storage quota in MB. ADMIN = unlimited.
   storageQuotaMb Int @default(3072)
 
   providerId String?
@@ -163,29 +168,32 @@ model User {
   driverProfile DriverProfile?
   guideProfile  GuideProfile?
 
-  // Quan hệ phân công & tài chính
+  // Assignment relations
   driverAssignments Assignment[] @relation("DriverAssignment")
   guidedAssignments Assignment[] @relation("GuideAssignment")
   reportVerifies    Assignment[] @relation("ReportVerifier")
-  guidePaymentPeriods GuidePaymentPeriod[]
 
-  // Quyết toán 2 lớp — lớp 1 theo Booking (thu hộ/hòan tiền) & lớp 2 theo Assignment (phí xe/nhà hàng/chung)
-  createdSettlements Settlement[]
-
-  // Quản lý lịch nghỉ & Session
+  // Leave management & sessions
   leaves         UserLeave[]
-  reviewedLeaves UserLeave[]   @relation("LeaveReviewedBy")
+  reviewedLeaves UserLeave[]    @relation("LeaveReviewedBy")
   sessions       UserSession[]
   auditLogs      AuditLog[]
   authActivities AuthActivity[]
 
-  // Drive (lưu trữ cá nhân kiểu Google Drive)
+  // Drive (personal storage, Google Drive style)
   driveFolders DriveFolder[] @relation("UserDriveFolders")
   driveFiles   DriveFile[]   @relation("UserDriveFiles")
 
-  // Notifications & Push
+  // Notifications & push
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
+
+  // Accounting Room
+  settlementEntries Settlement[]        @relation("SettlementCreatedBy")
+  paymentPeriods    PaymentPeriod[]     @relation("PeriodCreatedBy")
+  moneyVerifies     TourReport[]        @relation("MoneyVerifiedBy")
+  moneyPayableTos   TourReport[]        @relation("MoneyPayableTo")
+  settledTours      PaymentPeriodLine[] @relation("LinePayableTo")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -201,7 +209,7 @@ model UserLeave {
   status    LeaveStatus @default(PENDING)
 
   reviewedById String?
-  reviewedBy   User?   @relation("LeaveReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedBy   User?     @relation("LeaveReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   reviewedAt   DateTime?
 
   createdAt DateTime @default(now())
@@ -230,11 +238,12 @@ model UserSession {
 }
 
 model DriverProfile {
-  id            String @id @default(uuid())
-  userId        String @unique
-  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String     @id @default(uuid())
+  userId        String     @unique
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   licenseNumber String
-  rating        Float  @default(5.0)
+  type          DriverType @default(COMPANY) // In-house driver or freelance
+  rating        Float      @default(5.0)
 }
 
 model GuideProfile {
@@ -246,20 +255,20 @@ model GuideProfile {
   rating    Float     @default(5.0)
 }
 
-// ─── COMPANY PROFILE (chữ ký số/in ấn quyết toán hằng năm) ─────────────
-// Bảng singleton — service luôn lấy 1 dòng đầu tiên, cập nhật qua PUT.
+// ─── COMPANY PROFILE (digital signature / annual settlement printing) ──────────
+// Singleton table — the service always reads the first row, updated via PUT.
 model CompanyProfile {
-  id        String   @id @default(uuid())
-  name      String
-  address   String?
-  phone     String?
-  email     String?
-  taxId     String?
-  website   String?
-  rootLatitude  Float? // Root/depot coordinate — dùng cho tính toán khoảng cách đón khách
+  id            String   @id @default(uuid())
+  name          String
+  address       String?
+  phone         String?
+  email         String?
+  taxId         String?
+  website       String?
+  rootLatitude  Float? // Depot coordinate — used to calculate pickup distance
   rootLongitude Float?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // ─── TOUR & LOGISTICS ────────────────────────────────────────────────
@@ -282,17 +291,17 @@ model Tour {
   promotionStartsAt      DateTime?
   promotionEndsAt        DateTime?
 
-  // Thông tin trang chi tiết tour (layout kiểu "Chương trình Tour")
-  departureLocation String? // Nơi khởi hành
-  transportation    String? // Phương tiện
-  overview          String? @db.Text // Tổng quan (HTML bullets)
-  includedServices  String? @db.Text // Dịch vụ bao gồm (HTML list)
-  excludedServices  String? @db.Text // Dịch vụ không bao gồm (HTML list)
-  childrenPolicy    String? @db.Text // Giá trẻ em (HTML list)
-  regulations       String? @db.Text // Hướng dẫn / Thông quy định (HTML)
-  highlights        String? @db.Text // Điểm nổi bật (HTML)
-  insurancePolicy   String? @db.Text // Chính sách bảo hiểm (HTML)
-  mapQuery          String? // Trung tâm bản đồ Google Maps embed
+  // Tour detail page content (layout similar to a "Tour Itinerary" page)
+  departureLocation String? // Departure point
+  transportation    String? // Transportation type
+  overview          String? @db.Text // Overview (HTML bullet list)
+  includedServices  String? @db.Text // Included services (HTML list)
+  excludedServices  String? @db.Text // Excluded services (HTML list)
+  childrenPolicy    String? @db.Text // Child pricing (HTML list)
+  regulations       String? @db.Text // Terms & conditions (HTML)
+  highlights        String? @db.Text // Highlights (HTML)
+  insurancePolicy   String? @db.Text // Insurance policy (HTML)
+  mapQuery          String? // Google Maps embed map centre query
 
   itineraries TourItinerary[]
   gallery     TourGallery[]
@@ -303,16 +312,16 @@ model Tour {
 }
 
 model TourTypePrice {
-  id         String   @id @default(uuid())
-  tourId     String
-  tour       Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
-  type       TourType // PRIVATE_TOUR / GROUP_TOUR
-  adultPrice Decimal  @default(0)
-  childPrice Decimal  @default(0)
-  infantPrice Decimal @default(0)
-  currency   String   @default("USD")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(uuid())
+  tourId      String
+  tour        Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  type        TourType // PRIVATE_TOUR / GROUP_TOUR
+  adultPrice  Decimal  @default(0)
+  childPrice  Decimal  @default(0)
+  infantPrice Decimal  @default(0)
+  currency    String   @default("USD")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([tourId, type])
   @@index([tourId])
@@ -344,8 +353,8 @@ model TourItinerary {
   description String? @db.Text
   timeSlot    String? // e.g., "08:30 AM - 10:00 AM"
   location    String? // Destination name
-  imageUrl    String? // Ảnh đại diện của item (chọn từ backend uploads)
-  mapQuery    String? // Địa điểm / query cho Google Maps embed
+  imageUrl    String? // Item thumbnail (picked from backend uploads)
+  mapQuery    String? // Location / query for the Google Maps embed
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -353,7 +362,7 @@ model TourItinerary {
   @@index([tourId, dayNumber, orderIndex])
 }
 
-// Thư mục ảnh slideshow của tour — được sinh tự động khi tour được tạo.
+// Tour slideshow image folder — generated automatically when a tour is created.
 model TourGallery {
   id         String   @id @default(uuid())
   tourId     String
@@ -367,13 +376,14 @@ model TourGallery {
 }
 
 model TransportationProvider {
-  id       String       @id @default(uuid())
-  name     String
-  // Công ty sở hữu đội xe riêng (Company Fleet): xe/HDV của hãng là tài nguyên nội bộ,
-  // giá luôn 0 VND và được ưu tiên khi auto-assign trước nhà xe ngoài.
-  isCompany Boolean      @default(false)
-  users     User[]
-  vehicles  Vehicle[]
+  id          String       @id @default(uuid())
+  name        String
+  // Company-owned fleet (Company Fleet): the company's own vehicles/guides are
+  // internal resources, always priced at 0 VND and preferred by auto-assign
+  // ahead of third-party providers.
+  isCompany   Boolean      @default(false)
+  users       User[]
+  vehicles    Vehicle[]
   routePrices RoutePrice[]
   assignments Assignment[]
 }
@@ -412,7 +422,7 @@ model Booking {
   tourId  String?
   tour    Tour?           @relation(fields: [tourId], references: [id])
 
-  // Nguồn gốc / mã xác nhận (upsert key theo .md: source + confirmationCode)
+  // Origin / confirmation code (upsert key per .md: source + confirmationCode)
   source           String?
   confirmationCode String?
 
@@ -434,28 +444,22 @@ model Booking {
   isNoShow     Boolean @default(false)
   noShowReason String?
 
-  // Số tiền thu/hoàn dự kiến chuẩn bị sẵn cho booking (ghi trước chuyến, sync vào Confirm Finished)
-  collectAmount Decimal? @db.Decimal(12, 2)
-  refundAmount  Decimal? @db.Decimal(12, 2)
-
-  // Ghi chú nội bộ cho booking (chế độ ăn, nơi nhận khách, hướng dẫn thu/hoàn...)
-  notes String? @db.Text
-
+  // Internal note for this booking (dietary needs, pickup point, collect/refund instructions...)
+  notes     String?  @db.Text
   rawDataId String?  @unique
   rawData   RawData? @relation(fields: [rawDataId], references: [id])
 
   assignmentId String?
   assignment   Assignment? @relation(fields: [assignmentId], references: [id])
-  paxSequence  Int         @default(0) // Phục vụ Drag-and-Drop xếp vị trí khách trong xe
+  paxSequence  Int         @default(0) // Used for drag-and-drop passenger ordering on the bus
 
-  // Bằng chứng nguồn gốc khi khách bị kéo-thả sang bus khác (giữ màu đỏ / thẻ "MOVED from")
+  settlements Settlement[]
+
+  // Provenance record when a passenger is dragged onto another bus (keeps the red colour / "MOVED from" tag)
   movedFromBusId String?
   movedFromBus   Assignment? @relation("MovedFromBus", fields: [movedFromBusId], references: [id], onDelete: SetNull)
 
-  // Lớp 1 quyết toán: các khoản thu/chi gắn theo từng booking (thu hộ COD, hòan tiền...)
-  settlements Settlement[]
-
-  createdWho String? // Ai tạo booking: tên user hoặc "Pub-Sub System"
+  createdWho String? // Who created the booking: user name or "Pub-Sub System"
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -465,23 +469,23 @@ model Booking {
 }
 
 model Assignment {
-  id       String    @id @default(uuid())
-  code     String? // Tên bus/xe hiển thị (VD: "Bus 01", "Xe 29 chỗ")
-  bookings Booking[]
-  // Khách từng bị kéo-thả từ bus này sang bus khác (Booking.movedFromBus)
+  id            String    @id @default(uuid())
+  code          String? // Display name for the bus/vehicle (e.g. "Bus 01", "29-seat coach")
+  bookings      Booking[]
+  // Passengers that were dragged from this bus onto another one (Booking.movedFromBus)
   movedBookings Booking[] @relation("MovedFromBus")
 
-  // Thời gian bắt đầu và kết thúc của Chuyến (Hỗ trợ Tour 1 ngày hoặc Nhiều ngày)
+  // Trip start and end times (supports both 1-day and multi-day tours)
   startDate DateTime
   endDate   DateTime
 
-  // ── Thông tin quan trọng của chuyến (tự động tổng hợp từ bookings khi auto-assign) ──
-  tourName     String? // Tên tour chính của chuyến
+  // ── Key trip details (auto-aggregated from bookings during auto-assign) ──
+  tourName     String? // Main tour name for this trip
   tourType     TourType? // PRIVATE_TOUR / GROUP_TOUR
-  durationDays Int? // Số ngày tour (từ Tour.durationDays)
-  totalPax     Int       @default(0) // Tổng pax của chuyến (tự tổng hợp từ bookings)
+  durationDays Int? // Tour length in days (from Tour.durationDays)
+  totalPax     Int       @default(0) // Total pax for the trip (auto-aggregated from bookings)
   pickupInfo   Json? // [{ bookingRef, customerName, pickup, totalPax, latitude, longitude }]
-  latitude     Float? // Toạ độ trung tâm các điểm đón (centroid) cho bản đồ
+  latitude     Float? // Centroid of all pickup points, used for the map
   longitude    Float?
 
   vehicleId  String?
@@ -494,19 +498,19 @@ model Assignment {
   guideId  String?
   guide    User?   @relation("GuideAssignment", fields: [guideId], references: [id])
 
-  // Người chịu trách nhiệm xác minh báo cáo HDV của chuyến (admin / kế toán)
+  // Person responsible for verifying this trip's guide report (admin / office)
   reportVerifierId String?
   reportVerifier   User?   @relation("ReportVerifier", fields: [reportVerifierId], references: [id])
+
+  settlements  Settlement[]
+  paymentLines PaymentPeriodLine[]
 
   status        AssignmentStatus @default(PENDING)
   origin        AssignmentOrigin @default(MANUAL)
   sequenceIndex Int              @default(0)
   priceOverride Decimal?
   tripNotes     String?          @db.Text
-  createdWho    String? // Ai tạo assignment: tên user hoặc "Auto-Assign System"
-
-  // Lớp 2 quyết toán: các khoản thu/chi gắn theo tổng chuyến xe (tiền nhà hàng, phí xe, chi phí chung)
-  settlements Settlement[]
+  createdWho    String? // Who created the assignment: user name or "Auto-Assign System"
 
   tourReport TourReport?
 
@@ -514,21 +518,21 @@ model Assignment {
   updatedAt DateTime @updatedAt
 
   @@index([status, sequenceIndex])
-  @@index([startDate, endDate]) // Tối ưu query lọc khả dụng theo khoảng thời gian
+  @@index([startDate, endDate]) // Optimises availability queries filtered by date range
 }
 
-// ─── TOUR REPORT (HDV báo cáo sau khi tour kết thúc) ──────────────────
+// ─── TOUR REPORT (guide reports after the tour finishes) ──────────────────
 model TourReport {
   id           String     @id @default(uuid())
   assignmentId String     @unique
   assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 
-  // Người gửi (HDV chính của chuyến, hoặc OFFICE thay mặt)
+  // Submitter (the trip's main guide, or OFFICE acting on their behalf)
   submittedById   String?
   submittedByName String?
   submittedAt     DateTime @default(now())
 
-  // Nội dung báo cáo tour
+  // Tour report content
   actualPax   Int?
   pickupNotes String?  @db.Text
   distanceKm  Float?
@@ -538,38 +542,43 @@ model TourReport {
 
   status TourReportStatus @default(SUBMITTED)
 
-  // Xác minh bởi bộ phận kế toán / quản lý
+  // Verified by Admin / manager
   verifiedById      String?
   verifiedByName    String?
   verifiedAt        DateTime?
   verificationNotes String?   @db.Text
 
-  // ── Quyết toán tiền sau khi kết thúc chuyến (Confirm finished) ──
-  // Số tiền HDV đã thu hộ từ khách (base = tổng các khoản thu COD của booking trong chuyến).
-  collectedAmount Decimal?
-  // Số tiền HDV đã hoàn lại cho khách.
-  refundedAmount  Decimal?
-  // Các khoản chi hộ (operator services) HDV đã trả: [{ categoryId?, name, amount }].
-  services        Json?
-  servicesTotal   Decimal?
-  // net = collectedAmount - refundedAmount - servicesTotal. Nếu dương → HDV nộp lại cho công ty; âm → công ty hoàn trả.
-  netAmount       Decimal?
-  // COLLECT_MONEY → HDV nộp net cho công ty; PAY_MONEY → công ty hoàn trả |net| cho HDV.
-  settlementFlow  FeeFlowType?
-  // Người thực hiện quyết toán cuối cùng (tên thật của user submit: admin/kế toán/HDV).
+  // Who finalized the trip (Confirm finished): real name of the acting user.
   finalizedById   String?
   finalizedByName String?
   finalizedAt     DateTime?
 
-  // ── Thanh toán cho HDV (bộ phận kế toán export kỳ quyết toán) ──
-  // Khi kế toán export một khoảng thời gian (Handle payment), mọi tour đã finalized
-  // trong khoảng đó được đánh dấu paid → lần sau tính từ watermark (không tính lại miền đã trả).
-  guidePaidAt     DateTime?
-  guidePaidById   String?
-  guidePaidByName String?
+  // ─── Accounting Room: money lock ──────────────────────────────────────
+  // settlementFlow + netAmount are LOCKED when Accounting verifies, then immutable.
+  // Cash direction is derived from the Settlement rows, never set by hand.
+  settlementFlow        FeeFlowType?
+  netAmount             Decimal?
+  moneyVerifiedById     String?
+  moneyVerifiedBy       User?        @relation("MoneyVerifiedBy", fields: [moneyVerifiedById], references: [id])
+  moneyVerifiedByName   String?
+  moneyVerifiedAt       DateTime?
+  moneyVerificationNote String?      @db.Text
 
-  // Ảnh chứng từ / bằng chứng HDV chụp sau tour. [{ name, url, uploadedAt }].
-  // Upload xong đến khi kế toán xác minh thì toàn bộ nằm ở trạng thái chờ xác minh.
+  // The person RECEIVING money for this trip (guide or driver), fixed at verify time.
+  // Required: one trip has only one net amount. Without storing it, both the guide
+  // and the driver would see that amount and could both export a period → paid twice.
+  moneyPayableToId     String?
+  moneyPayableTo       User?        @relation("MoneyPayableTo", fields: [moneyPayableToId], references: [id])
+
+  // Accounting reviews then clicks Verify or Reject. Reject → notify the submitter
+  // to check again; the trip leaves the queue until it is resubmitted.
+  moneyRejectedAt       DateTime?
+  moneyRejectedById     String?
+  moneyRejectedByName   String?
+  moneyRejectionReason  String?      @db.Text
+
+  // Receipt / evidence photos the guide took after the tour. [{ name, url, uploadedAt }].
+  // From upload until Admin verification, everything stays in "pending verification" state.
   evidenceImages Json?
 
   createdAt DateTime @default(now())
@@ -577,84 +586,120 @@ model TourReport {
 
   @@index([status])
   @@index([finalizedAt])
-  @@index([guidePaidAt])
+  @@index([moneyVerifiedAt])
+  @@index([moneyPayableToId])
 }
 
-// ─── GUIDE PAYMENT PERIOD (Kỳ thanh toán cho HDV) ──────────────────────
-// Mỗi lần kế toán "export / handle payment" cho một HDV trên một khoảng thời gian
-// will ghi 1 bản ghi audit. Lần sau, watermark = max(toDate) → kỳ mới bắt đầu ngay sau đó.
-model GuidePaymentPeriod {
-  id          String   @id @default(uuid())
-  guideId     String
-  fromDate    DateTime
-  toDate      DateTime
-  tourCount   Int      @default(0)
-  // HDV nộp lại cho công ty (COLLECT_MONEY).
-  guideReturnsToCompany Decimal @default(0)
-  // Công ty hoàn trả cho HDV (PAY_MONEY).
-  companyReturnsToGuide Decimal @default(0)
-  totalNet    Decimal  @default(0)
-  note        String?  @db.Text
+// ─── ACCOUNTING ROOM: settlements & payment periods ───────────────────
+// Model: a money entry belongs to a trip (Assignment) and/or a booking.
+// Accounting verifies a trip → locks netAmount (immutable) → exports a payment
+// period per person (guide or driver). Each period keeps the original detail
+// lines (PaymentPeriodLine) so an exported statement never changes its numbers later.
 
-  createdById   String?
-  createdByName String?
-  createdAt     DateTime @default(now())
-
-  guide User @relation(fields: [guideId], references: [id])
-
-  @@index([guideId, createdAt])
-  @@map("guide_payment_periods")
-}
-
-// ─── FINANCIAL SETTLEMENT (2 LỚP) ────────────────────────────────────
-// Danh mục khoản thu/chi — dropdown cố định (Back-end truyền xuống).
 model SettlementCategory {
   id          String       @id @default(uuid())
-  name        String // Ví dụ: "Thu hộ COD", "Tiền nhà hàng", "Phí cầu đường", "Khác..."
-  code        String       @unique // Ví dụ: "COLLECT_ON_BEHALF", "RESTAURANT", "TOLL_FEE", "OTHERS"
-  flowType    FeeFlowType // Phân biệt Thu (COLLECT_MONEY) hay Chi (PAY_MONEY)
-  isSystem    Boolean      @default(true) // Danh mục hệ thống hay danh mục do người dùng tạo thêm
+  code        String       @unique
+  name        String
+  flowType    FeeFlowType
+  isSystem    Boolean      @default(false)
   settlements Settlement[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Settlement {
-  id       String  @id @default(uuid())
-  amount   Float // Số tiền thu/chi
-  note     String? // Ghi chú chi tiết
-  imageUrl String? // Ảnh chứng từ/hóa đơn
+  id     String  @id @default(uuid())
+  amount Decimal // Always positive. Direction is decided by category.flowType.
+  note   String?
 
-  // Trỏ tới danh mục cố định (dropdown từ Back-end)
+  assignmentId String?
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  bookingId    String?
+  booking      Booking?    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
   categoryId String?
   category   SettlementCategory? @relation(fields: [categoryId], references: [id])
 
-  // Cho phép nhập tay tên danh mục khi chọn khoản "Khác" (OTHERS)
-  customCategoryName String?
+  createdById   String
+  createdBy     User     @relation("SettlementCreatedBy", fields: [createdById], references: [id])
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  // Người tạo khoản thu/chi
-  createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id])
+  // Immutable once the trip's money is locked. If a mistake is made, create a
+  // reversal row — never edit or delete the original.
+  reversesId String?     @unique
+  reverses   Settlement? @relation("SettlementReversal", fields: [reversesId], references: [id])
+  reversedBy Settlement? @relation("SettlementReversal")
 
-  // Lớp 1: gắn theo từng Booking (thu hộ COD, hoàn tiền…) — 1 trong 2 lớp bắt buộc
-  bookingId String?
-  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  // Lớp 2: gắn theo tổng Chuyến xe (tiền nhà hàng, phí xe, chi phí chung…)
-  assignmentId String?
-  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([bookingId])
   @@index([assignmentId])
+  @@index([bookingId])
   @@index([categoryId])
-  @@index([createdById])
+}
+
+enum PayeeType {
+  TRANSPORT_PROVIDER // Third-party transport provider (template groups many drivers under one provider)
+  COMPANY_GUIDE // In-house guide
+  COMPANY_DRIVER // In-house driver
+  FREELANCE // Freelance driver + freelance guide
+}
+
+model PaymentPeriod {
+  id        String    @id @default(uuid())
+  personId  String // userId (guide/driver) or providerId (third-party transport provider)
+  payeeType PayeeType @default(COMPANY_GUIDE) // Payee group, decides how periods are grouped
+  payeeName String? // Name snapshot taken at export time
+  fromDate  DateTime
+  toDate    DateTime
+
+  tourCount              Int     @default(0)
+  personReturnsToCompany Decimal @default(0) // Trip creator owes the company
+  companyReturnsToPerson Decimal @default(0) // Company owes the trip creator
+  totalNet               Decimal // = personReturnsToCompany - companyReturnsToPerson
+  note                   String? @db.Text
+
+  createdById   String
+  createdBy     User     @relation("PeriodCreatedBy", fields: [createdById], references: [id])
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  // Period was VOIDED because it was wrong. Never hard-deleted — money data must
+  // remain for reconciliation. All logic (watermark, dedupe, history) skips voided periods.
+  voidedAt     DateTime?
+  voidedById   String?
+  voidedByName String?
+  voidReason   String?      @db.Text
+
+  lines PaymentPeriodLine[]
+
+  @@index([personId, toDate])
+  @@index([createdAt])
+}
+
+// A FROZEN detail line of a period. Never recalculated from live data: if a
+// tour/booking is edited later, an already exported statement keeps its old numbers.
+model PaymentPeriodLine {
+  id       String        @id @default(uuid())
+  periodId String
+  period   PaymentPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  payableToId  String
+  payableTo    User       @relation("LinePayableTo", fields: [payableToId], references: [id])
+
+  tourName  String?
+  tourDate  DateTime
+  netAmount Decimal
+  flow      FeeFlowType
+  note      String?
+
+  @@unique([periodId, assignmentId])
+  @@index([payableToId])
 }
 
 // ─── UTILS & PUB/SUB MAILBOX ──────────────────────────────────────────
+
 model GmailAccount {
   id              String   @id @default(uuid())
   email           String   @unique
@@ -672,7 +717,7 @@ model RawData {
   status      String
   payloadHash String?
   email       String?
-  templateTag String? // 'airbnb' | 'booking-com' | 'tripadvisor' | 'website' | 'unknown' — tag từ bước nhận (header match)
+  templateTag String? // 'airbnb' | 'booking-com' | 'tripadvisor' | 'website' | 'unknown' — tag from the ingest step (header match)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   booking     Booking?
@@ -710,7 +755,7 @@ model AuditLog {
 }
 
 // ─── AUTH ACTIVITY ──────────────────────────────────────────────────
-// Ghi lại sự kiện xác thực (đăng nhập/đăng xuất/thất bại) tách riêng khỏi audit log.
+// Records authentication events (sign-in / sign-out / failure), kept separate from the audit log.
 model AuthActivity {
   id           String        @id @default(uuid())
   userId       String?
@@ -726,8 +771,9 @@ model AuthActivity {
   @@index([createdAt])
 }
 
-// ─── DRIVE (lưu trữ cá nhân kiểu Google Drive) ──────────────────────
-// userId nullable + SetNull: khi xoá user, drive & avatar folder được giữ lại (không bị xoá).
+// ─── DRIVE (personal storage, Google Drive style) ──────────────────────
+// userId nullable + SetNull: when a user is deleted, their drive and avatar
+// folders are kept (not deleted).
 model DriveFolder {
   id        String        @id @default(uuid())
   userId    String?
@@ -753,7 +799,7 @@ model DriveFile {
   name       String
   mimeType   String?
   size       Int
-  storageKey String      @unique // đường dẫn tương đối dưới backend/uploads/drive
+  storageKey String      @unique // Relative path under backend/uploads/drive
   createdAt  DateTime    @default(now())
 
   @@index([userId, folderId])
@@ -762,15 +808,17 @@ model DriveFile {
 // ─── NOTIFICATIONS & PUSH SUBSCRIPTIONS ──────────────────────────────
 
 enum NotificationType {
-  ASSIGNED // Được gán vào chuyến
-  TRANSFERRED // Chuyến bị đổi xe / đổi vị trí
-  CANCELED // Khách hủy / chuyến bị hủy
-  REPORT_VERIFIED // Báo cáo tour được xác nhận
-  REPORT_REJECTED // Báo cáo tour bị từ chối
-  LEAVE_REQUESTED // Nhân sự đăng ký nghỉ phép — cần Admin duyệt
-  LEAVE_APPROVED // Admin đã duyệt nghỉ phép
-  LEAVE_REJECTED // Admin từ chối nghỉ phép
-  GENERAL // Thông báo chung
+  ASSIGNED // Assigned to a trip
+  TRANSFERRED // Trip changed bus / position
+  CANCELED // Passenger cancelled / trip cancelled
+  REPORT_VERIFIED // Tour report confirmed
+  REPORT_REJECTED // Tour report rejected
+  MONEY_REJECTED // Accounting returned the money sheet for re-checking
+  MONEY_VERIFIED // Accounting locked the trip's money
+  LEAVE_REQUESTED // Staff requested leave — needs Admin approval
+  LEAVE_APPROVED // Admin approved the leave request
+  LEAVE_REJECTED // Admin rejected the leave request
+  GENERAL // General notification
 }
 
 model Notification {
@@ -780,7 +828,7 @@ model Notification {
   type      NotificationType @default(GENERAL)
   title     String
   body      String           @db.Text
-  data      Json? // payload bổ sung (assignmentId, bookingId, ...)
+  data      Json? // Extra payload (assignmentId, bookingId, ...)
   read      Boolean          @default(false)
   createdAt DateTime         @default(now())
 

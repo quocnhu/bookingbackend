@@ -9,11 +9,7 @@ import { QueuesModule } from '@/queues/queues.module';
 @Module({
   imports: [AuditModule, QueuesModule],
   controllers: [BookingController],
-  providers: [
-    BookingService,
-    BookingManualProcessor,
-    BookingNormalizerService,
-  ],
+  providers: [BookingService, BookingManualProcessor, BookingNormalizerService],
   exports: [BookingService, BookingNormalizerService],
 })
 export class BookingModule {}

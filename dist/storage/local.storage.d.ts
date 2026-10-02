@@ -3,6 +3,7 @@ export declare class LocalStorage implements FileStorage {
     readonly driver: "local";
     private readonly root;
     private readonly publicBase;
+    private resolveSafe;
     save(key: string, buffer: Buffer): Promise<{
         key: string;
         url: string;

@@ -20,6 +20,9 @@ const assignment_board_service_1 = require("./assignment-board.service");
 const auto_crew_service_1 = require("./auto-crew.service");
 const queue_constants_1 = require("./queue.constants");
 const BUS_MAX_PAX = 12;
+function toDateKey(d) {
+    return d.toISOString().split('T')[0];
+}
 let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor extends bullmq_1.WorkerHost {
     prisma;
     board;
@@ -110,10 +113,11 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
         }
     }
     async createBusForBooking(booking) {
-        const startDate = new Date(booking.startingDate);
-        startDate.setUTCHours(0, 0, 0, 0);
+        const bookingDateKey = toDateKey(new Date(booking.startingDate));
+        const startDate = new Date(bookingDateKey + 'T00:00:00.000Z');
         const durationDays = booking.tour?.durationDays ?? 1;
-        const endDate = new Date(startDate.getTime() + Math.max(1, durationDays - 1) * 86400000);
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + Math.max(1, durationDays - 1));
         const label = booking.tourType === client_1.TourType.PRIVATE_TOUR ? 'Priv' : 'Group';
         const existing = await this.prisma.assignment.findMany({
             where: { code: { startsWith: `${label} Bus -` } },
@@ -163,16 +167,21 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
         });
     }
     async findCandidate(booking) {
+        const bookingTourName = booking.tour?.name ?? booking.tourName;
+        const bookingTourType = booking.tour?.type ?? booking.tourType;
+        const bookingDateKey = toDateKey(new Date(booking.startingDate));
         const candidates = await this.prisma.assignment.findMany({
             where: {
                 status: {
                     in: [client_1.AssignmentStatus.DRAFT_ASSIGNED, client_1.AssignmentStatus.PENDING],
                 },
-                startDate: { lte: booking.startingDate },
-                endDate: { gte: booking.startingDate },
+                startDate: { lte: new Date(booking.startingDate) },
+                endDate: { gte: new Date(booking.startingDate) },
             },
             include: {
-                bookings: true,
+                bookings: {
+                    include: { tour: { select: { name: true, type: true } } }
+                },
                 vehicle: {
                     select: {
                         id: true,
@@ -183,9 +192,17 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             },
             orderBy: [{ startDate: 'asc' }],
         });
-        const typeOk = (a) => booking.tourType == null ||
-            a.tourType == null ||
-            a.tourType === booking.tourType;
+        const typeOk = (a) => {
+            const aTourName = a.tourName ?? a.bookings[0]?.tour?.name;
+            const aTourType = a.tourType ?? a.bookings[0]?.tour?.type;
+            if (bookingTourType && aTourType && aTourType !== bookingTourType)
+                return false;
+            if (bookingTourName && aTourName && aTourName !== bookingTourName)
+                return false;
+            if (toDateKey(a.startDate) !== bookingDateKey)
+                return false;
+            return true;
+        };
         const capOk = (a) => {
             const used = a.bookings.reduce((sum, b) => sum + (b.totalPax ?? 0), 0);
             return (used + (booking.totalPax ?? 0) <=
@@ -195,14 +212,16 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
         if (matches.length === 0)
             return null;
         matches.sort((a, b) => {
+            const aTourName = a.tourName ?? a.bookings[0]?.tour?.name;
+            const bTourName = b.tourName ?? b.bookings[0]?.tour?.name;
+            const aExactName = aTourName === bookingTourName ? 0 : 1;
+            const bExactName = bTourName === bookingTourName ? 0 : 1;
+            if (aExactName !== bExactName)
+                return aExactName - bExactName;
             const aCompany = a.vehicle?.provider?.isCompany ? 0 : 1;
             const bCompany = b.vehicle?.provider?.isCompany ? 0 : 1;
             if (aCompany !== bCompany)
                 return aCompany - bCompany;
-            const aExact = a.tourType === booking.tourType ? 0 : 1;
-            const bExact = b.tourType === booking.tourType ? 0 : 1;
-            if (aExact !== bExact)
-                return aExact - bExact;
             return this.freeSeats(a) - this.freeSeats(b);
         });
         return matches[0];

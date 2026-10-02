@@ -19,8 +19,8 @@ export interface S3StorageConfig {
 
 /**
  * Driver cloud (S3 / S3-compatible: AWS, MinIO, R2, Wasabi...).
- * Key = storageKey hiện tại (drive/{userDir}/{folderId}/file) — giữ nguyên logic,
- * chỉ đổi nơi lưu trữ.
+ * Key = the current storageKey (drive/{userDir}/{folderId}/file) — the logic is
+ * unchanged, only the storage location differs.
  */
 export class S3Storage implements FileStorage {
   readonly driver = 's3' as const;

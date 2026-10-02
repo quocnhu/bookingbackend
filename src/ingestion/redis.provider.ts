@@ -5,8 +5,8 @@ import { REDIS_CLIENT } from '@/common/redis/redis.constants';
 const logger = new Logger('RedisProvider');
 
 /**
- * Redis client dùng chung cho ingestion (dedup claim + history checkpoint).
- * Lazy connect + retry bền bỉ: Redis sập không làm crash app.
+ * Redis client shared by ingestion (dedup claim + history checkpoint).
+ * Lazy connect + resilient retry: a Redis outage must not crash the app.
  */
 export const redisProvider: Provider = {
   provide: REDIS_CLIENT,

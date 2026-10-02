@@ -1,11 +1,17 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEmail,
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
+  Min,
+  Max,
+  Length,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
@@ -16,17 +22,37 @@ import {
   TourType,
 } from '@prisma/client';
 
+/**
+ * Create a booking. Shared by 2 flows: the admin Add Booking form, and the
+ * public tour booking form on the website.
+ *
+ * Every field the user enters manually is required; if missing, the
+ * ValidationPipe blocks it right at the controller.
+ *
+ * `mail` is the exception: the public form allows a guest to leave the email
+ * blank, so it is optional here, while the admin flow requires it — checked
+ * based on `channel` in BookingService.create(). Making it required in the DTO
+ * would break public tour booking.
+ *
+ * `bookingRef` is optional because the server generates it. `notes` is a free
+ * text note from the user. `paxDetail` is NOT a note — it is data written by
+ * the email pipeline (see BookingNormalizerService) and is left untouched so
+ * the parse flow is not broken.
+ */
 export class CreateBookingDto {
   @IsOptional()
   @IsString()
+  @Length(1, 50)
   bookingRef?: string;
 
   @IsOptional()
   @IsString()
+  @Length(1, 100)
   source?: string;
 
   @IsOptional()
   @IsString()
+  @Length(1, 100)
   confirmationCode?: string;
 
   @IsOptional()
@@ -37,56 +63,75 @@ export class CreateBookingDto {
   @IsEnum(BookingStatus)
   status?: BookingStatus;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  tourId?: string;
+  tourId: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  address?: string;
+  @Length(1, 200)
+  address: string;
 
   @IsOptional()
   @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
   latitude?: number;
 
   @IsOptional()
   @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
   longitude?: number;
 
-  @IsOptional()
+  @IsNotEmpty()
   startingDate?: string | Date;
-
-  @IsOptional()
-  @IsString()
-  customerName?: string;
 
   @IsNotEmpty()
   @IsString()
+  @Length(1, 200)
+  customerName: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @Length(1, 200)
   hotelName: string;
 
   @IsNotEmpty()
   @IsString()
+  @Matches(/^[+]?[\d\s\-()]{7,20}$/)
   phone: string;
 
   @IsOptional()
-  @IsString()
+  @IsEmail()
+  @Length(1, 100)
   mail?: string;
 
-  @IsOptional()
   @Type(() => Number)
   @IsInt()
-  totalPax?: number;
+  @Min(1)
+  @Max(12)
+  totalPax: number;
 
   @IsOptional()
   @IsString()
+  @Length(0, 1000)
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 1000)
   paxDetail?: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsEnum(TourType)
-  tourType?: TourType;
+  tourType: TourType;
 
   @IsOptional()
   @IsString()
+  @Length(1, 200)
   tourName?: string;
 
   @IsOptional()
@@ -99,6 +144,7 @@ export class CreateBookingDto {
 
   @IsOptional()
   @IsString()
+  @Length(0, 200)
   noShowReason?: string;
 }
 
@@ -113,14 +159,21 @@ export class UpdateBookingDto {
 
   @IsOptional()
   @IsString()
+  @Length(1, 200)
   address?: string;
 
   @IsOptional()
   @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
   latitude?: number;
 
   @IsOptional()
   @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
   longitude?: number;
 
   @IsOptional()
@@ -128,28 +181,30 @@ export class UpdateBookingDto {
 
   @IsOptional()
   @IsString()
+  @Length(1, 200)
   customerName?: string;
 
   @IsOptional()
   @IsString()
+  @Length(1, 200)
   hotelName?: string;
 
   @IsOptional()
   @IsString()
+  @Matches(/^[+]?[\d\s\-()]{7,20}$/)
   phone?: string;
 
   @IsOptional()
-  @IsString()
+  @IsEmail()
+  @Length(1, 100)
   mail?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(1)
+  @Max(12)
   totalPax?: number;
-
-  @IsOptional()
-  @IsString()
-  paxDetail?: string;
 
   @IsOptional()
   @IsEnum(TourType)
@@ -157,6 +212,7 @@ export class UpdateBookingDto {
 
   @IsOptional()
   @IsString()
+  @Length(1, 200)
   tourName?: string;
 
   @IsOptional()
@@ -169,19 +225,13 @@ export class UpdateBookingDto {
 
   @IsOptional()
   @IsString()
+  @Length(0, 200)
   noShowReason?: string;
 
   @IsOptional()
   @IsString()
+  @Length(0, 1000)
   notes?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  collectAmount?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  refundAmount?: number | null;
 }
 
 export class QueryBookingDto extends PaginationDto {
@@ -214,14 +264,6 @@ export class BookingPatchDto {
   @IsOptional()
   @IsString()
   notes?: string | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  collectAmount?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  refundAmount?: number | null;
 }
 
 export class BatchUpdateBookingsDto {

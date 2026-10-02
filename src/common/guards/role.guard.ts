@@ -1,7 +1,13 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '@/common/decorators/roles.decorator';
 import { PERMISSIONS_KEY } from '@/common/decorators/permissions.decorator';
+import { ANY_PERMISSIONS_KEY } from '@/common/decorators/permissions.decorator';
 import { IS_PUBLIC_KEY } from '@/common/decorators/public.decorator';
 import { RoleType } from '@prisma/client';
 import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
@@ -19,17 +25,25 @@ export class RoleGuard implements CanActivate {
       return true;
     }
 
-    const requiredRoles = this.reflector.getAllAndOverride<RoleType[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<RoleType[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
+      PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    const anyRequiredPermissions = this.reflector.getAllAndOverride<string[]>(
+      ANY_PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
-    // Không có metadata → mặc định cho phép mọi user đã xác thực.
-    if (!requiredRoles?.length && !requiredPermissions?.length) {
+    // No metadata → allow every authenticated user by default.
+    if (
+      !requiredRoles?.length &&
+      !requiredPermissions?.length &&
+      !anyRequiredPermissions?.length
+    ) {
       return true;
     }
 
@@ -38,7 +52,7 @@ export class RoleGuard implements CanActivate {
       throw new ForbiddenException('Forbidden resource');
     }
 
-    // ADMIN luôn có mọi quyền.
+    // ADMIN always has every permission.
     if (user.role === RoleType.ADMIN) {
       return true;
     }
@@ -48,7 +62,16 @@ export class RoleGuard implements CanActivate {
     }
 
     const userPermissions = new Set(user.permissions ?? []);
-    if (requiredPermissions?.length && !requiredPermissions.every((p) => userPermissions.has(p))) {
+    if (
+      requiredPermissions?.length &&
+      !requiredPermissions.every((p) => userPermissions.has(p))
+    ) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+    if (
+      anyRequiredPermissions?.length &&
+      !anyRequiredPermissions.some((p) => userPermissions.has(p))
+    ) {
       throw new ForbiddenException('Insufficient permissions');
     }
 

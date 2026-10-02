@@ -11,8 +11,8 @@ export declare class CompanyProfileController {
         email: string | null;
         updatedAt: Date;
         website: string | null;
-        phone: string | null;
         address: string | null;
+        phone: string | null;
         rootLatitude: number | null;
         rootLongitude: number | null;
         taxId: string | null;
@@ -24,8 +24,8 @@ export declare class CompanyProfileController {
         email: string | null;
         updatedAt: Date;
         website: string | null;
-        phone: string | null;
         address: string | null;
+        phone: string | null;
         rootLatitude: number | null;
         rootLongitude: number | null;
         taxId: string | null;

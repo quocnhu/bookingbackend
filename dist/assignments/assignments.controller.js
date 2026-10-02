@@ -17,13 +17,17 @@ const common_1 = require("@nestjs/common");
 const platform_express_1 = require("@nestjs/platform-express");
 const multer_1 = require("multer");
 const assignments_service_1 = require("./assignments.service");
+const accounting_service_1 = require("../accounting/accounting.service");
+const accounting_dto_1 = require("../accounting/dto/accounting.dto");
 const assignment_dto_1 = require("./dto/assignment.dto");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let AssignmentsController = class AssignmentsController {
     assignmentsService;
-    constructor(assignmentsService) {
+    accountingService;
+    constructor(assignmentsService, accountingService) {
         this.assignmentsService = assignmentsService;
+        this.accountingService = accountingService;
     }
     findAll(query, actor) {
         return this.assignmentsService.findAll(query, actor);
@@ -49,12 +53,6 @@ let AssignmentsController = class AssignmentsController {
     findMyCalendar(actor, year, month) {
         return this.assignmentsService.findMyCalendar(actor, year ? +year : undefined, month ? +month : undefined);
     }
-    findMyPayments(actor, startDate, endDate) {
-        return this.assignmentsService.findMyPayments(actor, startDate, endDate);
-    }
-    settlementSummary(dto) {
-        return this.assignmentsService.settlementSummary(dto.from, dto.to, dto.guideId, dto.driverId);
-    }
     findOne(id) {
         return this.assignmentsService.findOne(id);
     }
@@ -79,6 +77,9 @@ let AssignmentsController = class AssignmentsController {
     removeBooking(id, bookingId) {
         return this.assignmentsService.removeBooking(id, bookingId);
     }
+    syncDatesFromBookings(id) {
+        return this.assignmentsService.syncDatesFromBookings(id);
+    }
     remove(id) {
         return this.assignmentsService.remove(id);
     }
@@ -90,6 +91,15 @@ let AssignmentsController = class AssignmentsController {
     }
     verifyTourReport(id, dto, actor) {
         return this.assignmentsService.verifyTourReport(id, dto, actor);
+    }
+    tourMoney(id, actor) {
+        return this.accountingService.tourMoney(actor, id);
+    }
+    addTourMoney(id, dto, actor) {
+        return this.accountingService.addTourMoney(actor, id, dto);
+    }
+    reverseTourMoney(id, settlementId, dto, actor) {
+        return this.accountingService.reverseTourMoney(actor, id, settlementId, dto);
     }
     finalize(id, dto, actor) {
         return this.assignmentsService.finalize(id, dto, actor);
@@ -160,23 +170,6 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "findMyCalendar", null);
-__decorate([
-    (0, common_1.Get)('my-payments'),
-    __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('startDate')),
-    __param(2, (0, common_1.Query)('endDate')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String, String]),
-    __metadata("design:returntype", void 0)
-], AssignmentsController.prototype, "findMyPayments", null);
-__decorate([
-    (0, common_1.Get)('settlement-summary'),
-    (0, permissions_decorator_1.Permissions)('assignment.read'),
-    __param(0, (0, common_1.Query)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [assignment_dto_1.SettlementSummaryDto]),
-    __metadata("design:returntype", void 0)
-], AssignmentsController.prototype, "settlementSummary", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('assignment.read'),
@@ -250,6 +243,14 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "removeBooking", null);
 __decorate([
+    (0, common_1.Post)(':id/sync-dates'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "syncDatesFromBookings", null);
+__decorate([
     (0, common_1.Delete)(':id'),
     (0, permissions_decorator_1.Permissions)('assignment.delete'),
     __param(0, (0, common_1.Param)('id')),
@@ -259,7 +260,7 @@ __decorate([
 ], AssignmentsController.prototype, "remove", null);
 __decorate([
     (0, common_1.Post)(':id/tour-report'),
-    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    (0, permissions_decorator_1.AnyPermissions)('assignment.update', 'assignment.tour-report.submit'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -269,7 +270,7 @@ __decorate([
 ], AssignmentsController.prototype, "submitTourReport", null);
 __decorate([
     (0, common_1.Post)(':id/tour-report/images'),
-    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    (0, permissions_decorator_1.AnyPermissions)('assignment.update', 'assignment.tour-report.submit'),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
         storage: (0, multer_1.memoryStorage)(),
         limits: { fileSize: 20 * 1024 * 1024 },
@@ -292,6 +293,33 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "verifyTourReport", null);
 __decorate([
+    (0, common_1.Get)(':id/money'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "tourMoney", null);
+__decorate([
+    (0, common_1.Post)(':id/money'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, accounting_dto_1.CreateSettlementDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "addTourMoney", null);
+__decorate([
+    (0, common_1.Post)(':id/money/:settlementId/reverse'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('settlementId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, accounting_dto_1.ReverseTourMoneyDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "reverseTourMoney", null);
+__decorate([
     (0, common_1.Put)(':id/finalize'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),
     __param(0, (0, common_1.Param)('id')),
@@ -303,6 +331,7 @@ __decorate([
 ], AssignmentsController.prototype, "finalize", null);
 exports.AssignmentsController = AssignmentsController = __decorate([
     (0, common_1.Controller)('assignments'),
-    __metadata("design:paramtypes", [assignments_service_1.AssignmentsService])
+    __metadata("design:paramtypes", [assignments_service_1.AssignmentsService,
+        accounting_service_1.AccountingService])
 ], AssignmentsController);
 //# sourceMappingURL=assignments.controller.js.map

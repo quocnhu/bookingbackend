@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { randomUUID } from 'node:crypto';
 import { WebsiteBookingDto } from '@/gmail/dto/website-booking.dto';
 
 export class WebsiteHtmlParser {
@@ -107,8 +108,9 @@ export class WebsiteHtmlParser {
     if (wpPostId) {
       bookingRef = `WEB-${wpPostId}`; // Resolves to standard format: e.g., WEB-3286
     } else {
-      // Safe fallback ensuring 100% uniqueness if the admin link or Post ID is missing
-      bookingRef = `WEB-FALLBACK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      // Fallback when the admin link or Post ID is missing.
+      // randomUUID() keeps this unpredictable and collision-resistant, unlike Math.random().
+      bookingRef = `WEB-FALLBACK-${randomUUID()}`;
     }
 
     // ── 5. TOUR TYPE CLASSIFICATION LOGIC ────────────────────────────────────────

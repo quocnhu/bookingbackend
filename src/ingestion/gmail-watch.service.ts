@@ -3,11 +3,11 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
 import { GmailAuthService } from './gmail-auth.provider';
 
-const RENEW_WINDOW_MS = 24 * 60 * 60 * 1000; // renew khi còn < 1 ngày
+const RENEW_WINDOW_MS = 24 * 60 * 60 * 1000; // renew when < 1 day remains
 
 /**
- * Đăng ký + gia hạn Gmail watch() trên topic Pub/Sub (theo .md bước 2).
- * Watch tự hết hạn sau ~7 ngày nên phải renew định kỳ bằng cron.
+ * Register + renew the Gmail watch() on the Pub/Sub topic (per .md step 2).
+ * A watch expires on its own after ~7 days, so it must be renewed periodically via cron.
  */
 @Injectable()
 export class GmailWatchService {

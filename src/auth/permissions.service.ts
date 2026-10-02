@@ -6,7 +6,7 @@ import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interf
 export class PermissionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Quyền = quyền của role(s) + quyền cá nhân (user permissions). */
+  /** Permissions = the role's permissions + personal permissions (user permissions). */
   async resolveUserPermissions(userId: string): Promise<string[]> {
     const [rolePermissions, userPermissions] = await Promise.all([
       this.prisma.rolePermission.findMany({

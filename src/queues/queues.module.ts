@@ -11,10 +11,10 @@ import { ASSIGN_QUEUE, BOOKING_MANUAL_QUEUE } from './queue.constants';
 import { PARSE_QUEUE } from '@/parsing/parsing.queue';
 
 /**
- * Module @Global đăng ký BullMQ root + tất cả queue dùng chung:
- * booking-manual (tạo thủ công), parse (Stage 2), assign (Stage 3 - auto-assign).
- * Processor của parse nằm ở parsing/parsing.processor.ts.
- * Processor của assign nằm ở queues/assignment.processor.ts.
+ * The @Global module registers the BullMQ root and all shared queues:
+ * booking-manual (manual creation), parse (Stage 2), assign (Stage 3 - auto-assign).
+ * The parse processor lives in parsing/parsing.processor.ts.
+ * The assign processor lives in queues/assignment.processor.ts.
  */
 @Global()
 @Module({

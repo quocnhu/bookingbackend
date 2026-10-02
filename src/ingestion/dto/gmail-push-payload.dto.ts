@@ -1,6 +1,6 @@
 /**
- * Shape của message Pub/Sub push từ Gmail watch.
- * body.message.data là base64 của JSON {emailAddress, historyId}.
+ * Shape of a Pub/Sub push message from Gmail watch.
+ * body.message.data is base64 of the JSON {emailAddress, historyId}.
  */
 export interface GmailPushMessage {
   message?: {

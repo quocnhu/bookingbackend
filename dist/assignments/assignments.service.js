@@ -22,6 +22,7 @@ const notification_service_1 = require("../notifications/notification.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
 const leaves_service_1 = require("../leaves/leaves.service");
 const storage_1 = require("../storage");
+const BOARD_LOOKBACK_DAYS = 30;
 let AssignmentsService = class AssignmentsService {
     prisma;
     auditService;
@@ -43,7 +44,6 @@ let AssignmentsService = class AssignmentsService {
         bookings: {
             orderBy: { paxSequence: 'asc' },
             include: {
-                settlements: { include: { category: true } },
                 tour: { select: { adultPrice: true } },
                 movedFromBus: {
                     select: {
@@ -58,20 +58,26 @@ let AssignmentsService = class AssignmentsService {
         driver: { select: { id: true, name: true, email: true } },
         guide: { select: { id: true, name: true, email: true } },
         reportVerifier: { select: { id: true, name: true, email: true } },
-        settlements: { include: { category: true } },
         tourReport: true,
+        paymentLines: {
+            select: {
+                id: true,
+                tourDate: true,
+                periodId: true,
+                payableTo: { select: { id: true, name: true } },
+            },
+        },
     };
     async findBoard(actor) {
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
         const maxDate = new Date(startOfToday);
         maxDate.setDate(maxDate.getDate() + 90);
+        const minDate = new Date(startOfToday);
+        minDate.setDate(minDate.getDate() - BOARD_LOOKBACK_DAYS);
         const where = {
-            status: {
-                notIn: [client_1.AssignmentStatus.CANCELED, client_1.AssignmentStatus.COMPLETED],
-            },
             startDate: { lte: maxDate },
-            endDate: { gte: startOfToday },
+            endDate: { gte: minDate },
         };
         if (actor.role !== client_1.RoleType.ADMIN && actor.role !== client_1.RoleType.OFFICE) {
             if (actor.role === client_1.RoleType.TRANSPORT_PROVIDER) {
@@ -85,7 +91,7 @@ let AssignmentsService = class AssignmentsService {
             where,
             include: this.include,
             orderBy: [{ startDate: 'asc' }],
-            take: 200,
+            take: 500,
         });
         return items.map((a) => {
             const card = this.decorateBoardCard(a);
@@ -101,7 +107,13 @@ let AssignmentsService = class AssignmentsService {
         startOfToday.setHours(0, 0, 0, 0);
         const active = await this.prisma.assignment.findMany({
             where: {
-                status: { in: [client_1.AssignmentStatus.PENDING, client_1.AssignmentStatus.DISPATCHED, client_1.AssignmentStatus.VERIFYING] },
+                status: {
+                    in: [
+                        client_1.AssignmentStatus.PENDING,
+                        client_1.AssignmentStatus.DISPATCHED,
+                        client_1.AssignmentStatus.VERIFYING,
+                    ],
+                },
                 startDate: { gte: startOfToday },
             },
             select: { guideId: true, driverId: true },
@@ -144,7 +156,9 @@ let AssignmentsService = class AssignmentsService {
             name: u.name,
             email: u.email,
             rating: u.driverProfile?.rating ?? null,
-            provider: u.provider ? { id: u.provider.id, name: u.provider.name } : null,
+            provider: u.provider
+                ? { id: u.provider.id, name: u.provider.name }
+                : null,
             isBusy: busyDrivers.has(u.id),
             leaves: leaveMap.get(u.id) ?? [],
         }));
@@ -153,7 +167,13 @@ let AssignmentsService = class AssignmentsService {
     async fetchLeaveMap() {
         const leaves = await this.prisma.userLeave.findMany({
             where: { status: { in: [client_1.LeaveStatus.PENDING, client_1.LeaveStatus.APPROVED] } },
-            select: { id: true, userId: true, startDate: true, endDate: true, status: true },
+            select: {
+                id: true,
+                userId: true,
+                startDate: true,
+                endDate: true,
+                status: true,
+            },
             orderBy: { startDate: 'asc' },
         });
         const map = new Map();
@@ -244,7 +264,9 @@ let AssignmentsService = class AssignmentsService {
             name: u.name,
             email: u.email,
             rating: u.driverProfile?.rating ?? null,
-            provider: u.provider ? { id: u.provider.id, name: u.provider.name } : null,
+            provider: u.provider
+                ? { id: u.provider.id, name: u.provider.name }
+                : null,
             assignments: (byDriver.get(u.id) ?? []).map(toMember),
             leaves: leaveMap.get(u.id) ?? [],
         }));
@@ -323,13 +345,17 @@ let AssignmentsService = class AssignmentsService {
             throw new common_1.ForbiddenException('Cannot create an assignment for another provider');
         }
         if (dto.vehicleId) {
-            const v = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
+            const v = await this.prisma.vehicle.findUnique({
+                where: { id: dto.vehicleId },
+            });
             if (!v || v.providerId !== actor.providerId) {
                 throw new common_1.ForbiddenException('Vehicle does not belong to your provider');
             }
         }
         if (dto.driverId) {
-            const drv = await this.prisma.user.findUnique({ where: { id: dto.driverId } });
+            const drv = await this.prisma.user.findUnique({
+                where: { id: dto.driverId },
+            });
             if (!drv || drv.providerId !== actor.providerId) {
                 throw new common_1.ForbiddenException('Driver does not belong to your provider');
             }
@@ -358,7 +384,10 @@ let AssignmentsService = class AssignmentsService {
         const totalPax = a.totalPax ??
             a.bookings.reduce((sum, b) => sum + (b.totalPax ?? 0), 0);
         const type = a.tourType ?? a.bookings.find((b) => b.tourType)?.tourType ?? null;
-        const tourName = a.tourName ?? a.bookings.find((b) => b.tourName)?.tourName ?? a.code ?? 'Tour';
+        const tourName = a.tourName ??
+            a.bookings.find((b) => b.tourName)?.tourName ??
+            a.code ??
+            'Tour';
         const durationDays = a.durationDays ??
             (a.endDate && a.startDate
                 ? Math.max(1, Math.round((a.endDate.getTime() - a.startDate.getTime()) / 86400000) + 1)
@@ -373,7 +402,20 @@ let AssignmentsService = class AssignmentsService {
                 pickup: b.hotelName || b.address,
                 totalPax: b.totalPax ?? 0,
             }));
-        return { ...a, totalPax, tourType: type, tourName, durationDays, pickups };
+        const tourReportLocked = a.tourReport
+            ? a.tourReport.status === 'SUBMITTED' || a.tourReport.status === 'VERIFIED'
+            : false;
+        return {
+            ...a,
+            totalPax,
+            tourType: type,
+            tourName,
+            durationDays,
+            pickups,
+            tourReport: a.tourReport
+                ? { ...a.tourReport, locked: tourReportLocked }
+                : null,
+        };
     }
     async findAll(query, actor) {
         const { page, limit, status, vehicleId, driverId, guideId, sortOrder } = query;
@@ -449,7 +491,9 @@ let AssignmentsService = class AssignmentsService {
     }
     async update(id, dto) {
         const before = await this.findOne(id);
-        const startDate = dto.startDate ? new Date(dto.startDate) : before.startDate;
+        const startDate = dto.startDate
+            ? new Date(dto.startDate)
+            : before.startDate;
         const endDate = dto.endDate ? new Date(dto.endDate) : before.endDate;
         if (dto.guideId !== undefined || dto.driverId !== undefined) {
             await this.assertCrewAvailableForDates(dto.guideId !== undefined ? dto.guideId : before.guideId, dto.driverId !== undefined ? dto.driverId : before.driverId, startDate, endDate);
@@ -482,6 +526,7 @@ let AssignmentsService = class AssignmentsService {
             beforeData: before,
             afterData: assignment,
         });
+        this.gateway.notifyAll('board:refresh', { assignmentId: id, action: 'update' });
         return this.findOne(id);
     }
     assertDispatchableToday(assignment) {
@@ -491,7 +536,8 @@ let AssignmentsService = class AssignmentsService {
         endOfToday.setHours(23, 59, 59, 999);
         const start = new Date(assignment.startDate);
         const end = new Date(assignment.endDate ?? assignment.startDate);
-        if (start.getTime() > endOfToday.getTime() || end.getTime() < startOfToday.getTime()) {
+        if (start.getTime() > endOfToday.getTime() ||
+            end.getTime() < startOfToday.getTime()) {
             const label = `${start.getDate()}/${start.getMonth() + 1}/${start.getFullYear()}`;
             throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" (starts ${label}) — only tours active today can be dispatched. Future departures must wait until their tour day.`);
         }
@@ -515,7 +561,9 @@ let AssignmentsService = class AssignmentsService {
             this.assertRecallAllowed(before);
         }
         if (dto.status === client_1.AssignmentStatus.COMPLETED) {
-            const report = await this.prisma.tourReport.findUnique({ where: { assignmentId: id } });
+            const report = await this.prisma.tourReport.findUnique({
+                where: { assignmentId: id },
+            });
             if (!report || report.status !== 'VERIFIED') {
                 throw new common_1.BadRequestException('Cannot mark COMPLETED without a verified tour report. Guide must submit → Admin verifies → Then mark COMPLETED.');
             }
@@ -549,52 +597,6 @@ let AssignmentsService = class AssignmentsService {
         });
         return this.findOne(id);
     }
-    async ensureSettlement(assignment) {
-        const collectCategory = await this.prisma.settlementCategory.findUnique({
-            where: { code: 'COLLECT_ON_BEHALF' },
-        });
-        const vehicleCategory = await this.prisma.settlementCategory.findUnique({
-            where: { code: 'VEHICLE_FEE' },
-        });
-        const createdById = assignment.guideId ?? assignment.driverId ?? null;
-        if (!createdById)
-            return;
-        const bookings = assignment.bookings ?? [];
-        for (const b of bookings) {
-            const hasSettlement = await this.prisma.settlement.findFirst({
-                where: { bookingId: b.id },
-            });
-            if (hasSettlement)
-                continue;
-            const amount = Number(b.tour?.adultPrice ?? 0) > 0 ? Number(b.tour.adultPrice) : 0;
-            await this.prisma.settlement.create({
-                data: {
-                    amount,
-                    note: `Thu hộ COD — ${b.customerName ?? b.bookingRef ?? 'khách'}`,
-                    bookingId: b.id,
-                    assignmentId: assignment.id,
-                    categoryId: collectCategory?.id,
-                    createdById,
-                },
-            });
-        }
-        if (assignment.providerId) {
-            const hasVehicleSettlement = await this.prisma.settlement.findFirst({
-                where: { assignmentId: assignment.id, categoryId: vehicleCategory?.id },
-            });
-            if (!hasVehicleSettlement) {
-                await this.prisma.settlement.create({
-                    data: {
-                        amount: Number(assignment.priceOverride ?? 0),
-                        note: `Phí xe — ${assignment.code ?? 'Bus'}`,
-                        assignmentId: assignment.id,
-                        categoryId: vehicleCategory?.id,
-                        createdById,
-                    },
-                });
-            }
-        }
-    }
     async sendStatusNotifications(assignment, fromStatus, toStatus) {
         const code = assignment.code ?? 'Bus';
         const tour = assignment.tourName ?? '';
@@ -607,38 +609,38 @@ let AssignmentsService = class AssignmentsService {
             switch (toStatus) {
                 case client_1.AssignmentStatus.DISPATCHED:
                     type = client_1.NotificationType.ASSIGNED;
-                    title = `🚌 ${code} xuất bến`;
-                    body = `Chuyến ${tour} đã bắt đầu. Vui lòng lên xe.`;
+                    title = `🚌 ${code} departed`;
+                    body = `Trip ${tour} has started. Please board the bus.`;
                     break;
                 case client_1.AssignmentStatus.TRANSFERRED:
                     type = client_1.NotificationType.TRANSFERRED;
-                    title = `🔄 ${code} — Đã thay đổi`;
-                    body = `Chuyến ${tour} đã được đổi xe/vị trí. Kiểm tra lịch đón mới.`;
+                    title = `🔄 ${code} — Changed`;
+                    body = `Trip ${tour} has a new bus/seat. Check the new pickup schedule.`;
                     break;
                 case client_1.AssignmentStatus.VERIFYING:
                     type = client_1.NotificationType.GENERAL;
-                    title = `⏳ ${code} — Đang chờ xác minh`;
-                    body = `Báo cáo chuyến ${tour} đã nộp. Chờ Admin/Kế toán xác minh.`;
+                    title = `⏳ ${code} — Awaiting verification`;
+                    body = `Trip report for ${tour} has been submitted. Waiting for Admin verification.`;
                     break;
                 case client_1.AssignmentStatus.CANCELED:
                     type = client_1.NotificationType.CANCELED;
-                    title = `❌ ${code} — Đã hủy`;
-                    body = `Chuyến ${tour} đã bị hủy. Khách đã được gỡ khỏi lịch.`;
+                    title = `❌ ${code} — Canceled`;
+                    body = `Trip ${tour} has been canceled. Passengers were removed from the schedule.`;
                     break;
                 case client_1.AssignmentStatus.COMPLETED:
                     type = client_1.NotificationType.GENERAL;
-                    title = `✅ ${code} — Hoàn thành`;
-                    body = `Chuyến ${tour} đã kết thúc.`;
+                    title = `✅ ${code} — Completed`;
+                    body = `Trip ${tour} has ended.`;
                     break;
                 case client_1.AssignmentStatus.DRAFT_ASSIGNED:
                     type = client_1.NotificationType.ASSIGNED;
-                    title = `📋 ${code} — Đã gán draft`;
-                    body = `Chuyến ${tour} đã được xếp xe. Đang chờ xác nhận.`;
+                    title = `📋 ${code} — Draft assigned`;
+                    body = `Trip ${tour} has been assigned a bus. Waiting for confirmation.`;
                     break;
                 default:
                     type = client_1.NotificationType.GENERAL;
-                    title = `${code} — Cập nhật trạng thái`;
-                    body = `Trạng thái chuyển: ${fromStatus} → ${toStatus}`;
+                    title = `${code} — Status updated`;
+                    body = `Status changed: ${fromStatus} → ${toStatus}`;
             }
             const notif = await this.notificationService.create(userId, type, title, body, {
                 assignmentId: assignment.id,
@@ -652,26 +654,49 @@ let AssignmentsService = class AssignmentsService {
     }
     async assignBookings(id, dto) {
         const assignment = await this.findOne(id);
-        const existing = await this.prisma.booking.findMany({
+        const bookingsToAssign = await this.prisma.booking.findMany({
             where: { id: { in: dto.bookingIds } },
-            select: { id: true, assignmentId: true },
+            select: { id: true, assignmentId: true, startingDate: true, tour: { select: { durationDays: true, name: true } } },
         });
-        const busy = existing.find((b) => b.assignmentId && b.assignmentId !== id);
+        const busy = bookingsToAssign.find((b) => b.assignmentId && b.assignmentId !== id);
         if (busy) {
             throw new common_1.BadRequestException(`Booking ${busy.id} is already assigned to another assignment`);
+        }
+        const tourNames = [...new Set(bookingsToAssign.map((b) => b.tour?.name).filter((n) => !!n))];
+        if (tourNames.length > 1) {
+            throw new common_1.BadRequestException(`Cannot assign bookings with different tours to the same assignment. Tours: ${tourNames.join(', ')}`);
+        }
+        const uniqueStartDates = [...new Set(bookingsToAssign.map((b) => b.startingDate?.toISOString().split('T')[0]).filter((d) => !!d))];
+        if (uniqueStartDates.length > 1) {
+            throw new common_1.BadRequestException(`Cannot assign bookings with different dates to the same assignment. Dates: ${uniqueStartDates.join(', ')}`);
         }
         const maxSeq = await this.prisma.booking.aggregate({
             where: { assignmentId: id },
             _max: { paxSequence: true },
         });
-        await this.prisma.$transaction(dto.bookingIds.map((bookingId, i) => this.prisma.booking.update({
-            where: { id: bookingId },
+        await this.prisma.$transaction(bookingsToAssign.map((booking, i) => this.prisma.booking.update({
+            where: { id: booking.id },
             data: {
                 assignmentId: id,
                 paxSequence: (maxSeq._max.paxSequence ?? 0) + i + 1,
                 status: client_1.BookingStatus.ASSIGNED,
             },
         })));
+        if (uniqueStartDates.length === 1) {
+            const startDate = new Date(uniqueStartDates[0]);
+            const durationDays = bookingsToAssign[0]?.tour?.durationDays ?? 1;
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + durationDays - 1);
+            await this.prisma.assignment.update({
+                where: { id },
+                data: {
+                    startDate,
+                    endDate,
+                    durationDays,
+                    tourName: tourNames[0] ?? assignment.tourName,
+                },
+            });
+        }
         await this.refreshSummary(id);
         await this.auditService.log({
             entityType: 'Assignment',
@@ -679,28 +704,50 @@ let AssignmentsService = class AssignmentsService {
             action: 'ASSIGN_BOOKINGS',
             afterData: { bookingIds: dto.bookingIds },
         });
+        this.gateway.notifyAll('board:refresh', { assignmentId: id, action: 'assign_bookings' });
         return this.findOne(id);
     }
     async removeBooking(id, bookingId) {
         await this.findOne(id);
-        const booking = await this.prisma.booking.findUnique({ where: { id: bookingId } });
+        const booking = await this.prisma.booking.findUnique({
+            where: { id: bookingId },
+        });
         if (!booking || booking.assignmentId !== id) {
             throw new common_1.NotFoundException('Booking not in this assignment');
         }
         await this.prisma.booking.update({
             where: { id: bookingId },
-            data: { assignmentId: null, paxSequence: 0, status: client_1.BookingStatus.PENDING },
+            data: {
+                assignmentId: null,
+                paxSequence: 0,
+                status: client_1.BookingStatus.PENDING,
+            },
         });
         await this.refreshSummary(id);
+        this.gateway.notifyAll('board:refresh', { assignmentId: id, action: 'remove_booking' });
         return this.findOne(id);
     }
     async reorderBookings(id, bookingIds) {
         const result = await this.board.reorder(id, bookingIds);
         if (result.error)
             throw new common_1.BadRequestException(result.error);
+        this.gateway.notifyAll('board:refresh', { assignmentId: id, action: 'reorder' });
         return this.findOne(id);
     }
     async moveBooking(fromAssignmentId, bookingId, toAssignmentId) {
+        const [booking, toAssignment] = await Promise.all([
+            this.prisma.booking.findUnique({
+                where: { id: bookingId },
+                select: { tour: { select: { name: true } } },
+            }),
+            this.prisma.assignment.findUnique({
+                where: { id: toAssignmentId },
+                select: { tourName: true },
+            }),
+        ]);
+        if (booking?.tour?.name && toAssignment?.tourName && booking.tour.name !== toAssignment.tourName) {
+            throw new common_1.BadRequestException(`Cannot move booking to a bus with a different tour. Booking tour: ${booking.tour.name}, Target bus tour: ${toAssignment.tourName}`);
+        }
         const result = await this.board.move(fromAssignmentId, bookingId, toAssignmentId);
         if (result.error)
             throw new common_1.BadRequestException(result.error);
@@ -709,6 +756,8 @@ let AssignmentsService = class AssignmentsService {
             data: { movedFromBusId: fromAssignmentId },
         });
         await this.notifyMoveBooking(fromAssignmentId, toAssignmentId, bookingId);
+        this.gateway.notifyAll('board:refresh', { assignmentId: fromAssignmentId, action: 'move_out' });
+        this.gateway.notifyAll('board:refresh', { assignmentId: toAssignmentId, action: 'move_in' });
         return this.findOne(toAssignmentId);
     }
     async notifyMoveBooking(fromAssignmentId, toAssignmentId, bookingId) {
@@ -726,28 +775,30 @@ let AssignmentsService = class AssignmentsService {
                 select: { bookingRef: true, customerName: true },
             }),
         ]);
-        const guest = `${booking?.customerName ?? 'Khách'}${booking?.bookingRef ? ` (${booking.bookingRef})` : ''}`;
+        const guest = `${booking?.customerName ?? 'Passenger'}${booking?.bookingRef ? ` (${booking.bookingRef})` : ''}`;
         const recipients = [
             {
                 id: from?.guideId,
-                body: `Booking ${guest} đã được chuyển khỏi xe ${from?.code ?? ''} của bạn.`,
+                body: `Booking ${guest} has been moved out of your bus ${from?.code ?? ''}.`,
             },
             {
                 id: to?.guideId,
-                body: `Booking ${guest} mới được chuyển vào xe ${to?.code ?? ''} của bạn. Kiểm tra danh sách khách trước khi xuất bến.`,
+                body: `Booking ${guest} has just been moved into your bus ${to?.code ?? ''}. Check the passenger list before departure.`,
             },
         ];
         for (const r of recipients) {
             if (!r.id)
                 continue;
-            const notif = await this.notificationService.create(r.id, client_1.NotificationType.TRANSFERRED, `🔄 ${to?.code ?? 'Xe'} — Khách thay đổi`, r.body, { bookingId, fromAssignmentId, toAssignmentId });
+            const notif = await this.notificationService.create(r.id, client_1.NotificationType.TRANSFERRED, `🔄 ${to?.code ?? 'Bus'} — Passenger changed`, r.body, { bookingId, fromAssignmentId, toAssignmentId });
             this.gateway.notifyUser(r.id, 'notification', notif);
         }
     }
     async refreshSummary(assignmentId) {
         const bookings = await this.prisma.booking.findMany({
             where: { assignmentId },
-            include: { tour: { select: { durationDays: true, type: true, name: true } } },
+            include: {
+                tour: { select: { durationDays: true, type: true, name: true } },
+            },
         });
         for (const b of bookings) {
             if (b.latitude != null && b.longitude != null)
@@ -785,6 +836,15 @@ let AssignmentsService = class AssignmentsService {
             undefined;
         const durationDays = first?.tour?.durationDays ?? 1;
         const totalPax = bookings.reduce((sum, b) => sum + (b.totalPax ?? 0), 0);
+        const activeBookings = bookings.filter((b) => b.status !== client_1.BookingStatus.CANCELED);
+        if (activeBookings.length === 0 && bookings.length > 0) {
+            await this.prisma.assignment.update({
+                where: { id: assignmentId },
+                data: { status: client_1.AssignmentStatus.CANCELED },
+            });
+            this.gateway.notifyAll('board:refresh', { assignmentId, action: 'auto_cancel' });
+            return;
+        }
         const geo = bookings.filter((b) => b.latitude != null && b.longitude != null);
         const latitude = geo.length > 0
             ? geo.reduce((s, b) => s + b.latitude, 0) / geo.length
@@ -796,6 +856,41 @@ let AssignmentsService = class AssignmentsService {
             where: { id: assignmentId },
             data: { tourName, tourType, durationDays, totalPax, latitude, longitude },
         });
+    }
+    async syncDatesFromBookings(assignmentId) {
+        const assignment = await this.findOne(assignmentId);
+        const bookings = await this.prisma.booking.findMany({
+            where: { assignmentId },
+            select: { startingDate: true, tour: { select: { durationDays: true } } },
+        });
+        if (bookings.length === 0) {
+            throw new common_1.BadRequestException('Assignment has no bookings to sync dates from');
+        }
+        const dates = bookings
+            .map((b) => b.startingDate?.toISOString().split('T')[0])
+            .filter((d) => !!d);
+        if (dates.length === 0) {
+            throw new common_1.BadRequestException('No bookings with valid startingDate');
+        }
+        const counts = dates.reduce((acc, d) => {
+            acc[d] = (acc[d] ?? 0) + 1;
+            return acc;
+        }, {});
+        const maxCount = Math.max(...Object.values(counts));
+        const mostCommon = Object.entries(counts)
+            .filter(([, c]) => c === maxCount)
+            .map(([d]) => d)
+            .sort()[0];
+        const startDate = new Date(mostCommon);
+        const durationDays = assignment.durationDays ?? bookings[0]?.tour?.durationDays ?? 1;
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + durationDays - 1);
+        await this.prisma.assignment.update({
+            where: { id: assignmentId },
+            data: { startDate, endDate, durationDays },
+        });
+        await this.refreshSummary(assignmentId);
+        return this.findOne(assignmentId);
     }
     async submitTourReport(id, dto, actor) {
         const assignment = await this.findOne(id);
@@ -827,11 +922,17 @@ let AssignmentsService = class AssignmentsService {
                 notes: dto.notes,
                 status: 'SUBMITTED',
                 evidenceImages: (dto.evidenceImages ??
-                    (Array.isArray(latest?.evidenceImages) ? latest.evidenceImages : [])),
+                    (Array.isArray(latest?.evidenceImages)
+                        ? latest.evidenceImages
+                        : [])),
                 verifiedById: null,
                 verifiedByName: null,
                 verifiedAt: null,
                 verificationNotes: null,
+                moneyRejectedAt: null,
+                moneyRejectedById: null,
+                moneyRejectedByName: null,
+                moneyRejectionReason: null,
             },
             create: {
                 assignmentId: id,
@@ -883,8 +984,7 @@ let AssignmentsService = class AssignmentsService {
         const guideDir = `${slug}_${assignment.guideId ?? 'guide'}`;
         const dateKey = assignment.startDate.toISOString().slice(0, 10);
         const ext = (file.originalname.split('.').pop() || '').toLowerCase();
-        const safeName = (file.originalname.split('/').pop() || 'file')
-            .replace(/[^\w.\- ]/g, '_');
+        const safeName = (file.originalname.split('/').pop() || 'file').replace(/[^\w.\- ]/g, '_');
         const storageKey = `evidence/${guideDir}/${dateKey}/${Date.now()}-${safeName}`;
         const { url } = await this.storage.save(storageKey, file.buffer, {
             contentType: file.mimetype || undefined,
@@ -915,7 +1015,7 @@ let AssignmentsService = class AssignmentsService {
     }
     async verifyTourReport(id, dto, actor) {
         if (actor.role !== client_1.RoleType.ADMIN && actor.role !== client_1.RoleType.OFFICE) {
-            throw new common_1.BadRequestException('Only accounting/management (ADMIN/OFFICE) can verify tour reports');
+            throw new common_1.BadRequestException('Only management (ADMIN/OFFICE) can verify tour reports');
         }
         const assignment = await this.findOne(id);
         const report = await this.prisma.tourReport.findUnique({
@@ -937,15 +1037,7 @@ let AssignmentsService = class AssignmentsService {
                 verificationNotes: dto.verificationNotes,
             },
         });
-        if (dto.status === 'VERIFIED' && assignment.status !== client_1.AssignmentStatus.COMPLETED) {
-            const completed = await this.prisma.assignment.update({
-                where: { id },
-                data: { status: client_1.AssignmentStatus.COMPLETED, reportVerifierId: actor.id },
-                include: this.include,
-            });
-            await this.ensureSettlement(completed);
-        }
-        else if (dto.status === 'REJECTED') {
+        if (dto.status === 'REJECTED') {
             await this.prisma.assignment.update({
                 where: { id },
                 data: { reportVerifierId: null },
@@ -953,13 +1045,15 @@ let AssignmentsService = class AssignmentsService {
         }
         if (assignment.guideId) {
             const isVerified = dto.status === 'VERIFIED';
-            const notifType = isVerified ? client_1.NotificationType.REPORT_VERIFIED : client_1.NotificationType.REPORT_REJECTED;
+            const notifType = isVerified
+                ? client_1.NotificationType.REPORT_VERIFIED
+                : client_1.NotificationType.REPORT_REJECTED;
             const title = isVerified
-                ? `✅ Báo cáo "${assignment.code}" đã được xác nhận`
-                : `❌ Báo cáo "${assignment.code}" bị từ chối`;
+                ? `✅ Report "${assignment.code}" has been confirmed`
+                : `❌ Report "${assignment.code}" was rejected`;
             const body = isVerified
-                ? `Báo cáo tour ${assignment.tourName ?? ''} đã được kế toán xác nhận.`
-                : `Báo cáo tour ${assignment.tourName ?? ''} bị từ chối. ${dto.verificationNotes ?? ''}`;
+                ? `Tour report ${assignment.tourName ?? ''} has been confirmed.`
+                : `Tour report ${assignment.tourName ?? ''} was rejected. ${dto.verificationNotes ?? ''}`;
             const notif = await this.notificationService.create(assignment.guideId, notifType, title, body, {
                 assignmentId: id,
                 reportStatus: dto.status,
@@ -982,26 +1076,20 @@ let AssignmentsService = class AssignmentsService {
             throw new common_1.BadRequestException('Tour already completed');
         }
         if (assignment.status === client_1.AssignmentStatus.CANCELED) {
-            throw new common_1.BadRequestException('Canceled assignment cannot be settled');
+            throw new common_1.BadRequestException('Canceled assignment cannot be closed');
         }
-        if (assignment.status === client_1.AssignmentStatus.VERIFYING) {
-            throw new common_1.BadRequestException('Report is pending verification — please wait for accounting to verify');
+        const report = await this.prisma.tourReport.findUnique({
+            where: { assignmentId: id },
+        });
+        if (!report) {
+            throw new common_1.BadRequestException('No tour report submitted for this assignment');
         }
-        if (assignment.status !== client_1.AssignmentStatus.DISPATCHED) {
-            throw new common_1.BadRequestException('Bus must be dispatched before confirming finished');
+        if (report.status !== 'VERIFIED') {
+            throw new common_1.BadRequestException('Tour report must be verified by accounting before completing');
         }
-        const collectedAmount = Number(dto.collectedAmount ?? 0);
-        const refundedAmount = Number(dto.refundedAmount ?? 0);
-        const services = (dto.services ?? [])
-            .filter((s) => Number(s.amount) > 0)
-            .map((s) => ({
-            categoryId: s.categoryId ?? null,
-            name: s.name,
-            amount: Number(s.amount),
-        }));
-        const servicesTotal = services.reduce((sum, s) => sum + s.amount, 0);
-        const netAmount = collectedAmount - refundedAmount - servicesTotal;
-        const settlementFlow = netAmount >= 0 ? client_1.FeeFlowType.COLLECT_MONEY : client_1.FeeFlowType.PAY_MONEY;
+        if (!report.moneyVerifiedAt) {
+            throw new common_1.BadRequestException('Tour money must be verified and locked by accounting before completing');
+        }
         await this.prisma.$transaction(async (tx) => {
             await tx.assignment.update({
                 where: { id },
@@ -1016,124 +1104,26 @@ let AssignmentsService = class AssignmentsService {
                 : [];
             const mergedEvidence = [...prevEvidence, ...(dto.evidenceImages ?? [])];
             const data = {
-                collectedAmount,
-                refundedAmount,
-                services,
-                servicesTotal,
-                netAmount,
-                settlementFlow,
                 evidenceImages: mergedEvidence,
                 finalizedById: actor.id,
                 finalizedByName: actor.name,
                 finalizedAt: new Date(),
             };
-            await tx.tourReport.upsert({
+            await tx.tourReport.update({
                 where: { assignmentId: id },
-                update: data,
-                create: { assignmentId: id, ...data },
+                data,
             });
         });
-        const withBookings = await this.prisma.assignment.findUniqueOrThrow({
-            where: { id },
-            include: this.include,
-        });
-        await this.ensureSettlement(withBookings);
-        if (dto.bookingSettlements?.length) {
-            const collectCat = await this.prisma.settlementCategory.findUnique({ where: { code: 'COLLECT_ON_BEHALF' } });
-            const refundCat = await this.prisma.settlementCategory.findUnique({ where: { code: 'OTHERS' } });
-            const createdById = withBookings.guideId ?? withBookings.driverId ?? null;
-            if (createdById) {
-                for (const bs of dto.bookingSettlements) {
-                    const existingCollect = await this.prisma.settlement.findFirst({
-                        where: { bookingId: bs.bookingId, categoryId: collectCat?.id },
-                    });
-                    if (existingCollect) {
-                        await this.prisma.settlement.update({
-                            where: { id: existingCollect.id },
-                            data: { amount: Number(bs.collect ?? 0) },
-                        });
-                    }
-                    else if (Number(bs.collect ?? 0) > 0) {
-                        await this.prisma.settlement.create({
-                            data: {
-                                amount: Number(bs.collect),
-                                note: `Thu hộ COD`,
-                                bookingId: bs.bookingId,
-                                assignmentId: id,
-                                categoryId: collectCat?.id,
-                                createdById,
-                            },
-                        });
-                    }
-                    const existingRefund = await this.prisma.settlement.findFirst({
-                        where: { bookingId: bs.bookingId, categoryId: refundCat?.id },
-                    });
-                    if (existingRefund) {
-                        await this.prisma.settlement.update({
-                            where: { id: existingRefund.id },
-                            data: { amount: Number(bs.refund ?? 0) },
-                        });
-                    }
-                    else if (Number(bs.refund ?? 0) > 0) {
-                        await this.prisma.settlement.create({
-                            data: {
-                                amount: Number(bs.refund),
-                                note: `Hoàn tiền khách`,
-                                bookingId: bs.bookingId,
-                                assignmentId: id,
-                                categoryId: refundCat?.id,
-                                createdById,
-                            },
-                        });
-                    }
-                }
-            }
-        }
-        if (services.length && (withBookings.guideId ?? withBookings.driverId)) {
-            const serviceCreatedById = withBookings.guideId ?? withBookings.driverId;
-            for (const s of services) {
-                const existing = s.categoryId
-                    ? await this.prisma.settlement.findFirst({
-                        where: { assignmentId: id, categoryId: s.categoryId },
-                    })
-                    : await this.prisma.settlement.findFirst({
-                        where: { assignmentId: id, categoryId: null, note: s.name },
-                    });
-                if (existing) {
-                    await this.prisma.settlement.update({
-                        where: { id: existing.id },
-                        data: { amount: s.amount, note: s.name },
-                    });
-                }
-                else {
-                    await this.prisma.settlement.create({
-                        data: {
-                            amount: s.amount,
-                            note: s.name,
-                            assignmentId: id,
-                            categoryId: s.categoryId ?? null,
-                            createdById: serviceCreatedById,
-                        },
-                    });
-                }
-            }
-        }
-        if (withBookings.guideId) {
-            const flowText = settlementFlow === client_1.FeeFlowType.COLLECT_MONEY
-                ? `Nộp lại công ty $${netAmount.toLocaleString('en-US')}`
-                : `Công ty hoàn trả $${Math.abs(netAmount).toLocaleString('en-US')}`;
-            const notif = await this.notificationService.create(withBookings.guideId, client_1.NotificationType.REPORT_VERIFIED, `✅ Chuyến "${withBookings.code ?? 'Bus'}" đã được quyết toán`, `${withBookings.tourName ?? 'Tour'} — ${flowText}. Người thực hiện: ${actor.name ?? '—'}`, { assignmentId: id });
-            this.gateway.notifyUser(withBookings.guideId, 'notification', notif);
+        if (assignment.guideId) {
+            const notif = await this.notificationService.create(assignment.guideId, client_1.NotificationType.REPORT_VERIFIED, `✅ Trip "${assignment.code ?? 'Bus'}" is completed`, `${assignment.tourName ?? 'Tour'} — closed by: ${actor.name ?? '—'}`, { assignmentId: id });
+            this.gateway.notifyUser(assignment.guideId, 'notification', notif);
         }
         await this.auditService.log({
             entityType: 'Assignment',
             entityId: id,
             action: 'FINALIZE',
             afterData: {
-                collectedAmount,
-                servicesTotal,
-                netAmount,
-                settlementFlow,
+                evidenceCount: dto.evidenceImages?.length ?? 0,
                 finalizedByName: actor.name,
             },
             changedBy: actor.id,
@@ -1146,9 +1136,14 @@ let AssignmentsService = class AssignmentsService {
         cutoff.setHours(0, 0, 0, 0);
         const where = {
             status: { not: client_1.AssignmentStatus.CANCELED },
-            OR: [{ driverId: actor.id }, { guideId: actor.id }],
             endDate: { gte: cutoff },
         };
+        if (actor.role === client_1.RoleType.TRANSPORT_PROVIDER) {
+            where.providerId = actor.providerId;
+        }
+        else {
+            where.OR = [{ driverId: actor.id }, { guideId: actor.id }];
+        }
         const items = await this.prisma.assignment.findMany({
             where,
             include: {
@@ -1162,14 +1157,21 @@ let AssignmentsService = class AssignmentsService {
             orderBy: [{ startDate: 'asc' }],
             take: 100,
         });
-        const tourIds = [...new Set(items.map((a) => a.bookings?.[0]?.tourId).filter((id) => !!id))];
+        const tourIds = [
+            ...new Set(items
+                .map((a) => a.bookings?.[0]?.tourId)
+                .filter((id) => !!id)),
+        ];
         const tours = tourIds.length > 0
             ? await this.prisma.tour.findMany({
                 where: { id: { in: tourIds } },
                 select: {
                     id: true,
                     itineraries: {
-                        orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }],
+                        orderBy: [
+                            { dayNumber: 'asc' },
+                            { orderIndex: 'asc' },
+                        ],
                     },
                 },
             })
@@ -1177,7 +1179,9 @@ let AssignmentsService = class AssignmentsService {
         const tourMap = new Map(tours.map((t) => [t.id, t.itineraries]));
         const enriched = items.map((a) => {
             const firstBooking = a.bookings?.[0];
-            const itinerary = firstBooking?.tourId ? (tourMap.get(firstBooking.tourId) ?? []) : [];
+            const itinerary = firstBooking?.tourId
+                ? (tourMap.get(firstBooking.tourId) ?? [])
+                : [];
             return this.decorateBoardCard({ ...a, itinerary });
         });
         return enriched;
@@ -1188,13 +1192,19 @@ let AssignmentsService = class AssignmentsService {
         const m = month ?? now.getMonth() + 1;
         const start = new Date(y, m - 1, 1);
         const end = new Date(y, m, 0, 23, 59, 59, 999);
+        const where = {
+            status: { not: client_1.AssignmentStatus.CANCELED },
+            startDate: { lte: end },
+            endDate: { gte: start },
+        };
+        if (actor.role === client_1.RoleType.TRANSPORT_PROVIDER) {
+            where.providerId = actor.providerId;
+        }
+        else {
+            where.OR = [{ driverId: actor.id }, { guideId: actor.id }];
+        }
         const items = await this.prisma.assignment.findMany({
-            where: {
-                status: { not: client_1.AssignmentStatus.CANCELED },
-                OR: [{ driverId: actor.id }, { guideId: actor.id }],
-                startDate: { lte: end },
-                endDate: { gte: start },
-            },
+            where,
             include: {
                 vehicle: { select: { plateNumber: true } },
                 driver: { select: { id: true, name: true } },
@@ -1244,163 +1254,6 @@ let AssignmentsService = class AssignmentsService {
             })),
         };
     }
-    async findMyPayments(actor, startDate, endDate) {
-        const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), 0, 1);
-        const end = endDate
-            ? new Date(endDate + 'T23:59:59.999')
-            : new Date(new Date().getFullYear(), 11, 31, 23, 59, 59, 999);
-        const profile = await this.prisma.guideProfile.findUnique({
-            where: { userId: actor.id },
-        });
-        const guideType = profile?.type ?? client_1.GuideType.FREELANCE;
-        const assignments = await this.prisma.assignment.findMany({
-            where: {
-                guideId: actor.id,
-                status: client_1.AssignmentStatus.COMPLETED,
-                endDate: { gte: start, lte: end },
-            },
-            include: {
-                settlements: {
-                    include: { category: true },
-                },
-                vehicle: { select: { plateNumber: true } },
-            },
-            orderBy: { endDate: 'asc' },
-        });
-        const lines = assignments.map((a) => {
-            const collected = a.settlements.reduce((sum, s) => sum + (s.category?.flowType === client_1.FeeFlowType.COLLECT_MONEY ? s.amount : 0), 0);
-            const paid = a.settlements.reduce((sum, s) => sum + (s.category?.flowType === client_1.FeeFlowType.PAY_MONEY ? s.amount : 0), 0);
-            const net = collected - paid;
-            return {
-                id: a.id,
-                code: a.code,
-                tourName: a.tourName,
-                vehiclePlate: a.vehicle?.plateNumber ?? null,
-                startDate: a.startDate,
-                endDate: a.endDate,
-                collected,
-                paid,
-                net,
-                items: a.settlements.map((s) => ({
-                    id: s.id,
-                    category: s.category?.name ?? s.customCategoryName ?? 'Other',
-                    flowType: s.category?.flowType ?? client_1.FeeFlowType.COLLECT_MONEY,
-                    amount: s.amount,
-                    note: s.note,
-                })),
-            };
-        });
-        const totalCollected = lines.reduce((s, l) => s + l.collected, 0);
-        const totalPaid = lines.reduce((s, l) => s + l.paid, 0);
-        const totalNet = totalCollected - totalPaid;
-        return {
-            guideType,
-            startDate: start,
-            endDate: end,
-            summary: {
-                tours: lines.length,
-                totalCollected,
-                totalPaid,
-                totalNet,
-            },
-            lines,
-        };
-    }
-    async settlementSummary(from, to, guideId, driverId) {
-        const gte = new Date(from);
-        const lte = new Date(to);
-        if (Number.isNaN(gte.getTime()) || Number.isNaN(lte.getTime()) || gte > lte) {
-            throw new common_1.BadRequestException('Invalid settlement date range');
-        }
-        const where = {
-            tourReport: { is: { finalizedAt: { gte, lte } } },
-        };
-        if (guideId)
-            where.guideId = guideId;
-        if (driverId)
-            where.driverId = driverId;
-        const assignments = await this.prisma.assignment.findMany({
-            where,
-            include: {
-                vehicle: { select: { plateNumber: true } },
-                driver: { select: { id: true, name: true, email: true } },
-                guide: { select: { id: true, name: true, email: true } },
-                tourReport: true,
-                bookings: {
-                    select: {
-                        tourName: true,
-                        tour: {
-                            select: {
-                                name: true,
-                                itineraries: {
-                                    orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }],
-                                    select: { dayNumber: true, title: true, location: true },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-            orderBy: { startDate: 'asc' },
-        });
-        const toNumber = (v) => Number(v ?? 0);
-        const netOf = (a) => toNumber(a.tourReport?.netAmount);
-        const collect = assignments.filter((a) => a.tourReport?.settlementFlow === client_1.FeeFlowType.COLLECT_MONEY);
-        const pay = assignments.filter((a) => a.tourReport?.settlementFlow === client_1.FeeFlowType.PAY_MONEY);
-        const lines = assignments.map((a) => {
-            const places = [];
-            const seen = new Set();
-            for (const b of a.bookings) {
-                for (const it of b.tour?.itineraries ?? []) {
-                    const label = it.location && it.location !== '' ? it.location : it.title;
-                    if (label && !seen.has(`${label}#${it.dayNumber}`)) {
-                        seen.add(`${label}#${it.dayNumber}`);
-                        places.push(it.dayNumber > 1 ? `Day ${it.dayNumber}: ${label}` : label);
-                    }
-                }
-            }
-            return {
-                id: a.id,
-                code: a.code ?? '—',
-                tourName: a.tourName ??
-                    a.bookings.find((b) => b.tourName)?.tourName ??
-                    (a.bookings.find((b) => b.tour)?.tour?.name ?? null),
-                vehiclePlate: a.vehicle?.plateNumber ?? null,
-                guide: a.guide?.name ?? null,
-                driver: a.driver?.name ?? null,
-                startDate: a.startDate,
-                endDate: a.endDate,
-                collectedAmount: toNumber(a.tourReport?.collectedAmount),
-                servicesTotal: toNumber(a.tourReport?.servicesTotal),
-                netAmount: netOf(a),
-                settlementFlow: a.tourReport?.settlementFlow ?? null,
-                places,
-            };
-        });
-        return {
-            from,
-            to,
-            guideId,
-            driverId,
-            guideName: guideId
-                ? (assignments.map((a) => a.guide?.name).find(Boolean) ?? null)
-                : null,
-            driverName: driverId
-                ? (assignments.map((a) => a.driver?.name).find(Boolean) ?? null)
-                : null,
-            summary: {
-                guideReturnsToCompany: {
-                    count: collect.length,
-                    total: collect.reduce((sum, a) => sum + netOf(a), 0),
-                },
-                companyReturnsToGuide: {
-                    count: pay.length,
-                    total: pay.reduce((sum, a) => sum + netOf(a), 0),
-                },
-            },
-            lines,
-        };
-    }
     async findMyFleet(actor, startDate, endDate) {
         if (!actor.providerId) {
             return { providerId: null, items: [] };
@@ -1416,7 +1269,9 @@ let AssignmentsService = class AssignmentsService {
         const items = await this.prisma.assignment.findMany({
             where,
             include: {
-                vehicle: { select: { id: true, plateNumber: true, capacity: true, brand: true } },
+                vehicle: {
+                    select: { id: true, plateNumber: true, capacity: true, brand: true },
+                },
                 driver: { select: { id: true, name: true, email: true } },
                 provider: { select: { id: true, name: true } },
                 tourReport: { select: { id: true, status: true } },
@@ -1444,10 +1299,18 @@ let AssignmentsService = class AssignmentsService {
         await this.findOne(id);
         await this.prisma.booking.updateMany({
             where: { assignmentId: id },
-            data: { assignmentId: null, paxSequence: 0, status: client_1.BookingStatus.PENDING },
+            data: {
+                assignmentId: null,
+                paxSequence: 0,
+                status: client_1.BookingStatus.PENDING,
+            },
         });
         await this.prisma.assignment.delete({ where: { id } });
-        await this.auditService.log({ entityType: 'Assignment', entityId: id, action: 'DELETE' });
+        await this.auditService.log({
+            entityType: 'Assignment',
+            entityId: id,
+            action: 'DELETE',
+        });
         return { message: 'Assignment deleted' };
     }
 };

@@ -1,35 +1,57 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AssignmentsService } from './assignments.service';
+import { AccountingService } from '@/accounting/accounting.service';
+import {
+  CreateSettlementDto,
+  ReverseTourMoneyDto,
+} from '@/accounting/dto/accounting.dto';
 import {
   AssignBookingsDto,
   CreateAssignmentDto,
-  ExportGuidePaymentDto,
   FinalizeAssignmentDto,
-  GuidePaymentPeriodsQueryDto,
   MoveBookingDto,
   QueryAssignmentDto,
   ReorderBookingsDto,
   SetBoardOriginDto,
-  SettlementSummaryDto,
   SubmitTourReportDto,
   UpdateAssignmentDto,
   UpdateAssignmentStatusDto,
   VerifyTourReportDto,
 } from './dto/assignment.dto';
-import { Permissions } from '@/common/decorators/permissions.decorator';
+import {
+  Permissions,
+  AnyPermissions,
+} from '@/common/decorators/permissions.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Public } from '@/common/decorators/public.decorator';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 
 @Controller('assignments')
 export class AssignmentsController {
-  constructor(private readonly assignmentsService: AssignmentsService) {}
+  constructor(
+    private readonly assignmentsService: AssignmentsService,
+    private readonly accountingService: AccountingService,
+  ) {}
 
   @Get()
   @Permissions('assignment.read')
-  findAll(@Query() query: QueryAssignmentDto, @CurrentUser() actor: AuthenticatedUser) {
+  findAll(
+    @Query() query: QueryAssignmentDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
     return this.assignmentsService.findAll(query, actor);
   }
 
@@ -59,10 +81,7 @@ export class AssignmentsController {
 
   @Get('board/crew/availability')
   @Permissions('assignment.read')
-  getCrewAvailability(
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
+  getCrewAvailability(@Query('from') from?: string, @Query('to') to?: string) {
     return this.assignmentsService.getCrewAvailability(
       new Date(from ?? Date.now()),
       new Date(to ?? Date.now()),
@@ -80,44 +99,11 @@ export class AssignmentsController {
     @Query('year') year?: string,
     @Query('month') month?: string,
   ) {
-    return this.assignmentsService.findMyCalendar(actor, year ? +year : undefined, month ? +month : undefined);
-  }
-
-  @Get('my-payments')
-  findMyPayments(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.assignmentsService.findMyPayments(actor, startDate, endDate);
-  }
-
-  @Get('settlement-summary')
-  @Permissions('assignment.read')
-  settlementSummary(@Query() dto: SettlementSummaryDto) {
-    return this.assignmentsService.settlementSummary(
-      dto.from,
-      dto.to,
-      dto.guideId,
-      dto.driverId,
-      dto.unpaidOnly,
+    return this.assignmentsService.findMyCalendar(
+      actor,
+      year ? +year : undefined,
+      month ? +month : undefined,
     );
-  }
-
-  @Get('settlement/guide-payments')
-  guidePaymentPeriods(
-    @Query() query: GuidePaymentPeriodsQueryDto,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.assignmentsService.listGuidePaymentPeriods(actor, query.guideId);
-  }
-
-  @Post('settlement/export')
-  exportGuidePayment(
-    @Body() dto: ExportGuidePaymentDto,
-    @CurrentUser() actor: AuthenticatedUser,
-  ) {
-    return this.assignmentsService.exportGuidePayment(actor, dto);
   }
 
   @Get(':id')
@@ -128,7 +114,10 @@ export class AssignmentsController {
 
   @Post()
   @Permissions('assignment.create')
-  create(@Body() dto: CreateAssignmentDto, @CurrentUser() actor: AuthenticatedUser) {
+  create(
+    @Body() dto: CreateAssignmentDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
     return this.assignmentsService.create(dto, actor);
   }
 
@@ -140,16 +129,16 @@ export class AssignmentsController {
 
   @Put(':id/status')
   @Permissions('assignment.update')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateAssignmentStatusDto) {
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateAssignmentStatusDto,
+  ) {
     return this.assignmentsService.updateStatus(id, dto);
   }
 
   @Post(':id/bookings/reorder')
   @Permissions('assignment.update')
-  reorderBookings(
-    @Param('id') id: string,
-    @Body() dto: ReorderBookingsDto,
-  ) {
+  reorderBookings(@Param('id') id: string, @Body() dto: ReorderBookingsDto) {
     return this.assignmentsService.reorderBookings(id, dto.bookingIds);
   }
 
@@ -160,7 +149,11 @@ export class AssignmentsController {
     @Param('bookingId') bookingId: string,
     @Body() dto: MoveBookingDto,
   ) {
-    return this.assignmentsService.moveBooking(id, bookingId, dto.toAssignmentId);
+    return this.assignmentsService.moveBooking(
+      id,
+      bookingId,
+      dto.toAssignmentId,
+    );
   }
 
   @Post(':id/bookings')
@@ -171,8 +164,17 @@ export class AssignmentsController {
 
   @Delete(':id/bookings/:bookingId')
   @Permissions('assignment.update')
-  removeBooking(@Param('id') id: string, @Param('bookingId') bookingId: string) {
+  removeBooking(
+    @Param('id') id: string,
+    @Param('bookingId') bookingId: string,
+  ) {
     return this.assignmentsService.removeBooking(id, bookingId);
+  }
+
+  @Post(':id/sync-dates')
+  @Permissions('assignment.update')
+  syncDatesFromBookings(@Param('id') id: string) {
+    return this.assignmentsService.syncDatesFromBookings(id);
   }
 
   @Delete(':id')
@@ -182,7 +184,7 @@ export class AssignmentsController {
   }
 
   @Post(':id/tour-report')
-  @Permissions('assignment.update')
+  @AnyPermissions('assignment.update', 'assignment.tour-report.submit')
   submitTourReport(
     @Param('id') id: string,
     @Body() dto: SubmitTourReportDto,
@@ -192,7 +194,7 @@ export class AssignmentsController {
   }
 
   @Post(':id/tour-report/images')
-  @Permissions('assignment.update')
+  @AnyPermissions('assignment.update', 'assignment.tour-report.submit')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -215,6 +217,42 @@ export class AssignmentsController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.assignmentsService.verifyTourReport(id, dto, actor);
+  }
+
+  /**
+   * The trip's money sheet — visible to the guide/driver before submitting the
+   * report so they know whether they owe the company or the company owes them.
+   * Not the Accounting Room view.
+   */
+  @Get(':id/money')
+  tourMoney(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.accountingService.tourMoney(actor, id);
+  }
+
+  /** Guide/driver adds their own entry to that trip's money sheet. */
+  @Post(':id/money')
+  addTourMoney(
+    @Param('id') id: string,
+    @Body() dto: CreateSettlementDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.accountingService.addTourMoney(actor, id, dto);
+  }
+
+  /** Guide/driver reverses the entry they just added (only while the money is not yet locked). */
+  @Post(':id/money/:settlementId/reverse')
+  reverseTourMoney(
+    @Param('id') id: string,
+    @Param('settlementId') settlementId: string,
+    @Body() dto: ReverseTourMoneyDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.accountingService.reverseTourMoney(
+      actor,
+      id,
+      settlementId,
+      dto,
+    );
   }
 
   @Put(':id/finalize')

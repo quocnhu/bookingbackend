@@ -10,8 +10,9 @@ export interface BookingManualJob {
 }
 
 /**
- * Queue riêng cho booking tạo thủ công (dashboard/API), tách khỏi flow mail.
- * Sau khi tạo vẫn đẩy sang Assignment để gom chuyến như booking từ mail.
+ * Dedicated queue for manually created bookings (dashboard/API), separate from
+ * the mail flow. After creation they are still pushed to Assignment so trips
+ * are grouped the same way as mail-originated bookings.
  */
 @Injectable()
 @Processor(BOOKING_MANUAL_QUEUE, { concurrency: 20 })

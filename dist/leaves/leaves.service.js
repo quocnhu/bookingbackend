@@ -184,7 +184,9 @@ let LeavesService = class LeavesService {
             include: this.includeUser,
         });
         const approved = dto.status === client_1.LeaveStatus.APPROVED;
-        const notif = await this.notificationService.create(leave.userId, approved ? client_1.NotificationType.LEAVE_APPROVED : client_1.NotificationType.LEAVE_REJECTED, approved ? '✅ Đơn nghỉ phép đã được duyệt' : '❌ Đơn nghỉ phép bị từ chối', `${this.formatRange(leave.startDate, leave.endDate)} — ${approved ? 'Đã duyệt' : 'Bị từ chối'} bởi ${actor.name ?? actor.email}.`, { leaveId: leave.id, status: dto.status, userId: leave.userId });
+        const notif = await this.notificationService.create(leave.userId, approved ? client_1.NotificationType.LEAVE_APPROVED : client_1.NotificationType.LEAVE_REJECTED, approved
+            ? '✅ Leave request approved'
+            : '❌ Leave request rejected', `${this.formatRange(leave.startDate, leave.endDate)} — ${approved ? 'Approved' : 'Rejected'} by ${actor.name ?? actor.email}.`, { leaveId: leave.id, status: dto.status, userId: leave.userId });
         this.gateway.notifyUser(leave.userId, 'notification', notif);
         await this.auditService.log({
             entityType: 'UserLeave',
@@ -245,10 +247,10 @@ let LeavesService = class LeavesService {
             where: { role: client_1.RoleType.ADMIN, isActive: true },
             select: { id: true },
         });
-        const requester = leave.user?.name ?? leave.user?.email ?? 'Nhân sự';
-        const role = leave.user?.role === client_1.RoleType.DRIVER ? 'Tài xế' : 'Tour guide';
-        const title = `📅 Yêu cầu nghỉ phép mới`;
-        const body = `${requester} (${role}) đăng ký nghỉ: ${this.formatRange(leave.startDate, leave.endDate)}. Vào mục Leaves để duyệt.`;
+        const requester = leave.user?.name ?? leave.user?.email ?? 'Staff member';
+        const role = leave.user?.role === client_1.RoleType.DRIVER ? 'Driver' : 'Tour guide';
+        const title = `📅 New leave request`;
+        const body = `${requester} (${role}) registered leave: ${this.formatRange(leave.startDate, leave.endDate)}. Go to Leaves to review it.`;
         for (const admin of admins) {
             const notif = await this.notificationService.create(admin.id, client_1.NotificationType.LEAVE_REQUESTED, title, body, { leaveId: leave.id, userId: leave.userId });
             this.gateway.notifyUser(admin.id, 'notification', notif);

@@ -20,7 +20,7 @@ import {
   RenameFolderDto,
 } from './dto/drive.dto';
 
-// Ngưỡng multer đủ cao để ADMIN không bị chặn; non-ADMIN bị chặn 100MB ở service.
+// Multer threshold high enough that ADMIN is never blocked; non-ADMIN is blocked at 100MB in the service.
 const MAX_FILE_SIZE = 512 * 1024 * 1024; // 512MB buffer
 
 @Controller('drive')

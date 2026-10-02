@@ -64,7 +64,7 @@ export class TransportationProvidersService {
     return actor!.providerId;
   }
 
-  /** OFFICE/ADMIN xem toàn bộ; TRANSPORT_PROVIDER chỉ xem nhà xe của chính mình. */
+  /** OFFICE/ADMIN see everything; TRANSPORT_PROVIDER only sees their own vehicles. */
   async findAll(actor?: AuthenticatedUser) {
     const [providers, contacts, drivers] = await Promise.all([
       this.prisma.transportationProvider.findMany({
@@ -115,7 +115,7 @@ export class TransportationProvidersService {
     return provider;
   }
 
-  /** Tài xế (kèm licenseNumber). Provider chỉ thấy tài xế thuộc nhà xe mình. */
+  /** Drivers (including licenseNumber). A provider only sees drivers belonging to their own vehicles. */
   async findAllDrivers(actor?: AuthenticatedUser) {
     const rows = await this.prisma.user.findMany({
       where: { role: RoleType.DRIVER, ...this.providerScope(actor) },
@@ -125,7 +125,7 @@ export class TransportationProvidersService {
     return rows.map((d) => this.toDriverView(d));
   }
 
-  /** Tạo tài xế. Provider: providerId LUÔN lấy từ session, không tin payload. */
+  /** Create a driver. For a provider, providerId is ALWAYS taken from the session, never trusted from the payload. */
   async createDriver(actor: AuthenticatedUser, dto: CreateDriverDto) {
     const providerId = this.isProvider(actor) ? this.requireProviderId(actor) : (dto.providerId ?? null);
     if (providerId) await this.ensureProviderOrFail(providerId);
@@ -133,7 +133,7 @@ export class TransportationProvidersService {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already registered');
 
-    // Temp password cho lần đăng nhập đầu (flow gửi email/welcome sẽ bổ sung sau).
+    // Temp password for the first login (the email/welcome flow will be added later).
     const passwordHash = await bcrypt.hash('driver123', 10);
     const user = await this.prisma.user.create({
       data: {
@@ -158,7 +158,7 @@ export class TransportationProvidersService {
     return { ...this.toDriverView(user), defaultPassword: 'driver123' };
   }
 
-  /** Sửa tài xế. Provider chỉ sửa được tài xế thuộc nhà xe mình. */
+  /** Update a driver. A provider can only edit drivers belonging to their own vehicles. */
   async updateDriver(actor: AuthenticatedUser, id: string, dto: UpdateDriverDto) {
     const user = await this.prisma.user.findUnique({ where: { id }, include: { driverProfile: true } });
     if (!user || user.role !== RoleType.DRIVER) throw new NotFoundException('Driver not found');
@@ -260,7 +260,7 @@ export class TransportationProvidersService {
       throw new ForbiddenException('Cannot delete a vehicle that belongs to another provider');
     }
 
-    // RoutePrice.vehicleId là FK Restrict → phải xoá các route price của xe trước.
+    // RoutePrice.vehicleId is a Restrict FK → the vehicle's route prices must be deleted first.
     const priceIds = await this.prisma.routePrice.findMany({
       where: { vehicleId: id },
       select: { id: true },

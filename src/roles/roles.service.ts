@@ -52,7 +52,7 @@ export class RolesService {
   async update(id: string, dto: UpdateRoleDto) {
     const role = await this.findOne(id);
     if (role.isSystem) {
-      // Role system (ADMIN) không sửa permission.
+      // System roles (ADMIN) cannot have their permissions modified.
       if (dto.permissionIds !== undefined) {
         throw new ForbiddenException('Cannot modify permissions of a system role');
       }

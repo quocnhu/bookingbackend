@@ -9,11 +9,12 @@ import { LeavesService } from '@/leaves/leaves.service';
 import { AuditService } from '@/audit/audit.service';
 
 /**
- * Auto-crew (bước "gán HDV + tài xế" trong bookingflow.md):
- * - Ưu tiên guide nghiệp vụ (GuideType.OFFICIAL) và tài xế của Company Fleet
- *   (provider.isCompany), không gán người đang nghỉ phép hoặc trùng lịch chuyến khác.
- * - Chỉ điền crew còn thiếu (guideId/driverId = null), không bao giờ override
- *   gán thủ công của admin.
+ * Auto-crew (the "assign guide + driver" step in bookingflow.md):
+ * - Prefers professional guides (GuideType.OFFICIAL) and Company Fleet drivers
+ *   (provider.isCompany); never assigns someone on leave or already booked on
+ *   another trip.
+ * - Only fills in missing crew (guideId/driverId = null) and never overrides the
+ *   admin's manual assignment.
  */
 @Injectable()
 export class AutoCrewService {
@@ -25,7 +26,7 @@ export class AutoCrewService {
     private readonly audit: AuditService,
   ) {}
 
-  /** Gán guide + driver khả dụng cho 1 bus nếu bus chưa có đủ crew. */
+  /** Assign an available guide + driver to a bus if it does not yet have a full crew. */
   async assignCrewForBus(assignmentId: string) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
@@ -84,7 +85,7 @@ export class AutoCrewService {
     return { assigned: updates.guideId || updates.driverId, updates };
   }
 
-  /** Điền crew còn thiếu cho toàn bộ bus có khách trong [hôm nay, +horizonDays]. */
+  /** Fill in the missing crew for every bus with passengers within [today, +horizonDays]. */
   async assignMissingCrew(horizonDays = 7) {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -140,7 +141,7 @@ export class AutoCrewService {
     return e;
   }
 
-  /** Chọn 1 user khả dụng: hướng dẫn viên / tài xế, không nghỉ phép, không trùng lịch. */
+  /** Pick an available user: guide / driver, not on leave, not double-booked. */
   private async pickUserId(
     role: RoleType,
     excludeAssignmentId: string,

@@ -40,21 +40,29 @@ class LocalStorage {
     driver = 'local';
     root = path.join(process.cwd(), 'uploads');
     publicBase = process.env.PUBLIC_UPLOADS_BASE || 'http://localhost:4000/uploads';
+    resolveSafe(key) {
+        const abs = path.resolve(this.root, key);
+        const rootResolved = path.resolve(this.root);
+        if (!abs.startsWith(rootResolved + path.sep) && abs !== rootResolved) {
+            throw new Error('Path traversal attempt blocked');
+        }
+        return abs;
+    }
     async save(key, buffer) {
-        const abs = path.join(this.root, key);
+        const abs = this.resolveSafe(key);
         await fsp.mkdir(path.dirname(abs), { recursive: true });
         await fsp.writeFile(abs, buffer);
         return { key, url: this.url(key) };
     }
     async remove(key) {
         try {
-            await fsp.unlink(path.join(this.root, key));
+            await fsp.unlink(this.resolveSafe(key));
         }
         catch {
         }
     }
     async list(prefix) {
-        const dir = path.join(this.root, prefix);
+        const dir = this.resolveSafe(prefix);
         let entries;
         try {
             entries = await fsp.readdir(dir, { withFileTypes: true });
@@ -72,8 +80,8 @@ class LocalStorage {
         return files;
     }
     async rename(fromKey, toKey) {
-        const from = path.join(this.root, fromKey);
-        const to = path.join(this.root, toKey);
+        const from = this.resolveSafe(fromKey);
+        const to = this.resolveSafe(toKey);
         await fsp.mkdir(path.dirname(to), { recursive: true });
         await fsp.rename(from, to);
     }

@@ -12,6 +12,7 @@ var BookingService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BookingService = void 0;
 const common_1 = require("@nestjs/common");
+const node_crypto_1 = require("node:crypto");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
@@ -35,6 +36,18 @@ let BookingService = BookingService_1 = class BookingService {
     async upsert(data, rawDataId, actorId, createdWho) {
         const bookingRef = data.bookingRef;
         const existing = await this.findExisting(data.source, bookingRef);
+        let tourName = data.tourName;
+        let tourType = data.tourType;
+        if (data.tourId && (!tourName || !tourType)) {
+            const tour = await this.prisma.tour.findUnique({
+                where: { id: data.tourId },
+                select: { name: true, type: true },
+            });
+            if (tour) {
+                tourName ??= tour.name;
+                tourType ??= tour.type;
+            }
+        }
         const bookingData = {
             bookingRef,
             confirmationCode: data.bookingRef,
@@ -46,12 +59,14 @@ let BookingService = BookingService_1 = class BookingService {
                 ? client_1.BookingStatus.CANCELED
                 : (data.status ?? client_1.BookingStatus.PENDING),
             tourId: data.tourId,
-            tourName: data.tourName,
-            tourType: data.tourType,
+            tourName,
+            tourType,
             address: data.address,
             latitude: data.latitude,
             longitude: data.longitude,
-            startingDate: data.startingDate ? new Date(data.startingDate) : undefined,
+            startingDate: data.startingDate
+                ? new Date(data.startingDate)
+                : undefined,
             customerName: data.customerName,
             hotelName: data.hotelName ?? '',
             phone: data.phone ?? '',
@@ -83,7 +98,9 @@ let BookingService = BookingService_1 = class BookingService {
             await this.postWrite(booking);
             return booking;
         }
-        const booking = await this.prisma.booking.create({ data: { ...bookingData, createdWho: _createdWho } });
+        const booking = await this.prisma.booking.create({
+            data: { ...bookingData, createdWho: _createdWho },
+        });
         await this.auditService.log({
             entityType: 'Booking',
             entityId: booking.id,
@@ -107,7 +124,7 @@ let BookingService = BookingService_1 = class BookingService {
     async createManual(data, actorId) {
         const bookingRef = data.bookingRef ||
             data.confirmationCode ||
-            (await this.generateManualBookingRef(data.tourType));
+            this.randomBookingRef(data.tourType);
         const existing = await this.prisma.booking.findUnique({
             where: { bookingRef },
         });
@@ -125,7 +142,7 @@ let BookingService = BookingService_1 = class BookingService {
             latitude: data.latitude,
             longitude: data.longitude,
             startingDate: data.startingDate
-                ? new Date(data.startingDate).toISOString()
+                ? new Date(data.startingDate + 'T00:00:00.000+07:00').toISOString()
                 : undefined,
             customerName: data.customerName,
             hotelName: data.hotelName,
@@ -152,19 +169,16 @@ let BookingService = BookingService_1 = class BookingService {
         }
         return this.prisma.booking.findUnique({ where: { bookingRef } });
     }
-    async generateManualBookingRef(tourType) {
+    async previewBookingRef(tourType) {
+        return this.randomBookingRef(tourType);
+    }
+    randomBookingRef(tourType) {
         const prefixCode = tourType === client_1.TourType.PRIVATE_TOUR
             ? 'PRV'
             : tourType === client_1.TourType.GROUP_TOUR
                 ? 'GR'
                 : 'MB';
-        const now = new Date();
-        const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-        const prefix = `${prefixCode}-${ymd}-`;
-        const count = await this.prisma.booking.count({
-            where: { bookingRef: { startsWith: prefix } },
-        });
-        return `${prefix}${String(count + 1).padStart(4, '0')}`;
+        return `${prefixCode}-${(0, node_crypto_1.randomUUID)()}`;
     }
     async findAll(query, actor) {
         const { page, limit, status, channel, payment, tourId, assignmentId } = query;
@@ -188,7 +202,9 @@ let BookingService = BookingService_1 = class BookingService {
             this.prisma.booking.findMany({
                 where,
                 include: {
-                    tour: { select: { id: true, name: true, type: true, durationDays: true } },
+                    tour: {
+                        select: { id: true, name: true, type: true, durationDays: true },
+                    },
                 },
                 orderBy: { createdAt: 'desc' },
                 skip: (page - 1) * limit,
@@ -208,19 +224,32 @@ let BookingService = BookingService_1 = class BookingService {
         return booking;
     }
     async create(dto, actor) {
-        const bookingRef = dto.bookingRef || (await this.generateManualBookingRef(dto.tourType));
-        const existing = await this.prisma.booking.findUnique({
-            where: { bookingRef },
-        });
-        if (existing)
+        this.assertEmailForChannel(dto);
+        const submitted = dto.bookingRef?.trim();
+        let bookingRef = submitted || this.randomBookingRef(dto.tourType);
+        let booking = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const data = { ...dto, bookingRef };
+                if (dto.startingDate)
+                    data.startingDate = new Date(dto.startingDate);
+                if (!data.payment)
+                    data.payment = client_1.PaymentStatus.PAID;
+                data.createdWho = actor?.name ?? actor?.email ?? 'System';
+                booking = await this.prisma.booking.create({ data });
+                break;
+            }
+            catch (e) {
+                const isUniqueViolation = e?.code === 'P2002';
+                if (!isUniqueViolation || !this.looksGenerated(bookingRef) || attempt === 2) {
+                    throw e;
+                }
+                this.logger.warn(`Booking ref is duplicated, issuing a new ref (attempt ${attempt + 1})`);
+                bookingRef = this.randomBookingRef(dto.tourType);
+            }
+        }
+        if (!booking)
             throw new common_1.ConflictException('Booking reference already exists');
-        const data = { ...dto, bookingRef };
-        if (dto.startingDate)
-            data.startingDate = new Date(dto.startingDate);
-        if (!data.payment)
-            data.payment = client_1.PaymentStatus.PAID;
-        data.createdWho = actor?.name ?? actor?.email ?? 'System';
-        const booking = await this.prisma.booking.create({ data });
         await this.auditService.log({
             entityType: 'Booking',
             entityId: booking.id,
@@ -230,8 +259,28 @@ let BookingService = BookingService_1 = class BookingService {
         await this.postWrite(booking);
         return booking;
     }
+    looksGenerated(bookingRef) {
+        return /^(PRV|GR|MB)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingRef);
+    }
+    assertEmailForChannel(dto) {
+        if (dto.channel === client_1.BookingProvider.WEBSITE)
+            return;
+        if (!dto.mail?.trim()) {
+            throw new common_1.BadRequestException('Email is required');
+        }
+    }
     async update(id, dto) {
         const before = await this.findOne(id);
+        if (before.assignmentId) {
+            const assignment = await this.prisma.assignment.findUnique({
+                where: { id: before.assignmentId },
+                include: { tourReport: true },
+            });
+            const locked = assignment?.tourReport?.status === 'SUBMITTED' || assignment?.tourReport?.status === 'VERIFIED';
+            if (locked) {
+                throw new common_1.BadRequestException('This booking is locked because the tour report has been submitted for verification. Only accounting can unlock by rejecting the report.');
+            }
+        }
         const data = { ...dto };
         if (dto.startingDate)
             data.startingDate = new Date(dto.startingDate);
@@ -246,19 +295,53 @@ let BookingService = BookingService_1 = class BookingService {
         await this.postWrite(booking);
         return booking;
     }
-    async updateBatch(items) {
+    async assertCanPatchBookings(bookingIds, actor) {
+        if (actor.permissions?.includes('booking.update'))
+            return;
+        const bookings = await this.prisma.booking.findMany({
+            where: { id: { in: bookingIds } },
+            select: { id: true, assignmentId: true },
+        });
+        if (bookings.length !== bookingIds.length) {
+            throw new common_1.NotFoundException('Booking not found');
+        }
+        const assignmentIds = [
+            ...new Set(bookings.map((b) => b.assignmentId).filter((v) => !!v)),
+        ];
+        if (assignmentIds.length === 0) {
+            throw new common_1.ForbiddenException('Booking is not assigned to a bus yet, so it cannot be edited');
+        }
+        const owned = await this.prisma.assignment.findMany({
+            where: {
+                id: { in: assignmentIds },
+                OR: [{ guideId: actor.id }, { driverId: actor.id }],
+            },
+            select: { id: true },
+        });
+        const ownedIds = new Set(owned.map((a) => a.id));
+        const blocked = assignmentIds.filter((id) => !ownedIds.has(id));
+        if (blocked.length > 0) {
+            throw new common_1.ForbiddenException('You can only edit the notes of bookings on trips you are responsible for');
+        }
+    }
+    async updateBatch(items, actor) {
         if (items.length === 0)
             return [];
+        await this.assertCanPatchBookings(items.map((i) => i.id), actor);
+        const bookings = await this.prisma.booking.findMany({
+            where: { id: { in: items.map((i) => i.id) } },
+            include: { assignment: { include: { tourReport: true } } },
+        });
+        for (const booking of bookings) {
+            const locked = booking.assignment?.tourReport?.status === 'SUBMITTED' || booking.assignment?.tourReport?.status === 'VERIFIED';
+            if (locked) {
+                throw new common_1.BadRequestException(`Booking ${booking.bookingRef} is locked because the tour report has been submitted for verification. Only accounting can unlock by rejecting the report.`);
+            }
+        }
         const updated = await this.prisma.$transaction(items.map((item) => this.prisma.booking.update({
             where: { id: item.id },
             data: {
                 ...(item.notes !== undefined ? { notes: item.notes } : {}),
-                ...(item.collectAmount !== undefined
-                    ? { collectAmount: item.collectAmount }
-                    : {}),
-                ...(item.refundAmount !== undefined
-                    ? { refundAmount: item.refundAmount }
-                    : {}),
             },
         })));
         await this.auditService.log({
@@ -266,6 +349,7 @@ let BookingService = BookingService_1 = class BookingService {
             entityId: items.map((i) => i.id).join(','),
             action: 'UPDATE_BATCH',
             afterData: { count: items.length },
+            changedBy: actor.id,
         });
         for (const b of updated)
             await this.postWrite(b);

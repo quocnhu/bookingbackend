@@ -26,8 +26,10 @@ export class AuditService {
           changedBy: entry.changedBy ?? null,
         },
       });
-    } catch {
-      // Audit lỗi không làm fail business flow.
+    } catch (e) {
+      // Audit failures must not fail the business flow — but they must be
+      // visible, otherwise money audit logs are silently lost.
+      console.error('[audit] failed to write audit log:', (e as Error)?.message);
     }
   }
 }

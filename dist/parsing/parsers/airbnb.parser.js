@@ -84,8 +84,8 @@ let AirbnbParser = class AirbnbParser {
         return m ? m[1].replace(/[\s().-]/g, '') : undefined;
     }
     normalizeDate(raw) {
-        const d = new Date(raw);
-        return Number.isNaN(d.getTime()) ? raw : d.toISOString();
+        const d = new Date(raw + '+07:00');
+        return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
     }
 };
 exports.AirbnbParser = AirbnbParser;

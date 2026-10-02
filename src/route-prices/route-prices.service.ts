@@ -87,8 +87,8 @@ export class RoutePricesService {
     return { providers, tours };
   }
 
-  /** Tổ hợp (provider × vehicle × tour) ĐÃ CÓ giá — dropdown cho tab Assign Tour.
-   *  Provider chỉ thấy nhà xe mình. */
+  /** (provider × vehicle × tour) combinations that ALREADY have a price — the
+   *  dropdown for the Assign Tour tab. A provider only sees their own vehicles. */
   async getAssignable(actor?: AuthenticatedUser) {
     const prices = await this.prisma.routePrice.findMany({
       where: this.providerScope(actor),
@@ -154,7 +154,7 @@ export class RoutePricesService {
       if (before.providerId !== actor.providerId) {
         throw new ForbiddenException('Cannot edit a route price of another provider');
       }
-      delete dto.providerId; // provider không được chuyển hàng qua nhà xe khác
+      delete dto.providerId; // a provider cannot move the record to another vehicle provider
     }
     const tourId = dto.tourId ?? before.tourId;
     const providerId = dto.providerId ?? before.providerId;

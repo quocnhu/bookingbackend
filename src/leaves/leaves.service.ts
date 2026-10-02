@@ -33,7 +33,7 @@ export class LeavesService {
     reviewedBy: { select: { id: true, name: true, email: true, role: true } },
   };
 
-  /** Chuẩn hoá ngày nghỉ: start = 00:00:00, end = 23:59:59 → lấp trọn cả ngày. */
+  /** Normalize leave days: start = 00:00:00, end = 23:59:59 → cover the whole day. */
   private normalizeRange(startDate: string | Date, endDate: string | Date) {
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -48,7 +48,7 @@ export class LeavesService {
     return { start, end };
   }
 
-  /** Kiểm tra user có nghỉ phép (PENDING/APPROVED) trùng khoảng [start, end] hay không. */
+  /** Check whether the user has a leave (PENDING/APPROVED) overlapping [start, end]. */
   async hasLeaveConflict(userId: string, start: Date, end: Date, excludeId?: string) {
     const count = await this.prisma.userLeave.count({
       where: {
@@ -62,7 +62,7 @@ export class LeavesService {
     return count > 0;
   }
 
-  /** User (guide/driver/...) tự đăng ký nghỉ 1 ngày hoặc 1 khoảng ngày. */
+  /** A user (guide/driver/...) registers leave for a single day or a range of days. */
   async create(dto: CreateLeaveDto, actor: AuthenticatedUser) {
     const { start, end } = this.normalizeRange(dto.startDate, dto.endDate);
 
@@ -118,7 +118,7 @@ export class LeavesService {
     return leave;
   }
 
-  /** Danh sách nghỉ phép: Admin/OFFICE xem tất cả, nhân sự chỉ xem của mình. */
+  /** Leave list: Admin/OFFICE see all, other staff only see their own. */
   async findAll(query: QueryLeaveDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>> {
     const {
       page,
@@ -189,7 +189,7 @@ export class LeavesService {
     });
   }
 
-  /** Admin/OFFICE duyệt hoặc từ chối đơn nghỉ phép. */
+  /** Admin/OFFICE approves or rejects a leave request. */
   async updateStatus(id: string, dto: UpdateLeaveStatusDto, actor: AuthenticatedUser) {
     if (actor.role !== RoleType.ADMIN && actor.role !== RoleType.OFFICE) {
       throw new ForbiddenException('Only ADMIN/OFFICE can approve or reject leave requests');
@@ -221,8 +221,10 @@ export class LeavesService {
     const notif = await this.notificationService.create(
       leave.userId,
       approved ? NotificationType.LEAVE_APPROVED : NotificationType.LEAVE_REJECTED,
-      approved ? '✅ Đơn nghỉ phép đã được duyệt' : '❌ Đơn nghỉ phép bị từ chối',
-      `${this.formatRange(leave.startDate, leave.endDate)} — ${approved ? 'Đã duyệt' : 'Bị từ chối'} bởi ${actor.name ?? actor.email}.`,
+      approved
+        ? '✅ Leave request approved'
+        : '❌ Leave request rejected',
+      `${this.formatRange(leave.startDate, leave.endDate)} — ${approved ? 'Approved' : 'Rejected'} by ${actor.name ?? actor.email}.`,
       { leaveId: leave.id, status: dto.status, userId: leave.userId },
     );
     this.gateway.notifyUser(leave.userId, 'notification', notif);
@@ -239,7 +241,7 @@ export class LeavesService {
     return updated;
   }
 
-  /** Chủ sở hữu (đơn PENDING) hoặc Admin/OFFICE có thể xoá đơn. */
+  /** The owner (for PENDING requests) or Admin/OFFICE can delete a request. */
   async remove(id: string, actor: AuthenticatedUser) {
     const leave = await this.prisma.userLeave.findUnique({ where: { id } });
     if (!leave) throw new NotFoundException('Leave request not found');
@@ -270,7 +272,7 @@ export class LeavesService {
     return s === e ? s : `${s} → ${e}`;
   }
 
-  /** Làm phẳng kết quả: đưa requesterName/requesterRole lên cùng cấp, chuyển ngày sang ISO. */
+  /** Flatten the result: lift requesterName/requesterRole to the top level, convert dates to ISO. */
   private flatten(it: any) {
     return {
       id: it.id,
@@ -289,7 +291,7 @@ export class LeavesService {
     };
   }
 
-  /** Thông báo toàn bộ Admin trên hệ thống khi nhân sự đăng ký nghỉ phép. */
+  /** Notify all Admins on the system when staff register leave. */
   private async notifyAdminsOfRequest(leave: {
     id: string;
     userId: string;
@@ -302,11 +304,11 @@ export class LeavesService {
       select: { id: true },
     });
     const requester =
-      (leave as any).user?.name ?? (leave as any).user?.email ?? 'Nhân sự';
+      (leave as any).user?.name ?? (leave as any).user?.email ?? 'Staff member';
     const role =
-      (leave as any).user?.role === RoleType.DRIVER ? 'Tài xế' : 'Tour guide';
-    const title = `📅 Yêu cầu nghỉ phép mới`;
-    const body = `${requester} (${role}) đăng ký nghỉ: ${this.formatRange(leave.startDate, leave.endDate)}. Vào mục Leaves để duyệt.`;
+      (leave as any).user?.role === RoleType.DRIVER ? 'Driver' : 'Tour guide';
+    const title = `📅 New leave request`;
+    const body = `${requester} (${role}) registered leave: ${this.formatRange(leave.startDate, leave.endDate)}. Go to Leaves to review it.`;
 
     for (const admin of admins) {
       const notif = await this.notificationService.create(

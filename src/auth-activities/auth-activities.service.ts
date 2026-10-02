@@ -29,7 +29,7 @@ export class AuthActivitiesService {
         },
       });
     } catch {
-      // Logging auth không làm fail business flow.
+      // Auth logging failures must not fail the business flow.
     }
   }
 

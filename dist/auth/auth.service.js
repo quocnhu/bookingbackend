@@ -52,54 +52,62 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const permissions_service_1 = require("./permissions.service");
 const auth_activities_service_1 = require("../auth-activities/auth-activities.service");
 const drive_service_1 = require("../drive/drive.service");
+const cache_service_1 = require("../cache/cache.service");
 const client_1 = require("@prisma/client");
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 60 * 60 * 1000;
 const MAX_IP_FAILURES = 20;
 const IP_BLOCK_MS = 60 * 60 * 1000;
+const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60;
 let AuthService = class AuthService {
     prisma;
     jwtService;
     permissionsService;
     authActivitiesService;
     driveService;
-    ipFailures = new Map();
-    constructor(prisma, jwtService, permissionsService, authActivitiesService, driveService) {
+    cache;
+    constructor(prisma, jwtService, permissionsService, authActivitiesService, driveService, cache) {
         this.prisma = prisma;
         this.jwtService = jwtService;
         this.permissionsService = permissionsService;
         this.authActivitiesService = authActivitiesService;
         this.driveService = driveService;
+        this.cache = cache;
     }
     async issueTokens(user) {
         const accessToken = await this.jwtService.signAsync(user, {
             secret: process.env.JWT_SECRET,
-            expiresIn: (process.env.JWT_EXPIRES_IN || '1d'),
+            expiresIn: (process.env.JWT_EXPIRES_IN || '15m'),
+            algorithm: 'HS256',
         });
-        const refreshToken = await this.jwtService.signAsync({ sub: user.id, type: 'refresh' }, {
+        const refreshToken = await this.jwtService.signAsync({ sub: user.id, type: 'refresh', jti: (0, crypto_1.randomUUID)() }, {
             secret: process.env.REFRESH_SECRET,
             expiresIn: (process.env.REFRESH_EXPIRES_IN || '7d'),
+            algorithm: 'HS256',
         });
+        await this.cache.set('refresh-tokens', user.id, refreshToken, REFRESH_TOKEN_TTL);
         return { accessToken, refreshToken };
     }
-    isIpBlocked(ip) {
-        const entry = this.ipFailures.get(ip);
-        if (!entry)
+    async isIpBlocked(ip) {
+        const key = `ratelimit:ip:${ip}`;
+        const count = await this.cache['client']?.get(key);
+        if (!count)
             return false;
-        if (Date.now() > entry.until) {
-            this.ipFailures.delete(ip);
-            return false;
+        return parseInt(count, 10) >= MAX_IP_FAILURES;
+    }
+    async recordIpFailure(ip) {
+        const key = `ratelimit:ip:${ip}`;
+        const client = this.cache['client'];
+        if (!client)
+            return;
+        const current = await client.incr(key);
+        if (current === 1) {
+            await client.expire(key, IP_BLOCK_MS / 1000);
         }
-        return entry.count >= MAX_IP_FAILURES;
     }
-    recordIpFailure(ip) {
-        const entry = this.ipFailures.get(ip) ?? { count: 0, until: 0 };
-        entry.count += 1;
-        entry.until = Date.now() + IP_BLOCK_MS;
-        this.ipFailures.set(ip, entry);
-    }
-    clearIpFailures(ip) {
-        this.ipFailures.delete(ip);
+    async clearIpFailures(ip) {
+        const key = `ratelimit:ip:${ip}`;
+        await this.cache['client']?.del(key);
     }
     async recordFailedLogin(userId, ip, userAgent) {
         this.recordIpFailure(ip);
@@ -142,20 +150,22 @@ let AuthService = class AuthService {
         return this.issueTokens(authUser);
     }
     async login(dto, ip, userAgent) {
-        if (this.isIpBlocked(ip)) {
+        if (await this.isIpBlocked(ip)) {
             throw new common_1.UnauthorizedException('Too many failed attempts from this IP. Try again later.');
         }
         const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
         if (user && user.lockoutUntil && user.lockoutUntil > new Date()) {
-            throw new common_1.UnauthorizedException(`Account is locked due to too many failed attempts. Try again after 1 hour.`);
+            throw new common_1.UnauthorizedException('Account is temporarily locked. Try again later.');
         }
         if (!user || !user.passwordHash || !user.isActive) {
             await this.recordFailedLogin(user?.id ?? null, ip, userAgent);
+            await this.recordIpFailure(ip);
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         const valid = await bcrypt.compare(dto.password, user.passwordHash);
         if (!valid) {
             await this.recordFailedLogin(user.id, ip, userAgent);
+            await this.recordIpFailure(ip);
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         await this.prisma.user.update({
@@ -170,7 +180,7 @@ let AuthService = class AuthService {
                 ipAddress: ip,
             },
         });
-        this.clearIpFailures(ip);
+        await this.clearIpFailures(ip);
         await this.authActivitiesService.record({
             userId: user.id,
             eventType: 'LOGIN',
@@ -344,6 +354,7 @@ exports.AuthService = AuthService = __decorate([
         jwt_1.JwtService,
         permissions_service_1.PermissionsService,
         auth_activities_service_1.AuthActivitiesService,
-        drive_service_1.DriveService])
+        drive_service_1.DriveService,
+        cache_service_1.CacheService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

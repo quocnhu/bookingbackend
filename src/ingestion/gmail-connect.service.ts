@@ -15,7 +15,7 @@ export class GmailConnectService {
     private readonly watch: GmailWatchService,
   ) {}
 
-  /** OAuth consent URL. Truyền accountId để reconnect (đổi refresh token). */
+  /** OAuth consent URL. Pass accountId to reconnect (rotate the refresh token). */
   buildConnectUrl(accountId?: string): string {
     return this.auth.buildConnectUrl(
       accountId ? { connect: 'gmail', accountId } : { connect: 'gmail' },
@@ -23,9 +23,9 @@ export class GmailConnectService {
   }
 
   /**
-   * Xử lý callback OAuth:
-   * - Mới: tạo GmailAccount + register watch.
-   * - Reconnect (state.accountId): cập nhật refresh token của account cũ (kéo dài vĩnh viễn).
+   * Handle OAuth callback:
+   * - New: create GmailAccount + register watch.
+   * - Reconnect (state.accountId): update the refresh token of the existing account (extend permanently).
    */
   async handleCallback(code: string, state?: string) {
     if (!code) throw new BadRequestException('Missing authorization code');
@@ -38,7 +38,7 @@ export class GmailConnectService {
         );
         accountId = parsed?.accountId;
       } catch {
-        /* state có thể không phải JSON */
+        /* state may not be JSON */
       }
     }
 
@@ -57,7 +57,7 @@ export class GmailConnectService {
     if (!email)
       throw new BadRequestException('Could not resolve mailbox email');
 
-    // Chỉ cho phép track đúng mailbox được cấu hình trong GOOGLE_ALLOWED_EMAIL.
+    // Only allow tracking the mailbox configured in GOOGLE_ALLOWED_EMAIL.
     const allowed = process.env.GOOGLE_ALLOWED_EMAIL?.toLowerCase();
     if (allowed && email.toLowerCase() !== allowed) {
       throw new BadRequestException(
@@ -69,12 +69,12 @@ export class GmailConnectService {
     try {
       watchExpiration = await this.watch.registerWatch(refreshToken);
     } catch (err: any) {
-      // Watch có thể fail nếu Pub/Sub push chưa set xong; vẫn lưu account.
+      // Watch may fail if Pub/Sub push is not ready yet; account is still saved.
       console.warn(`[gmail] watch failed for ${email}:`, err?.message);
     }
 
     if (accountId) {
-      // Reconnect: cập nhật refresh token cho account đã tồn tại.
+      // Reconnect: update the refresh token for the existing account.
       const existing = await this.prisma.gmailAccount.findUnique({
         where: { id: accountId },
       });
@@ -117,7 +117,7 @@ export class GmailConnectService {
     };
   }
 
-  /** Danh sách mailbox tracked với token masked. */
+  /** List of tracked mailboxes with masked token. */
   async list() {
     const accounts = await this.prisma.gmailAccount.findMany({
       orderBy: { createdAt: 'desc' },

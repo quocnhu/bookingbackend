@@ -15,7 +15,11 @@ import {
   QueryBookingDto,
   UpdateBookingDto,
 } from './dto/booking.dto';
-import { Permissions } from '@/common/decorators/permissions.decorator';
+import { TourType } from '@prisma/client';
+import {
+  Permissions,
+  AnyPermissions,
+} from '@/common/decorators/permissions.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 
@@ -32,6 +36,23 @@ export class BookingController {
     return this.bookingService.findAll(query, actor);
   }
 
+  /**
+   * Preview the next booking ref so the "Add Booking" form can pre-fill the
+   * Booking Ref field. Must be declared BEFORE `:id` — otherwise the param
+   * would swallow this string.
+   */
+  @Get('next-ref')
+  @Permissions('booking.create')
+  nextRef(@Query('tourType') tourType?: string) {
+    const type =
+      tourType === 'PRIVATE_TOUR'
+        ? TourType.PRIVATE_TOUR
+        : tourType === 'GROUP_TOUR'
+          ? TourType.GROUP_TOUR
+          : undefined;
+    return this.bookingService.previewBookingRef(type);
+  }
+
   @Get(':id')
   @Permissions('booking.read')
   findOne(@Param('id') id: string) {
@@ -40,14 +61,20 @@ export class BookingController {
 
   @Post()
   @Permissions('booking.create')
-  create(@Body() dto: CreateBookingDto, @CurrentUser() actor: AuthenticatedUser) {
+  create(
+    @Body() dto: CreateBookingDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
     return this.bookingService.create(dto, actor);
   }
 
   @Put('batch')
-  @Permissions('booking.update')
-  updateBatch(@Body() dto: BatchUpdateBookingsDto) {
-    return this.bookingService.updateBatch(dto.items);
+  @AnyPermissions('booking.update', 'booking.note.update')
+  updateBatch(
+    @Body() dto: BatchUpdateBookingsDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.bookingService.updateBatch(dto.items, actor);
   }
 
   @Put(':id')

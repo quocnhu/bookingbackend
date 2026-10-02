@@ -1,6 +1,8 @@
 import { BookingProvider } from '@prisma/client';
 import type { BookingFields } from './validation/booking-fields.schema';
-export type CleanBookingData = BookingFields;
+export interface CleanBookingData extends Omit<BookingFields, 'startingDate'> {
+    startingDate?: string | undefined;
+}
 export type NormalizeAction = 'CREATE' | 'CANCEL' | 'SKIP';
 export interface NormalizeResult {
     clean: boolean;

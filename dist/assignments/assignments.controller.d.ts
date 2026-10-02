@@ -1,9 +1,12 @@
 import { AssignmentsService } from './assignments.service';
-import { AssignBookingsDto, CreateAssignmentDto, FinalizeAssignmentDto, MoveBookingDto, QueryAssignmentDto, ReorderBookingsDto, SetBoardOriginDto, SettlementSummaryDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, VerifyTourReportDto } from './dto/assignment.dto';
+import { AccountingService } from "../accounting/accounting.service";
+import { CreateSettlementDto, ReverseTourMoneyDto } from "../accounting/dto/accounting.dto";
+import { AssignBookingsDto, CreateAssignmentDto, FinalizeAssignmentDto, MoveBookingDto, QueryAssignmentDto, ReorderBookingsDto, SetBoardOriginDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, VerifyTourReportDto } from './dto/assignment.dto';
 import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 export declare class AssignmentsController {
     private readonly assignmentsService;
-    constructor(assignmentsService: AssignmentsService);
+    private readonly accountingService;
+    constructor(assignmentsService: AssignmentsService, accountingService: AccountingService);
     findAll(query: QueryAssignmentDto, actor: AuthenticatedUser): Promise<import("../common/dto/pagination.dto").PaginatedResult<any>>;
     findBoard(actor: AuthenticatedUser): Promise<any[]>;
     setBoardOrigin(dto: SetBoardOriginDto): Promise<{
@@ -122,68 +125,6 @@ export declare class AssignmentsController {
             reason: string | null;
         }[];
     }>;
-    findMyPayments(actor: AuthenticatedUser, startDate?: string, endDate?: string): Promise<{
-        guideType: import("@prisma/client").$Enums.GuideType;
-        startDate: Date;
-        endDate: Date;
-        summary: {
-            tours: number;
-            totalCollected: number;
-            totalPaid: number;
-            totalNet: number;
-        };
-        lines: {
-            id: string;
-            code: string | null;
-            tourName: string | null;
-            vehiclePlate: string | null;
-            startDate: Date;
-            endDate: Date;
-            collected: number;
-            paid: number;
-            net: number;
-            items: {
-                id: string;
-                category: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-                amount: number;
-                note: string | null;
-            }[];
-        }[];
-    }>;
-    settlementSummary(dto: SettlementSummaryDto): Promise<{
-        from: string;
-        to: string;
-        guideId: string | undefined;
-        driverId: string | undefined;
-        guideName: string | null;
-        driverName: string | null;
-        summary: {
-            guideReturnsToCompany: {
-                count: number;
-                total: number;
-            };
-            companyReturnsToGuide: {
-                count: number;
-                total: number;
-            };
-        };
-        lines: {
-            id: string;
-            code: string;
-            tourName: string | null;
-            vehiclePlate: string | null;
-            guide: string | null;
-            driver: string | null;
-            startDate: Date;
-            endDate: Date;
-            collectedAmount: number;
-            servicesTotal: number;
-            netAmount: number;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
-            places: string[];
-        }[];
-    }>;
     findOne(id: string): Promise<{
         vehicle: {
             id: string;
@@ -199,28 +140,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -237,85 +183,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -332,6 +230,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -341,11 +248,11 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
@@ -373,28 +280,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -411,85 +323,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -506,6 +370,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -515,11 +388,11 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
@@ -547,28 +420,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -585,85 +463,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -680,6 +510,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -689,11 +528,11 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
@@ -721,28 +560,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -759,85 +603,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -854,6 +650,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -863,11 +668,11 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
@@ -895,28 +700,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -933,85 +743,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -1028,6 +790,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -1037,11 +808,11 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
@@ -1069,28 +840,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1107,85 +883,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -1202,6 +930,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -1211,11 +948,11 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
@@ -1243,28 +980,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1281,85 +1023,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -1376,6 +1070,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -1385,11 +1088,11 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
@@ -1417,28 +1120,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1455,85 +1163,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -1550,6 +1210,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -1559,11 +1228,151 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
+        createdWho: string | null;
+        startDate: Date;
+        endDate: Date;
+        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        driverId: string | null;
+        guideId: string | null;
+        reportVerifierId: string | null;
+        origin: import("@prisma/client").$Enums.AssignmentOrigin;
+        sequenceIndex: number;
+        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        tripNotes: string | null;
+    }>;
+    syncDatesFromBookings(id: string): Promise<{
+        vehicle: {
+            id: string;
+            providerId: string;
+            plateNumber: string;
+            capacity: number | null;
+            brand: string | null;
+        } | null;
+        tourReport: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import("@prisma/client").$Enums.TourReportStatus;
+            notes: string | null;
+            assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
+            actualPax: number | null;
+            pickupNotes: string | null;
+            distanceKm: number | null;
+            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
+            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            verifiedById: string | null;
+            verifiedByName: string | null;
+            verifiedAt: Date | null;
+            verificationNotes: string | null;
+            finalizedById: string | null;
+            finalizedByName: string | null;
+            finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+        } | null;
+        provider: {
+            id: string;
+            name: string;
+            isCompany: boolean;
+        } | null;
+        bookings: ({
+            tour: {
+                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+            } | null;
+            movedFromBus: {
+                vehicle: {
+                    plateNumber: string;
+                } | null;
+                code: string | null;
+            } | null;
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import("@prisma/client").$Enums.BookingStatus;
+            tourId: string | null;
+            startingDate: Date | null;
+            bookingRef: string;
+            source: string | null;
+            channel: import("@prisma/client").$Enums.BookingProvider;
+            tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            address: string | null;
+            latitude: number | null;
+            longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
+            payment: import("@prisma/client").$Enums.PaymentStatus | null;
+            isNoShow: boolean;
+            noShowReason: string | null;
+            confirmationCode: string | null;
+            rawDataId: string | null;
+            notes: string | null;
+            assignmentId: string | null;
+            paxSequence: number;
+            movedFromBusId: string | null;
+            createdWho: string | null;
+        })[];
+        driver: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        guide: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        reportVerifier: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
+    } & {
+        id: string;
+        createdAt: Date;
+        providerId: string | null;
+        updatedAt: Date;
+        code: string | null;
+        status: import("@prisma/client").$Enums.AssignmentStatus;
+        durationDays: number | null;
+        vehicleId: string | null;
+        tourName: string | null;
+        tourType: import("@prisma/client").$Enums.TourType | null;
+        latitude: number | null;
+        longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
@@ -1586,28 +1395,33 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.TourReportStatus;
         notes: string | null;
         assignmentId: string;
+        submittedById: string | null;
+        submittedByName: string | null;
+        submittedAt: Date;
         actualPax: number | null;
         pickupNotes: string | null;
         distanceKm: number | null;
         fuelCost: import("@prisma/client/runtime/library").Decimal | null;
         tollParking: import("@prisma/client/runtime/library").Decimal | null;
-        evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-        verificationNotes: string | null;
-        collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-        refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-        services: import("@prisma/client/runtime/library").JsonValue | null;
-        submittedById: string | null;
-        submittedByName: string | null;
-        submittedAt: Date;
         verifiedById: string | null;
         verifiedByName: string | null;
         verifiedAt: Date | null;
-        servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-        netAmount: import("@prisma/client/runtime/library").Decimal | null;
-        settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+        verificationNotes: string | null;
         finalizedById: string | null;
         finalizedByName: string | null;
         finalizedAt: Date | null;
+        settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+        netAmount: import("@prisma/client/runtime/library").Decimal | null;
+        moneyVerifiedById: string | null;
+        moneyVerifiedByName: string | null;
+        moneyVerifiedAt: Date | null;
+        moneyVerificationNote: string | null;
+        moneyPayableToId: string | null;
+        moneyRejectedAt: Date | null;
+        moneyRejectedById: string | null;
+        moneyRejectedByName: string | null;
+        moneyRejectionReason: string | null;
+        evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
     uploadTourReportImage(id: string, file: Express.Multer.File, actor: AuthenticatedUser): Promise<{
         name: string;
@@ -1631,28 +1445,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1669,85 +1488,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -1764,6 +1535,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -1773,11 +1553,11 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;
@@ -1789,6 +1569,84 @@ export declare class AssignmentsController {
         sequenceIndex: number;
         priceOverride: import("@prisma/client/runtime/library").Decimal | null;
         tripNotes: string | null;
+    }>;
+    tourMoney(id: string, actor: AuthenticatedUser): Promise<{
+        locked: boolean;
+        lockedBy: string | null;
+        returnedForRecheck: boolean;
+        collected: number;
+        paid: number;
+        net: number;
+        flow: "COLLECT_MONEY" | "PAY_MONEY";
+        entryCount: number;
+        rows: ({
+            booking: {
+                id: string;
+                bookingRef: string;
+                customerName: string | null;
+                totalPax: number;
+            } | null;
+            category: {
+                id: string;
+                name: string;
+                code: string;
+                flowType: import("@prisma/client").$Enums.FeeFlowType;
+            } | null;
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            assignmentId: string | null;
+            bookingId: string | null;
+            note: string | null;
+            amount: import("@prisma/client/runtime/library").Decimal;
+            categoryId: string | null;
+            createdById: string;
+            createdByName: string | null;
+            reversesId: string | null;
+        })[];
+        categories: {
+            id: string;
+            name: string;
+            code: string;
+            flowType: import("@prisma/client").$Enums.FeeFlowType;
+        }[];
+    }>;
+    addTourMoney(id: string, dto: CreateSettlementDto, actor: AuthenticatedUser): Promise<{
+        category: {
+            id: string;
+            createdAt: Date;
+            name: string;
+            updatedAt: Date;
+            isSystem: boolean;
+            code: string;
+            flowType: import("@prisma/client").$Enums.FeeFlowType;
+        } | null;
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        assignmentId: string | null;
+        bookingId: string | null;
+        note: string | null;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        categoryId: string | null;
+        createdById: string;
+        createdByName: string | null;
+        reversesId: string | null;
+    }>;
+    reverseTourMoney(id: string, settlementId: string, dto: ReverseTourMoneyDto, actor: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        assignmentId: string | null;
+        bookingId: string | null;
+        note: string | null;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        categoryId: string | null;
+        createdById: string;
+        createdByName: string | null;
+        reversesId: string | null;
     }>;
     finalize(id: string, dto: FinalizeAssignmentDto, actor: AuthenticatedUser): Promise<{
         vehicle: {
@@ -1805,28 +1663,33 @@ export declare class AssignmentsController {
             status: import("@prisma/client").$Enums.TourReportStatus;
             notes: string | null;
             assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
             actualPax: number | null;
             pickupNotes: string | null;
             distanceKm: number | null;
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
-            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
-            verificationNotes: string | null;
-            collectedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundedAmount: import("@prisma/client/runtime/library").Decimal | null;
-            services: import("@prisma/client/runtime/library").JsonValue | null;
-            submittedById: string | null;
-            submittedByName: string | null;
-            submittedAt: Date;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
-            servicesTotal: import("@prisma/client/runtime/library").Decimal | null;
-            netAmount: import("@prisma/client/runtime/library").Decimal | null;
-            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            verificationNotes: string | null;
             finalizedById: string | null;
             finalizedByName: string | null;
             finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
         } | null;
         provider: {
             id: string;
@@ -1843,85 +1706,37 @@ export declare class AssignmentsController {
                 } | null;
                 code: string | null;
             } | null;
-            settlements: ({
-                category: {
-                    id: string;
-                    createdAt: Date;
-                    name: string;
-                    updatedAt: Date;
-                    isSystem: boolean;
-                    code: string;
-                    flowType: import("@prisma/client").$Enums.FeeFlowType;
-                } | null;
-            } & {
-                id: string;
-                createdAt: Date;
-                updatedAt: Date;
-                imageUrl: string | null;
-                assignmentId: string | null;
-                bookingId: string | null;
-                categoryId: string | null;
-                amount: number;
-                note: string | null;
-                customCategoryName: string | null;
-                createdById: string;
-            })[];
         } & {
             id: string;
             createdAt: Date;
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
-        })[];
-        settlements: ({
-            category: {
-                id: string;
-                createdAt: Date;
-                name: string;
-                updatedAt: Date;
-                isSystem: boolean;
-                code: string;
-                flowType: import("@prisma/client").$Enums.FeeFlowType;
-            } | null;
-        } & {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            imageUrl: string | null;
-            assignmentId: string | null;
-            bookingId: string | null;
-            categoryId: string | null;
-            amount: number;
-            note: string | null;
-            customCategoryName: string | null;
-            createdById: string;
         })[];
         driver: {
             id: string;
@@ -1938,6 +1753,15 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
     } & {
         id: string;
         createdAt: Date;
@@ -1947,11 +1771,11 @@ export declare class AssignmentsController {
         status: import("@prisma/client").$Enums.AssignmentStatus;
         durationDays: number | null;
         vehicleId: string | null;
-        totalPax: number;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         latitude: number | null;
         longitude: number | null;
+        totalPax: number;
         createdWho: string | null;
         startDate: Date;
         endDate: Date;

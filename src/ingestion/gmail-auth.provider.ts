@@ -4,8 +4,8 @@ import { google, Auth } from 'googleapis';
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 
 /**
- * Tạo/điều phối OAuth2 client cho Gmail.
- * Refresh token được lưu trong GmailAccount (per-account) — không dùng env cố định.
+ * Creates/coordinates the OAuth2 client for Gmail.
+ * The refresh token is stored in GmailAccount (per-account) — no fixed env value is used.
  */
 @Injectable()
 export class GmailAuthService {

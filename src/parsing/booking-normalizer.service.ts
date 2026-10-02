@@ -10,7 +10,10 @@ const PAYMENT_STATUSES: PaymentStatus[] = [
   PaymentStatus.REFUNDED,
 ];
 
-export type CleanBookingData = BookingFields;
+/** Internal type for clean booking data - ISO strings for Prisma */
+export interface CleanBookingData extends Omit<BookingFields, 'startingDate'> {
+  startingDate?: string | undefined;
+}
 export type NormalizeAction = 'CREATE' | 'CANCEL' | 'SKIP';
 
 export interface NormalizeResult {
@@ -29,10 +32,10 @@ const SOURCE_TO_CHANNEL: Record<string, BookingProvider> = {
 };
 
 /**
- * Chuyển payload thô (RawData) thành BookingFields khớp model Prisma Booking.
- * Parser thật (TripAdvisor / Website HTML) đổ dữ liệu vào `payload.booking`;
- * những field bổ sung cấp payload (subject, emailAddress, ...) dùng để hoàn thiện.
- * Không resolve được bookingRef -> SKIP (chống rác).
+ * Convert a raw payload (RawData) into BookingFields matching the Prisma Booking model.
+ * The real parsers (TripAdvisor / Website HTML) put their data in `payload.booking`;
+ * additional fields from the payload (subject, emailAddress, ...) are used to complete it.
+ * bookingRef cannot be resolved -> SKIP (prevents junk records).
  */
 @Injectable()
 export class BookingNormalizerService {
@@ -152,10 +155,11 @@ export class BookingNormalizerService {
       : undefined;
   }
 
-  private normalizeDate(raw: unknown): string | undefined {
+private normalizeDate(raw: unknown): string | undefined {
     const value = this.pickString(raw);
     if (!value) return undefined;
-    const date = new Date(value);
+    // Parse as Vietnam local time (UTC+7) and convert to ISO string for storage
+    const date = new Date(value + (value.includes('T') ? '' : 'T00:00:00') + '+07:00');
     return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
   }
 

@@ -21,11 +21,7 @@ exports.BookingModule = BookingModule = __decorate([
     (0, common_1.Module)({
         imports: [audit_module_1.AuditModule, queues_module_1.QueuesModule],
         controllers: [booking_controller_1.BookingController],
-        providers: [
-            booking_service_1.BookingService,
-            booking_manual_processor_1.BookingManualProcessor,
-            booking_normalizer_service_1.BookingNormalizerService,
-        ],
+        providers: [booking_service_1.BookingService, booking_manual_processor_1.BookingManualProcessor, booking_normalizer_service_1.BookingNormalizerService],
         exports: [booking_service_1.BookingService, booking_normalizer_service_1.BookingNormalizerService],
     })
 ], BookingModule);

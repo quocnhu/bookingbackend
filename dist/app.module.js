@@ -27,7 +27,6 @@ const permissions_module_1 = require("./permissions/permissions.module");
 const tours_module_1 = require("./tours/tours.module");
 const booking_module_1 = require("./booking/booking.module");
 const assignments_module_1 = require("./assignments/assignments.module");
-const settlements_module_1 = require("./settlements/settlements.module");
 const company_profile_module_1 = require("./company-profile/company-profile.module");
 const audit_logs_module_1 = require("./audit-logs/audit-logs.module");
 const dashboard_module_1 = require("./dashboard/dashboard.module");
@@ -42,6 +41,7 @@ const leaves_module_1 = require("./leaves/leaves.module");
 const coordinates_module_1 = require("./coordinates/coordinates.module");
 const route_prices_module_1 = require("./route-prices/route-prices.module");
 const transportation_providers_module_1 = require("./transportation-providers/transportation-providers.module");
+const accounting_module_1 = require("./accounting/accounting.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -63,7 +63,6 @@ exports.AppModule = AppModule = __decorate([
             tours_module_1.ToursModule,
             booking_module_1.BookingModule,
             assignments_module_1.AssignmentsModule,
-            settlements_module_1.SettlementsModule,
             company_profile_module_1.CompanyProfileModule,
             audit_logs_module_1.AuditLogsModule,
             dashboard_module_1.DashboardModule,
@@ -77,6 +76,7 @@ exports.AppModule = AppModule = __decorate([
             coordinates_module_1.CoordinatesModule,
             route_prices_module_1.RoutePricesModule,
             transportation_providers_module_1.TransportationProvidersModule,
+            accounting_module_1.AccountingModule,
             serve_static_1.ServeStaticModule.forRoot({
                 rootPath: (0, path_1.join)(process.cwd(), 'uploads'),
                 serveRoot: '/uploads',

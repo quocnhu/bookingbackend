@@ -27,8 +27,8 @@ async function bootstrap() {
 
   app.use(
     helmet({
-      // Cho phép trình duyệt tải ảnh từ /uploads khi trang nằm ở origin khác
-      // (frontend :3000 ← backend :4000). Mặc định CORP=same-origin chặn ảnh.
+      // Allow the browser to load images from /uploads when the page is on a different origin
+      // (frontend :3000 ← backend :4000). The CORP=same-origin default blocks images.
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );

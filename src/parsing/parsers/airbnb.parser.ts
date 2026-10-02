@@ -6,12 +6,12 @@ const DATE_RE =
 const REF_RE =
   /(?:confirmation|reservation|booking|reservation code|confirmation code|itinerary)\s*[#:]?\s*([A-Z0-9][A-Z0-9-]{4,19})/i;
 
-/** Ép mọi value thành string an toàn (tránh '[object Object]'). */
+/** Safely coerce any value to a string (avoids '[object Object]'). */
 const asString = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
 /**
- * Airbnb confirmation email parser (heuristic trên headers + body plain text).
+ * Airbnb confirmation email parser (heuristic over headers + plain text body).
  */
 @Injectable()
 export class AirbnbParser implements TemplateParser {
@@ -111,8 +111,8 @@ export class AirbnbParser implements TemplateParser {
     return m ? m[1].replace(/[\s().-]/g, '') : undefined;
   }
 
-  private normalizeDate(raw: string): string {
-    const d = new Date(raw);
-    return Number.isNaN(d.getTime()) ? raw : d.toISOString();
+  private normalizeDate(raw: string): string | undefined {
+    const d = new Date(raw + '+07:00');
+    return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
   }
 }

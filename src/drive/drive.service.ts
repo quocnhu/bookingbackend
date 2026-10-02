@@ -14,9 +14,10 @@ import {
   RenameFileDto,
   RenameFolderDto,
 } from './dto/drive.dto';
+import { validateFile, sanitizeFileName, ALLOWED_AVATAR_TYPES, MAX_AVATAR_SIZE } from '@/common/utils/file-validation.util';
 
 export const AVATAR_SIZE = 515;
-export const DEFAULT_QUOTA_MB = 3072; // 3 GB cho mọi user không phải ADMIN
+export const DEFAULT_QUOTA_MB = 3072; // 3 GB for every non-ADMIN user
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB / file (non-ADMIN)
 const MB = 1024 * 1024;
 
@@ -40,8 +41,8 @@ export class DriveService {
   ) {}
 
   /**
-   * Tạo root "{slug}_{userId}" + thư mục "avatar" nếu chưa có (idempotent).
-   * Được gọi mỗi lần user đăng nhập/đăng ký.
+   * Creates the root "{slug}_{userId}" plus the "avatar" folder if missing (idempotent).
+   * Called every time a user logs in / registers.
    */
   async ensureUserDrive(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -59,7 +60,7 @@ export class DriveService {
         data: { userId, name: rootName, kind: 'root' },
       });
     } else if (root.name !== rootName) {
-      // upgrade: giữ tên luôn khớp định dạng {slug}_{uuid}
+      // upgrade: keep the name always matching the {slug}_{uuid} format
       root = await this.prisma.driveFolder.update({
         where: { id: root.id },
         data: { name: rootName },
@@ -147,8 +148,9 @@ export class DriveService {
   }
 
   /**
-   * Điểm vào chung cho avatar: profile page (self) và users page (ADMIN thay user khác)
-   * đều dùng endpoint này -> cùng logic xử lý ảnh, cùng nơi lưu, cùng cập nhật avatarUrl.
+   * Shared entry point for avatars: the profile page (self) and the users page
+   * (ADMIN replacing another user) both use this endpoint -> same image
+   * processing logic, same storage location, same avatarUrl update.
    */
   async uploadAvatar(
     actor: { id: string; role: string },
@@ -182,7 +184,12 @@ export class DriveService {
     const ext = (file.originalname.split('.').pop() || '').toLowerCase();
     const isAvatar = folder.kind === 'avatar';
 
-    // Avatar: tự động resize/crop về chuẩn 515x515 rồi mới lưu.
+    // Avatar: validate using magic bytes before processing
+    if (isAvatar) {
+      await validateFile(file.buffer, ALLOWED_AVATAR_TYPES, MAX_AVATAR_SIZE);
+    }
+
+    // Avatar: automatically resize/crop to the 515x515 standard before saving.
     let buffer = file.buffer;
     let mime = file.mimetype || null;
     let finalExt = ext;
@@ -222,18 +229,15 @@ export class DriveService {
       }
     }
 
-    const baseName = (clientName || file.originalname || `file.${ext || 'bin'}`)
-      .split('/')
-      .pop()!
-      .replace(/[^\w.\- ]/g, '_');
+    const baseName = sanitizeFileName(clientName || file.originalname || `file.${ext || 'bin'}`);
     const finalName = isAvatar ? `avatar.${finalExt}` : baseName;
     const storedName = isAvatar ? finalName : `${Date.now()}-${finalName}`;
 
     const storageKey = `drive/${userDir}/${targetId}/${storedName}`;
 
     if (isAvatar) {
-      // folder-based: xoá mọi ảnh avatar cũ trong folder trước khi ghi ảnh mới.
-      // Vì ảnh mới luôn trùng tên avatar.{ext}, xoá sau khi save sẽ xoá cả ảnh mới.
+      // folder-based: delete all old avatar images in the folder before writing the new one.
+      // Because the new image always has the same name avatar.{ext}, deleting after saving would delete the new image too.
       const oldFiles = await this.storage.list(`drive/${userDir}/${targetId}/`);
       for (const f of oldFiles) {
         await this.storage.remove(f.key);
@@ -264,7 +268,7 @@ export class DriveService {
         where: { id: userId },
         data: { avatarUrl },
       });
-      // trả url kèm version để trình duyệt không cache ảnh cũ
+      // return the url with a version so the browser does not cache the old image
       return { ...saved, url: avatarUrl };
     }
 
@@ -349,8 +353,8 @@ export class DriveService {
   }
 
   /**
-   * Tự động chuẩn hoá ảnh avatar về đúng 515x515 (cover-crop, giữ EXIF orientation),
-   * chấp nhận ảnh bất kỳ kích thước. Chỉ nhận PNG/JPG.
+   * Automatically normalizes the avatar image to exactly 515x515 (cover-crop,
+   * keeps EXIF orientation), accepting images of any size. Only PNG/JPG.
    */
   private async processAvatar(file: Express.Multer.File) {
     const ext = (file.originalname.split('.').pop() || '').toLowerCase();

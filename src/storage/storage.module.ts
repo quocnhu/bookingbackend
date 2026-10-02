@@ -4,11 +4,11 @@ import { LocalStorage } from './local.storage';
 import { S3Storage } from './s3.storage';
 
 /**
- * Chọn driver lưu trữ từ env:
- * - STORAGE_DRIVER=s3            -> luôn dùng cloud
- * - STORAGE_DRIVER=local         -> luôn dùng local
- * - STORAGE_DRIVER trống         -> tự động: đủ S3_BUCKET + S3_ACCESS_KEY + S3_SECRET_KEY
- *                                    thì dùng cloud, ngược lại local (test).
+ * Select the storage driver from env:
+ * - STORAGE_DRIVER=s3            -> always use cloud
+ * - STORAGE_DRIVER=local         -> always use local
+ * - STORAGE_DRIVER empty         -> automatic: use cloud when S3_BUCKET + S3_ACCESS_KEY
+ *                                    + S3_SECRET_KEY are all set, otherwise local (test).
  */
 function createFileStorage(): FileStorage {
   const driver = (process.env.STORAGE_DRIVER || '').trim().toLowerCase();

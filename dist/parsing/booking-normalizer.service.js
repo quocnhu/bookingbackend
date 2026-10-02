@@ -111,7 +111,7 @@ let BookingNormalizerService = class BookingNormalizerService {
         const value = this.pickString(raw);
         if (!value)
             return undefined;
-        const date = new Date(value);
+        const date = new Date(value + (value.includes('T') ? '' : 'T00:00:00') + '+07:00');
         return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
     }
     pickString(value) {

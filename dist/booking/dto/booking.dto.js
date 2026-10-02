@@ -30,6 +30,7 @@ class CreateBookingDto {
     phone;
     mail;
     totalPax;
+    notes;
     paxDetail;
     tourType;
     tourName;
@@ -41,16 +42,19 @@ exports.CreateBookingDto = CreateBookingDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 50),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "bookingRef", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 100),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "source", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 100),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "confirmationCode", void 0);
 __decorate([
@@ -64,68 +68,88 @@ __decorate([
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "status", void 0);
 __decorate([
-    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "tourId", void 0);
 __decorate([
-    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "address", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(-90),
+    (0, class_validator_1.Max)(90),
     __metadata("design:type", Number)
 ], CreateBookingDto.prototype, "latitude", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(-180),
+    (0, class_validator_1.Max)(180),
     __metadata("design:type", Number)
 ], CreateBookingDto.prototype, "longitude", void 0);
 __decorate([
-    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", Object)
 ], CreateBookingDto.prototype, "startingDate", void 0);
 __decorate([
-    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "customerName", void 0);
 __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "hotelName", void 0);
 __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Matches)(/^[+]?[\d\s\-()]{7,20}$/),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "phone", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsEmail)(),
+    (0, class_validator_1.Length)(1, 100),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "mail", void 0);
 __decorate([
-    (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(12),
     __metadata("design:type", Number)
 ], CreateBookingDto.prototype, "totalPax", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 1000),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "notes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 1000),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "paxDetail", void 0);
 __decorate([
-    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsEnum)(client_1.TourType),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "tourType", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "tourName", void 0);
 __decorate([
@@ -141,6 +165,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 200),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "noShowReason", void 0);
 class UpdateBookingDto {
@@ -155,15 +180,12 @@ class UpdateBookingDto {
     phone;
     mail;
     totalPax;
-    paxDetail;
     tourType;
     tourName;
     payment;
     isNoShow;
     noShowReason;
     notes;
-    collectAmount;
-    refundAmount;
 }
 exports.UpdateBookingDto = UpdateBookingDto;
 __decorate([
@@ -179,16 +201,23 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "address", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(-90),
+    (0, class_validator_1.Max)(90),
     __metadata("design:type", Number)
 ], UpdateBookingDto.prototype, "latitude", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(-180),
+    (0, class_validator_1.Max)(180),
     __metadata("design:type", Number)
 ], UpdateBookingDto.prototype, "longitude", void 0);
 __decorate([
@@ -198,34 +227,35 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "customerName", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "hotelName", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Matches)(/^[+]?[\d\s\-()]{7,20}$/),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "phone", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsEmail)(),
+    (0, class_validator_1.Length)(1, 100),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "mail", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(12),
     __metadata("design:type", Number)
 ], UpdateBookingDto.prototype, "totalPax", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateBookingDto.prototype, "paxDetail", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.TourType),
@@ -234,6 +264,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "tourName", void 0);
 __decorate([
@@ -249,23 +280,15 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 200),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "noShowReason", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 1000),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "notes", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_transformer_1.Type)(() => Number),
-    __metadata("design:type", Object)
-], UpdateBookingDto.prototype, "collectAmount", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_transformer_1.Type)(() => Number),
-    __metadata("design:type", Object)
-], UpdateBookingDto.prototype, "refundAmount", void 0);
 class QueryBookingDto extends pagination_dto_1.PaginationDto {
     status;
     channel;
@@ -302,8 +325,6 @@ __decorate([
 class BookingPatchDto {
     id;
     notes;
-    collectAmount;
-    refundAmount;
 }
 exports.BookingPatchDto = BookingPatchDto;
 __decorate([
@@ -316,16 +337,6 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", Object)
 ], BookingPatchDto.prototype, "notes", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_transformer_1.Type)(() => Number),
-    __metadata("design:type", Object)
-], BookingPatchDto.prototype, "collectAmount", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_transformer_1.Type)(() => Number),
-    __metadata("design:type", Object)
-], BookingPatchDto.prototype, "refundAmount", void 0);
 class BatchUpdateBookingsDto {
     items;
 }

@@ -11,6 +11,7 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '@/common/decorators/public.decorator';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { GmailPubSubService } from './gmail-pubsub.service';
@@ -28,8 +29,9 @@ export class GmailController {
     private readonly oidcService: GoogleOidcService,
   ) {}
 
-  /** Push subscription endpoint — Gmail → Pub/Sub → đây (public, verify OIDC). */
+  /** Push subscription endpoint — Gmail → Pub/Sub → here (public, verify OIDC). */
   @Public()
+  @Throttle({ default: { limit: 100, ttl: 60000 } })
   @Post('webhook')
   async webhook(
     @Headers('authorization') authorization: string | undefined,
@@ -43,7 +45,7 @@ export class GmailController {
       throw new BadRequestException('Invalid Authorization header');
     }
 
-    // Verify Google OIDC JWT trước khi xử lý.
+    // Verify the Google OIDC JWT before processing.
     await this.oidcService.verifyIdToken(token);
 
     const message = body?.message;
@@ -66,14 +68,14 @@ export class GmailController {
     return { received: true, ...result };
   }
 
-  /** Bắt đầu OAuth flow để connect/reconnect một mailbox. */
+  /** Start the OAuth flow to connect/reconnect a mailbox. */
   @Permissions('gmail.manage')
   @Get('connect')
   connect(@Res() res: Response, @Query('accountId') accountId?: string) {
     return res.redirect(this.connectService.buildConnectUrl(accountId));
   }
 
-  /** Google redirect về đây sau khi user đồng ý quyền. */
+  /** Google redirects here after the user grants permission. */
   @Public()
   @Get('callback')
   async callback(
@@ -104,35 +106,35 @@ export class GmailController {
     }
   }
 
-  /** Danh sách mailbox tracked. */
+  /** List of tracked mailboxes. */
   @Permissions('gmail.manage')
   @Get('accounts')
   list() {
     return this.connectService.list();
   }
 
-  /** Xóa mailbox. */
+  /** Remove a mailbox. */
   @Permissions('gmail.manage')
   @Delete('accounts/:id')
   remove(@Param('id') id: string) {
     return this.connectService.remove(id);
   }
 
-  /** Test refresh token: gọi Gmail API để xác nhận token còn hiệu lực. */
+  /** Test refresh token: call the Gmail API to confirm the token is still valid. */
   @Permissions('gmail.manage')
   @Post('accounts/:id/test')
   testConnection(@Param('id') id: string) {
     return this.pubSubService.testConnection(id);
   }
 
-  /** Gia hạn watch ngay (thủ công) cho một mailbox. */
+  /** Renew a mailbox's watch immediately (manually). */
   @Permissions('gmail.manage')
   @Post('accounts/:id/renew-watch')
   renewWatch(@Param('id') id: string) {
     return this.watchService.registerWatchForAccount(id);
   }
 
-  /** Test endpoint: renew các watch sắp hết hạn + thống kê rawData. */
+  /** Test endpoint: renew watches that are about to expire + rawData statistics. */
   @Permissions('gmail.manage')
   @Get('status')
   status() {

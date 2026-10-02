@@ -10,7 +10,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
-    BookingModule, // 🚀 Nạp BookingModule vào đây để GmailConsumer có thể @Inject(BookingService)
+    BookingModule, // 🚀 Import BookingModule here so GmailConsumer can @Inject(BookingService)
     PrismaModule, 
     RedisModule,  // ◄ CRITICAL: Gives GmailModule access to RedisService
     CacheModule.register(), // ◄ ADD THIS: Provides CACHE_MANAGER

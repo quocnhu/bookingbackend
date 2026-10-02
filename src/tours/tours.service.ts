@@ -18,9 +18,7 @@ import {
 } from './dto/tour.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
 import sharp from 'sharp';
-
-const MAX_GALLERY_IMAGE_BYTES = 15 * 1024 * 1024;
-const ALLOWED_GALLERY_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+import { validateFile, sanitizeFileName, ALLOWED_IMAGE_TYPES, MAX_FILE_SIZE } from '@/common/utils/file-validation.util';
 
 @Injectable()
 export class ToursService {
@@ -205,8 +203,8 @@ export class ToursService {
   }
 
   /**
-   * Thư mục ảnh của tour là nguồn dữ liệu: liệt kê mọi file trong
-   * tours/{tourId}/gallery, không cần bản ghi DB nào.
+   * The tour's image folder is the data source: list every file in
+   * tours/{tourId}/gallery, with no DB record needed.
    */
   private async listGallery(tourId: string) {
     const files = await this.storage.list(this.galleryPrefix(tourId));
@@ -220,8 +218,9 @@ export class ToursService {
   }
 
   /**
-   * Upload ảnh vào "thư mục ảnh" của tour (storage prefix tours/{tourId}/gallery).
-   * Tên file mang tiền tố thứ tự (000-, 001-...) để sắp xếp theo folder.
+   * Upload an image into the tour's "image folder" (storage prefix
+   * tours/{tourId}/gallery). File names carry an order prefix (000-, 001-...)
+   * so they sort by folder.
    */
   async uploadGallery(
     tourId: string,
@@ -232,15 +231,9 @@ export class ToursService {
     if (!file?.buffer) {
       throw new BadRequestException('No file uploaded');
     }
-    const mime = (file.mimetype || '').toLowerCase();
-    if (!ALLOWED_GALLERY_TYPES.includes(mime)) {
-      throw new BadRequestException(
-        'Gallery only accepts JPG, PNG or WEBP images',
-      );
-    }
-    if (file.size > MAX_GALLERY_IMAGE_BYTES) {
-      throw new BadRequestException('Max image size is 15MB');
-    }
+
+    // Validate file using magic bytes (not just MIME type)
+    await validateFile(file.buffer, ALLOWED_IMAGE_TYPES, MAX_FILE_SIZE);
 
     let buffer: Buffer;
     try {
@@ -258,11 +251,7 @@ export class ToursService {
     const folder = this.galleryPrefix(tourId);
     const existing = await this.storage.list(folder);
     const padded = String(existing.length).padStart(3, '0');
-    const baseName = (file.originalname || 'photo')
-      .split('/')
-      .pop()!
-      .replace(/[^\w.\- ]/g, '_')
-      .replace(/\.[^.]+$/, '');
+    const baseName = sanitizeFileName(file.originalname || 'photo').replace(/\.[^.]+$/, '');
     const storageKey = `${folder}/${padded}-${Date.now()}-${baseName}.webp`;
     await this.storage.save(storageKey, buffer, { contentType: 'image/webp' });
 

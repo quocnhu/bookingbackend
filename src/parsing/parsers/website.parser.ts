@@ -4,11 +4,11 @@ import { load } from 'cheerio';
 import { BookingNormalizerService } from '../booking-normalizer.service';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
-/** Ép mọi value thành string an toàn (tránh '[object Object]'). */
+/** Safely coerce any value to a string (avoids '[object Object]'). */
 const asString = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
-/** Collapse whitespace (nhiều dòng/indent trong cell → 1 dòng). */
+/** Collapse whitespace (multiple lines/indentation in a cell → 1 line). */
 const collapse = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
 interface WebsiteBooking {
@@ -34,19 +34,19 @@ interface WebsiteBooking {
 }
 
 /**
- * Website — email xác nhận từ WP Travel Engine (form đặt tour trên website).
- * Template là bảng HTML (xem src/check/website.txt):
+ * Website — confirmation email from WP Travel Engine (tour booking form on the website).
+ * The template is an HTML table (see src/check/website.txt):
  *
  *   Package Name → packageName   Trip Date   → startingDate
  *   Travellers    → totalPax     Subtotal/…   → priceLines + totalcost
  *   Name/Email/Billing Address   → customer/mail/address
  *   link wp-admin post.php?post= → bookingRef "WEB-<postId>"
  *
- * Hỗ trợ 3 nguồn:
- *   1. `payload.html`/`payload.body` chứa HTML → parse bảng trực tiếp.
+ * 3 sources are supported:
+ *   1. `payload.html`/`payload.body` contains HTML → parse the table directly.
  *   2. Plain-text body → regex fallback.
- *   3. `payload.booking` đã có JSON → normalize (backward-compat).
- * Dữ liệu giàu được lưu vào `payload.booking` để giữ trong rawData.payload.
+ *   3. `payload.booking` already contains JSON → normalize (backward-compat).
+ * The rich data is stored in `payload.booking` so it is kept in rawData.payload.
  */
 @Injectable()
 export class WebsiteParser implements TemplateParser {
@@ -92,7 +92,7 @@ export class WebsiteParser implements TemplateParser {
     return result.clean ? result.data! : null;
   }
 
-  /** Parse template website (HTML bảng hoặc plain-text fallback). */
+  /** Parse the website template (HTML table or plain-text fallback). */
   private parseHtml(
     raw: string,
     payload: Record<string, unknown>,
@@ -123,7 +123,7 @@ export class WebsiteParser implements TemplateParser {
         this.captureRow(rows, priceLinesParts, key, val);
       });
     } else {
-      // Plain-text fallback: "Label" / "Label : value" mỗi dòng.
+      // Plain-text fallback: "Label" / "Label : value" on each line.
       const linkMatch =
         /(https?:\/\/[^\s]+wp-admin\/post\.php\?post=\d+[^\s]*)/i.exec(text);
       bookingLink = linkMatch ? linkMatch[1] : null;
@@ -132,7 +132,7 @@ export class WebsiteParser implements TemplateParser {
         const m = /^([A-Za-z][A-Za-z ]{2,40}?):\s*(.*)$/.exec(line.trim());
         if (m) this.captureRow(rows, priceLinesParts, m[1].trim(), m[2].trim());
       }
-      // Tour name = dòng in đậm đầu tiên, thường nằm trên "Package Name".
+      // Tour name = the first bold line, usually right above "Package Name".
       const heading = /^(.{4,120})$/.exec(text.trim().split('\n')[0]);
       if (heading && !tourName) tourName = heading[1].trim();
     }
@@ -181,7 +181,7 @@ export class WebsiteParser implements TemplateParser {
     };
   }
 
-  /** Ghi một dòng bảng vào rows / priceLinesParts theo key đã biết. */
+  /** Write a table row into rows / priceLinesParts based on a known key. */
   private captureRow(
     rows: Map<string, string>,
     priceLinesParts: string[],
@@ -211,7 +211,7 @@ export class WebsiteParser implements TemplateParser {
       }
     }
 
-    // Dòng kiểu "Adult" | "2 X $25 = $50" → price line.
+    // A row like "Adult" | "2 X $25 = $50" → price line.
     const priceMatch = /^(\d+)\s*[Xx]\s*\$([0-9.]+)\s*=\s*\$([0-9.]+)$/.exec(
       value,
     );
@@ -222,7 +222,7 @@ export class WebsiteParser implements TemplateParser {
     }
   }
 
-  /** "post=3286" → "WEB-3286"; fallback dùng threadId/messageId để ổn định retry. */
+  /** "post=3286" → "WEB-3286"; fallback uses threadId/messageId for retry stability. */
   private resolveBookingRef(
     bookingLink: string | null,
     payload: Record<string, unknown>,
@@ -236,7 +236,7 @@ export class WebsiteParser implements TemplateParser {
     return null;
   }
 
-  /** Chuyển dữ liệu giàu sang BookingFields (khớp model Prisma Booking). */
+  /** Convert the rich data to BookingFields (matching the Prisma Booking model). */
   private toFields(
     rich: WebsiteBooking,
     payload: Record<string, unknown>,
@@ -272,7 +272,7 @@ export class WebsiteParser implements TemplateParser {
     return 'UNKNOWN';
   }
 
-  /** Tách hotel / địa chỉ tại dấu phẩy (ưu tiên từ khoá khách sạn). */
+  /** Split hotel / address at the comma (hotel keyword takes priority). */
   private splitPickUp(raw?: string | null): {
     hotel?: string;
     address?: string;
@@ -305,7 +305,7 @@ export class WebsiteParser implements TemplateParser {
 
   private normalizeDate(raw?: string | null): string | undefined {
     if (!raw) return undefined;
-    const date = new Date(raw);
+    const date = new Date(raw + '+07:00');
     return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
   }
 }

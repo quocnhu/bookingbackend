@@ -3,17 +3,17 @@ import { BookingProvider, TourType } from '@prisma/client';
 import { load } from 'cheerio';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
-/** Ép mọi value thành string an toàn (tránh '[object Object]'). */
+/** Safely coerce any value to a string (avoids '[object Object]'). */
 const asString = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
-/** Collapse whitespace (nhiều dòng/indent trong cell → 1 dòng). */
+/** Collapse whitespace (multiple lines/indentation in a cell → 1 line). */
 const collapse = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
 /**
- * GetYourGuide — email xác nhận đặt tour từ GetYourGuide (hệ Viator marketplace).
- * Template chính là bảng HTML label→value (giống TripAdvisor, ví dụ trong
- * src/check/gmail.consumer.ts với bookingRef "GET-91511242", soldBy GetYourGuide):
+ * GetYourGuide — tour booking confirmation email from GetYourGuide (Viator marketplace).
+ * The main template is an HTML label→value table (same as TripAdvisor, example in
+ * src/check/gmail.consumer.ts with bookingRef "GET-91511242", soldBy GetYourGuide):
  *
  *   Booking Ref. / Product Booking Ref. / Ext. Booking Ref. → bookingRef
  *   Product     → tourName   Rate            → tourType
@@ -21,10 +21,10 @@ const collapse = (value: string): string => value.replace(/\s+/g, ' ').trim();
  *   Customer    → customerName Customer Email → mail
  *   Date        → startingDate Pick-up       → hotelName + address
  *
- * Vẫn hỗ trợ 2 dạng nữa:
- *   - payload.booking/parsedBooking đã parse sẵn dạng JSON,
+ * Two other formats are also supported:
+ *   - payload.booking/parsedBooking already parsed as JSON,
  *   - plain-text GYG: "Booking number:" / "Booking reference:" + participants + pickup.
- * Dữ liệu giàu được lưu vào payload.booking để giữ trong rawData.payload.
+ * The rich data is stored in payload.booking so it is kept in rawData.payload.
  */
 @Injectable()
 export class GetYourGuideParser implements TemplateParser {
@@ -54,7 +54,7 @@ export class GetYourGuideParser implements TemplateParser {
     const text = html || body;
     const subject = asString(payload.subject);
 
-    // 1. HTML bảng label→value (chuẩn Viator/GetYourGuide operator email).
+    // 1. HTML label→value table (standard Viator/GetYourGuide operator email).
     if (text.includes('<')) {
       const rich = this.parseTable(text);
       if (rich) {
@@ -63,7 +63,7 @@ export class GetYourGuideParser implements TemplateParser {
       }
     }
 
-    // 2. Payload đã parse sẵn dạng JSON.
+    // 2. Payload already parsed as JSON.
     if (payload.booking ?? payload.parsedBooking) {
       const rich = this.fromJson(payload);
       if (rich) {
@@ -82,7 +82,7 @@ export class GetYourGuideParser implements TemplateParser {
     return null;
   }
 
-  /** Đọc bảng HTML: mỗi `tr` → [label, value]. */
+  /** Read the HTML table: each `tr` → [label, value]. */
   private parseTable(raw: string): Record<string, unknown> | null {
     const rows = new Map<string, string>();
     const text = raw.replace(/<br\s*\/?>/gi, '\n');
@@ -103,11 +103,11 @@ export class GetYourGuideParser implements TemplateParser {
         );
       });
     } catch {
-      // bỏ qua, dùng regex fallback
+      // ignore, use the regex fallback
     }
 
     if (rows.size === 0) {
-      // Fallback: "Label: value" trên dòng riêng.
+      // Fallback: "Label: value" on its own line.
       for (const line of text.split('\n')) {
         const m = /^([A-Za-z][A-Za-z .-]{2,40}?):\s*(.*)$/.exec(line.trim());
         if (m) this.setRow(rows, m[1], m[2]);
@@ -184,7 +184,7 @@ export class GetYourGuideParser implements TemplateParser {
     }
   }
 
-  /** Từ payload.booking/parsedBooking đã parse sẵn dạng JSON. */
+  /** From payload.booking/parsedBooking already parsed as JSON. */
   private fromJson(
     payload: Record<string, unknown>,
   ): Record<string, unknown> | null {
@@ -324,7 +324,7 @@ export class GetYourGuideParser implements TemplateParser {
     };
   }
 
-  /** Tách hotel / địa chỉ tại dấu phẩy đầu tiên. */
+  /** Split hotel / address at the first comma. */
   private splitPickUp(raw?: string): { hotel?: string; address?: string } {
     const value = raw?.trim();
     if (!value) return {};
@@ -335,15 +335,15 @@ export class GetYourGuideParser implements TemplateParser {
     return hotel ? { hotel, address } : { address };
   }
 
-  /** "65 Le Loi, Ben Nghe, District 1, HCM" → substring sau tên khách sạn (dùng khi table). */
+  /** "65 Le Loi, Ben Nghe, District 1, HCM" → substring after the hotel name (used with tables). */
   private subAddress(raw?: string | null): string | null {
     if (!raw) return null;
     const comma = raw.indexOf(',');
     return comma === -1 ? null : raw.slice(comma + 1).trim() || null;
   }
 
-  /** Cộng dồn Adult/Child/Infant trong "1 Child 2 Adult 1 Infant".
-   *  (?<!...) chặn giờ (07:30), số tháng (5/14), hay chuỗi số dài. */
+  /** Sum Adult/Child/Infant counts in "1 Child 2 Adult 1 Infant".
+   *  (?<!...) blocks times (07:30), month numbers (5/14), and long number sequences. */
   private sumPax(raw?: string): number | null | undefined {
     if (!raw) return undefined;
     const matches = raw.matchAll(
@@ -416,7 +416,7 @@ export class GetYourGuideParser implements TemplateParser {
     return index === -1 ? undefined : index;
   }
 
-  /** Rate/Product chứa private/solo → PRIVATE_TOUR; shared/group/max → GROUP_TOUR. */
+  /** Rate/Product containing private/solo → PRIVATE_TOUR; shared/group/max → GROUP_TOUR. */
   private detectTourType(text: string): TourType | 'UNKNOWN' {
     const value = text.toLowerCase();
     if (/\b(private|solo|exclusive)\b/.test(value)) return TourType.PRIVATE_TOUR;
@@ -424,12 +424,12 @@ export class GetYourGuideParser implements TemplateParser {
     return 'UNKNOWN';
   }
 
-  /** "Thu 14.May '26 @ 07:30" → ISO; fallback Date.parse. */
+  /** "Thu 14.May '26 @ 07:30" → ISO string in Vietnam timezone; fallback Date.parse. */
   private normalizeDate(raw?: string): string | undefined {
     if (!raw) return undefined;
     const iso = this.matchDate(raw);
-    if (iso) return iso;
-    const d = new Date(raw);
+    if (iso) return new Date(iso + '+07:00').toISOString();
+    const d = new Date(raw + '+07:00');
     return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
   }
 }

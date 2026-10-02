@@ -3,21 +3,21 @@ import { BookingProvider, TourType } from '@prisma/client';
 import { load } from 'cheerio';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
-/** Ép mọi value thành string an toàn (tránh '[object Object]'). */
+/** Safely coerce any value to a string (avoids '[object Object]'). */
 const asString = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
 /**
- * TripAdvisor — template email là một bảng HTML: mỗi `tr` có 2 cell
- * (label bên trái → value bên phải). Mapping theo PROCESS_FLOW.md §5.2:
+ * TripAdvisor — the email template is an HTML table: each `tr` has 2 cells
+ * (label on the left → value on the right). Mapping per PROCESS_FLOW.md §5.2:
  *
  *   Booking Ref. → bookingRef   Customer Email → mail
  *   Product      → tourName     Customer Phone → phone
  *   Rate         → tourType     Date           → startingDate
  *   Pax          → totalPax     Pick-up        → hotelName + address
- *   Customer     → customerName Notes/Extras   → (lưu giữ nguyên)
+ *   Customer     → customerName Notes/Extras   → (kept as-is)
  *
- * Vẫn hỗ trợ payload đã parse sẵn dạng JSON (`payload.booking`) từ flow cũ.
+ * A payload already parsed as JSON (`payload.booking`) from the old flow is also supported.
  */
 @Injectable()
 export class TripAdvisorParser implements TemplateParser {
@@ -58,9 +58,9 @@ export class TripAdvisorParser implements TemplateParser {
   }
 
   /**
-   * Đọc bảng: mỗi `tr` → [label, value]. Fallback regex khi không có cheerio.
-   * Giá trị được collapse whitespace (nhiều dòng/indent trong cell → 1 dòng);
-   * riêng cell `Notes` giữ cấu trúc dòng (join các <div>) để regex notes chạy được.
+   * Read the table: each `tr` → [label, value]. Regex fallback when cheerio is unavailable.
+   * Values have their whitespace collapsed (multiple lines/indentation in a cell → 1 line);
+   * the `Notes` cell keeps its line structure (joins the <div>s) so the notes regex can run.
    */
   private parseRows(raw: string): Map<string, string> {
     const rows = new Map<string, string>();
@@ -102,10 +102,10 @@ export class TripAdvisorParser implements TemplateParser {
         if (rows.size > 0) return rows;
       }
     } catch {
-      // bỏ qua, fallback regex bên dưới
+      // ignore, use the regex fallback below
     }
 
-    // Fallback: label 2-40 ký tự, theo sau là ':' rồi value tới hết dòng.
+    // Fallback: 2-40 character label, followed by ':' then the value to end of line.
     const re = /([A-Za-z][A-Za-z .-]{2,40}?):\s*(.*)$/gm;
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
@@ -219,8 +219,8 @@ export class TripAdvisorParser implements TemplateParser {
       address: pickUp.address,
     };
 
-    // Lưu toàn bộ field của template vào payload.booking (→ rawData.payload),
-    // giữ các field giàu không nằm trong Booking (supplier, inclusions, totalcost...).
+    // Store all template fields in payload.booking (→ rawData.payload),
+    // keeping the rich fields that are not part of Booking (supplier, inclusions, totalcost...).
     payload.booking = {
       provider: 'tripadvisor',
       bookingRef,
@@ -251,13 +251,13 @@ export class TripAdvisorParser implements TemplateParser {
     return fields;
   }
 
-  /** "Viator amount: USD 39.96" nằm trong Notes → trả "USD 39.96". */
+  /** "Viator amount: USD 39.96" located in Notes → return "USD 39.96". */
   private extractViatorAmount(notes: string): string | null {
     const m = /Viator amount:\s*([A-Za-z0-9.$ ]+)/i.exec(notes);
     return m ? m[1].replace(/\s+/g, ' ').trim() : null;
   }
 
-  /** Khối "--- Inclusions: --- ..." trong Notes → danh sách cách nhau dấu phẩy. */
+  /** The "--- Inclusions: --- ..." block in Notes → comma-separated list. */
   private extractInclusions(notes: string): string | null {
     if (!notes) return null;
     const m =
@@ -272,7 +272,7 @@ export class TripAdvisorParser implements TemplateParser {
     return items.length > 0 ? items.join(', ') : null;
   }
 
-  /** Khối "--- Booking languages: --- ..." trong Notes → bỏ tiền tố "GUIDE :". */
+  /** The "--- Booking languages: --- ..." block in Notes → strip the "GUIDE :" prefix. */
   private extractBookingLanguages(notes: string): string | null {
     if (!notes) return null;
     const m =
@@ -325,7 +325,7 @@ export class TripAdvisorParser implements TemplateParser {
     };
   }
 
-  /** Tách hotel / địa chỉ tại dấu phẩy đầu tiên (PROCESS_FLOW.md §5.2). */
+  /** Split hotel / address at the first comma (PROCESS_FLOW.md §5.2). */
   private splitPickUp(raw?: string): { hotel?: string; address?: string } {
     const value = raw?.trim();
     if (!value) return {};
@@ -336,7 +336,7 @@ export class TripAdvisorParser implements TemplateParser {
     return hotel ? { hotel, address } : { address };
   }
 
-  /** Tính paxTotal từ "2 Adult" → 2; cộng dồn Adult/Child/Infant. */
+  /** Compute paxTotal from "2 Adult" → 2; sums Adult/Child/Infant. */
   private sumPax(raw?: string): number | undefined {
     if (!raw) return undefined;
     const matches = raw.matchAll(/(\d+)\s*(?:adult|child|infant|pax)s?/gi);
@@ -349,7 +349,7 @@ export class TripAdvisorParser implements TemplateParser {
     return found ? total : undefined;
   }
 
-  /** Rate/Product chứa private/solo → PRIVATE_TOUR; shared/group/max → GROUP_TOUR. */
+  /** Rate/Product containing private/solo → PRIVATE_TOUR; shared/group/max → GROUP_TOUR. */
   private detectTourType(rate: string, product: string): TourType | undefined {
     const text = `${rate} ${product}`.toLowerCase();
     if (/\b(private|solo|exclusive)\b/.test(text)) return TourType.PRIVATE_TOUR;
@@ -357,7 +357,7 @@ export class TripAdvisorParser implements TemplateParser {
     return undefined;
   }
 
-  /** "Thu 14.May '26 @ 07:30" → ISO 2026-05-14T07:30:00.000Z */
+  /** "Thu 14.May '26 @ 07:30" → ISO string in Vietnam timezone; fallback Date.parse. */
   private normalizeDate(raw?: string): string | undefined {
     if (!raw) return undefined;
     const value = raw.trim();
@@ -374,10 +374,10 @@ export class TripAdvisorParser implements TemplateParser {
       const minute = Number(m[5]);
       if (month != null && year != null) {
         const date = new Date(year, month, day, hour, minute);
-        if (!Number.isNaN(date.getTime())) return date.toISOString();
+        if (!Number.isNaN(date.getTime())) return new Date(date.toISOString() + '+07:00').toISOString();
       }
     }
-    const plain = new Date(value);
+    const plain = new Date(value + '+07:00');
     return Number.isNaN(plain.getTime()) ? undefined : plain.toISOString();
   }
 

@@ -20,6 +20,7 @@ const common_1 = require("@nestjs/common");
 const sharp_1 = __importDefault(require("sharp"));
 const prisma_service_1 = require("../prisma/prisma.service");
 const storage_1 = require("../storage");
+const file_validation_util_1 = require("../common/utils/file-validation.util");
 exports.AVATAR_SIZE = 515;
 exports.DEFAULT_QUOTA_MB = 3072;
 exports.MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
@@ -144,6 +145,9 @@ let DriveService = class DriveService {
         const folder = await this.assertFolderAccess(userId, targetId);
         const ext = (file.originalname.split('.').pop() || '').toLowerCase();
         const isAvatar = folder.kind === 'avatar';
+        if (isAvatar) {
+            await (0, file_validation_util_1.validateFile)(file.buffer, file_validation_util_1.ALLOWED_AVATAR_TYPES, file_validation_util_1.MAX_AVATAR_SIZE);
+        }
         let buffer = file.buffer;
         let mime = file.mimetype || null;
         let finalExt = ext;
@@ -176,10 +180,7 @@ let DriveService = class DriveService {
                 throw new common_1.BadRequestException(`Storage quota exceeded (limit ${this.formatBytes(quotaBytes)})`);
             }
         }
-        const baseName = (clientName || file.originalname || `file.${ext || 'bin'}`)
-            .split('/')
-            .pop()
-            .replace(/[^\w.\- ]/g, '_');
+        const baseName = (0, file_validation_util_1.sanitizeFileName)(clientName || file.originalname || `file.${ext || 'bin'}`);
         const finalName = isAvatar ? `avatar.${finalExt}` : baseName;
         const storedName = isAvatar ? finalName : `${Date.now()}-${finalName}`;
         const storageKey = `drive/${userDir}/${targetId}/${storedName}`;

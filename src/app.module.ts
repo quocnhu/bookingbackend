@@ -18,7 +18,6 @@ import { PermissionsModule } from './permissions/permissions.module';
 import { ToursModule } from './tours/tours.module';
 import { BookingModule } from './booking/booking.module';
 import { AssignmentsModule } from './assignments/assignments.module';
-import { SettlementsModule } from './settlements/settlements.module';
 import { CompanyProfileModule } from './company-profile/company-profile.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -33,6 +32,7 @@ import { LeavesModule } from './leaves/leaves.module';
 import { CoordinatesModule } from './coordinates/coordinates.module';
 import { RoutePricesModule } from './route-prices/route-prices.module';
 import { TransportationProvidersModule } from './transportation-providers/transportation-providers.module';
+import { AccountingModule } from './accounting/accounting.module';
 
 @Module({
   imports: [
@@ -51,7 +51,6 @@ import { TransportationProvidersModule } from './transportation-providers/transp
     ToursModule,
     BookingModule,
     AssignmentsModule,
-    SettlementsModule,
     CompanyProfileModule,
     AuditLogsModule,
     DashboardModule,
@@ -65,15 +64,16 @@ import { TransportationProvidersModule } from './transportation-providers/transp
     CoordinatesModule,
     RoutePricesModule,
     TransportationProvidersModule,
+    AccountingModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
     }),
   ],
   providers: [
-    { provide: APP_GUARD, useClass: JwtAuthGuard }, // chạy trước: xác thực + gắn req.user
-    { provide: APP_GUARD, useClass: RoleGuard }, // chạy sau: kiểm tra role/permission
-    { provide: APP_GUARD, useClass: ThrottlerGuard }, // rate-limit toàn cục
+    { provide: APP_GUARD, useClass: JwtAuthGuard }, // runs first: authenticate + attach req.user
+    { provide: APP_GUARD, useClass: RoleGuard }, // runs after: check role/permission
+    { provide: APP_GUARD, useClass: ThrottlerGuard }, // global rate-limit
   ],
 })
 export class AppModule {}

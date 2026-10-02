@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { BookingStatus, AssignmentStatus, FeeFlowType, PaymentStatus } from '@prisma/client';
+import { BookingStatus, AssignmentStatus, PaymentStatus } from '@prisma/client';
 
 export type RangeKey = 'day' | 'week' | 'month';
 
@@ -58,7 +58,6 @@ export class DashboardService {
       todayBookings,
       pendingBookings,
       todayDispatched,
-      pendingSettlements,
       totalTours,
       totalUsers,
       totalRoles,
@@ -66,9 +65,6 @@ export class DashboardService {
       totalAssignments,
       todayLogins,
       lockedAccounts,
-      revenueToday,
-      revenueWeek,
-      revenueMonth,
     ] = await Promise.all([
       this.prisma.booking.count(),
       this.prisma.booking.count({ where: { createdAt: { gte: todayStart, lte: todayEnd } } }),
@@ -84,9 +80,6 @@ export class DashboardService {
       this.prisma.assignment.count(),
       this.prisma.userSession.count({ where: { loggedInAt: { gte: todayStart, lte: todayEnd } } }),
       this.prisma.user.count({ where: { lockoutUntil: { gt: new Date() } } }),
-      this.sumSettlementRevenue(todayStart, todayEnd),
-      this.sumSettlementRevenue(new Date(Date.now() - 7 * 86400000), todayEnd),
-      this.sumSettlementRevenue(new Date(Date.now() - 30 * 86400000), todayEnd),
     ]);
 
     return {
@@ -94,7 +87,6 @@ export class DashboardService {
       todayBookings,
       pendingBookings,
       todayDispatched,
-      pendingSettlements,
       totalTours,
       totalUsers,
       totalRoles,
@@ -102,22 +94,7 @@ export class DashboardService {
       totalAssignments,
       todayLogins,
       lockedAccounts,
-      revenueToday,
-      revenueWeek,
-      revenueMonth,
     };
-  }
-
-  private async sumSettlementRevenue(from: Date, to: Date): Promise<number> {
-    // Doanh thu = tổng các khoản THU (COLLECT_MONEY) trong khoảng thời gian.
-    const rows = await this.prisma.settlement.findMany({
-      where: {
-        createdAt: { gte: from, lte: to },
-        category: { is: { flowType: FeeFlowType.COLLECT_MONEY } },
-      },
-      select: { amount: true },
-    });
-    return rows.reduce((sum, s) => sum + Number(s.amount ?? 0), 0);
   }
 
   async charts(range: RangeKey) {
@@ -125,14 +102,7 @@ export class DashboardService {
     const startTime = buckets[0].start;
     const endTime = buckets[buckets.length - 1].end;
 
-    const [settlements, bookings, sessions, auditLogs] = await Promise.all([
-      this.prisma.settlement.findMany({
-        where: {
-          createdAt: { gte: new Date(startTime), lte: new Date(endTime) },
-          category: { is: { flowType: FeeFlowType.COLLECT_MONEY } },
-        },
-        select: { amount: true, createdAt: true },
-      }),
+    const [bookings, sessions, auditLogs] = await Promise.all([
       this.prisma.booking.findMany({
         where: { createdAt: { gte: new Date(startTime), lte: new Date(endTime) } },
         select: { createdAt: true, payment: true, status: true },
@@ -146,18 +116,6 @@ export class DashboardService {
         select: { action: true },
       }),
     ]);
-
-    const revenueByBucket = buckets.map((b) => {
-      let revenue = 0;
-      let collected = 0;
-      for (const s of settlements) {
-        if (this.bucketIndex(buckets, s.createdAt.getTime()) === buckets.indexOf(b)) {
-          revenue += Number(s.amount ?? 0);
-          collected += Number(s.amount ?? 0);
-        }
-      }
-      return { label: b.label, revenue, collected };
-    });
 
     const bookingsByBucket = buckets.map((b) => ({
       label: b.label,
@@ -191,7 +149,6 @@ export class DashboardService {
 
     return {
       range,
-      revenueByBucket,
       bookingsByBucket,
       loginsByBucket,
       paymentStatusDistribution,

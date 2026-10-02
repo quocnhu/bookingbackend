@@ -12,10 +12,10 @@ export declare class CoordinatesService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        hotelName: string;
         address: string;
         latitude: number;
         longitude: number;
+        hotelName: string;
         starRating: string | null;
     }>;
     create(dto: CreateCoordinateDto): Promise<{
@@ -23,10 +23,10 @@ export declare class CoordinatesService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        hotelName: string;
         address: string;
         latitude: number;
         longitude: number;
+        hotelName: string;
         starRating: string | null;
     }>;
     update(id: string, dto: UpdateCoordinateDto): Promise<{
@@ -34,10 +34,10 @@ export declare class CoordinatesService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        hotelName: string;
         address: string;
         latitude: number;
         longitude: number;
+        hotelName: string;
         starRating: string | null;
     }>;
     remove(id: string): Promise<{

@@ -70,26 +70,6 @@ export declare class VerifyTourReportDto {
     status: 'VERIFIED' | 'REJECTED';
     verificationNotes?: string;
 }
-export declare class FinalizeServiceDto {
-    categoryId?: string;
-    name: string;
-    amount: number;
-}
-export declare class BookingSettlementInputDto {
-    bookingId: string;
-    collect?: number;
-    refund?: number;
-}
 export declare class FinalizeAssignmentDto {
-    collectedAmount: number;
-    refundedAmount?: number;
-    services?: FinalizeServiceDto[];
     evidenceImages?: EvidenceImageDto[];
-    bookingSettlements?: BookingSettlementInputDto[];
-}
-export declare class SettlementSummaryDto {
-    from: string;
-    to: string;
-    guideId?: string;
-    driverId?: string;
 }

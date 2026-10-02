@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   UnauthorizedException,
+  Inject,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -11,6 +12,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { PermissionsService } from './permissions.service';
 import { AuthActivitiesService } from '@/auth-activities/auth-activities.service';
 import { DriveService } from '@/drive/drive.service';
+import { CacheService } from '@/cache/cache.service';
 import { LoginDto, RegisterDto, ChangePasswordDto, UpdateProfileDto } from './dto/auth.dto';
 import { AuthProvider, RoleType } from '@prisma/client';
 import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
@@ -19,58 +21,58 @@ const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 60 * 60 * 1000; // 1h
 const MAX_IP_FAILURES = 20;
 const IP_BLOCK_MS = 60 * 60 * 1000; // 1h
-
-interface IpFailure {
-  count: number;
-  until: number;
-}
+const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 
 @Injectable()
 export class AuthService {
-  private readonly ipFailures = new Map<string, IpFailure>();
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly permissionsService: PermissionsService,
     private readonly authActivitiesService: AuthActivitiesService,
     private readonly driveService: DriveService,
+    private readonly cache: CacheService,
   ) {}
 
   private async issueTokens(user: AuthenticatedUser) {
     const accessToken = await this.jwtService.signAsync(user, {
       secret: process.env.JWT_SECRET,
-      expiresIn: (process.env.JWT_EXPIRES_IN || '1d') as any,
+      expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any,
+      algorithm: 'HS256',
     });
     const refreshToken = await this.jwtService.signAsync(
-      { sub: user.id, type: 'refresh' },
+      { sub: user.id, type: 'refresh', jti: randomUUID() },
       {
         secret: process.env.REFRESH_SECRET,
         expiresIn: (process.env.REFRESH_EXPIRES_IN || '7d') as any,
+        algorithm: 'HS256',
       },
     );
+    // Store refresh token JTI in Redis for rotation/revocation
+    await this.cache.set('refresh-tokens', user.id, refreshToken, REFRESH_TOKEN_TTL);
     return { accessToken, refreshToken };
   }
 
-  private isIpBlocked(ip: string): boolean {
-    const entry = this.ipFailures.get(ip);
-    if (!entry) return false;
-    if (Date.now() > entry.until) {
-      this.ipFailures.delete(ip);
-      return false;
+  private async isIpBlocked(ip: string): Promise<boolean> {
+    const key = `ratelimit:ip:${ip}`;
+    const count = await this.cache['client']?.get(key);
+    if (!count) return false;
+    return parseInt(count, 10) >= MAX_IP_FAILURES;
+  }
+
+  private async recordIpFailure(ip: string): Promise<void> {
+    const key = `ratelimit:ip:${ip}`;
+    const client = this.cache['client'];
+    if (!client) return;
+    const current = await client.incr(key);
+    if (current === 1) {
+      await client.expire(key, IP_BLOCK_MS / 1000);
     }
-    return entry.count >= MAX_IP_FAILURES;
   }
 
-  private recordIpFailure(ip: string) {
-    const entry = this.ipFailures.get(ip) ?? { count: 0, until: 0 };
-    entry.count += 1;
-    entry.until = Date.now() + IP_BLOCK_MS;
-    this.ipFailures.set(ip, entry);
-  }
-
-  private clearIpFailures(ip: string) {
-    this.ipFailures.delete(ip);
+  private async clearIpFailures(ip: string): Promise<void> {
+    const key = `ratelimit:ip:${ip}`;
+    await this.cache['client']?.del(key);
   }
 
   private async recordFailedLogin(userId: string | null, ip: string, userAgent?: string) {
@@ -115,25 +117,25 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ip: string, userAgent?: string) {
-    if (this.isIpBlocked(ip)) {
+    if (await this.isIpBlocked(ip)) {
       throw new UnauthorizedException('Too many failed attempts from this IP. Try again later.');
     }
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
 
     if (user && user.lockoutUntil && user.lockoutUntil > new Date()) {
-      throw new UnauthorizedException(
-        `Account is locked due to too many failed attempts. Try again after 1 hour.`,
-      );
+      throw new UnauthorizedException('Account is temporarily locked. Try again later.');
     }
 
     if (!user || !user.passwordHash || !user.isActive) {
       await this.recordFailedLogin(user?.id ?? null, ip, userAgent);
+      await this.recordIpFailure(ip);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
       await this.recordFailedLogin(user.id, ip, userAgent);
+      await this.recordIpFailure(ip);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -149,7 +151,7 @@ export class AuthService {
         ipAddress: ip,
       },
     });
-    this.clearIpFailures(ip);
+    await this.clearIpFailures(ip);
     await this.authActivitiesService.record({
       userId: user.id,
       eventType: 'LOGIN',
@@ -162,7 +164,7 @@ export class AuthService {
     return this.issueTokens(authUser);
   }
 
-  /** Upsert user sau Google login; mặc định gán role CUSTOMER. */
+  /** Upsert the user after Google login; defaults to the CUSTOMER role. */
   async googleLogin(profile: { email: string; name?: string | null; providerId: string }, ip: string, userAgent?: string) {
     let user = await this.prisma.user.findUnique({ where: { email: profile.email } });
     if (!user) {
@@ -219,7 +221,7 @@ export class AuthService {
           });
         }
       } catch {
-        // Token hết hạn/hỏng: vẫn cho logout.
+        // Token expired/invalid: still allow logout.
       }
     }
     if (userId) {

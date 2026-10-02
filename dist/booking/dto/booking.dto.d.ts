@@ -6,18 +6,19 @@ export declare class CreateBookingDto {
     confirmationCode?: string;
     channel?: BookingProvider;
     status?: BookingStatus;
-    tourId?: string;
-    address?: string;
+    tourId: string;
+    address: string;
     latitude?: number;
     longitude?: number;
     startingDate?: string | Date;
-    customerName?: string;
+    customerName: string;
     hotelName: string;
     phone: string;
     mail?: string;
-    totalPax?: number;
+    totalPax: number;
+    notes?: string;
     paxDetail?: string;
-    tourType?: TourType;
+    tourType: TourType;
     tourName?: string;
     payment?: PaymentStatus;
     isNoShow?: boolean;
@@ -35,15 +36,12 @@ export declare class UpdateBookingDto {
     phone?: string;
     mail?: string;
     totalPax?: number;
-    paxDetail?: string;
     tourType?: TourType;
     tourName?: string;
     payment?: PaymentStatus;
     isNoShow?: boolean;
     noShowReason?: string;
     notes?: string;
-    collectAmount?: number | null;
-    refundAmount?: number | null;
 }
 export declare class QueryBookingDto extends PaginationDto {
     status?: BookingStatus;
@@ -55,8 +53,6 @@ export declare class QueryBookingDto extends PaginationDto {
 export declare class BookingPatchDto {
     id: string;
     notes?: string | null;
-    collectAmount?: number | null;
-    refundAmount?: number | null;
 }
 export declare class BatchUpdateBookingsDto {
     items: BookingPatchDto[];

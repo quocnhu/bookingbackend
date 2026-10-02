@@ -14,8 +14,6 @@ async function main() {
 
   console.log('\n🔄 Clearing rawData, booking, assignment (dependency order)...');
 
-  // Lớp 2 quyết toán theo assignment
-  await prisma.settlement.deleteMany();
   await prisma.tourReport.deleteMany();
 
   // Booking trước (RawData có relation 1-1 sang Booking; RawData.booking giữ FK rawDataId ở Booking)

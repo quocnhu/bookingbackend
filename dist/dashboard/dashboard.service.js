@@ -56,7 +56,7 @@ let DashboardService = class DashboardService {
         todayStart.setHours(0, 0, 0, 0);
         const todayEnd = new Date();
         todayEnd.setHours(23, 59, 59, 999);
-        const [totalBookings, todayBookings, pendingBookings, todayDispatched, pendingSettlements, totalTours, totalUsers, totalRoles, totalPermissions, totalAssignments, todayLogins, lockedAccounts, revenueToday, revenueWeek, revenueMonth,] = await Promise.all([
+        const [totalBookings, todayBookings, pendingBookings, todayDispatched, totalTours, totalUsers, totalRoles, totalPermissions, totalAssignments, todayLogins, lockedAccounts,] = await Promise.all([
             this.prisma.booking.count(),
             this.prisma.booking.count({ where: { createdAt: { gte: todayStart, lte: todayEnd } } }),
             this.prisma.booking.count({ where: { status: client_1.BookingStatus.PENDING } }),
@@ -71,16 +71,12 @@ let DashboardService = class DashboardService {
             this.prisma.assignment.count(),
             this.prisma.userSession.count({ where: { loggedInAt: { gte: todayStart, lte: todayEnd } } }),
             this.prisma.user.count({ where: { lockoutUntil: { gt: new Date() } } }),
-            this.sumSettlementRevenue(todayStart, todayEnd),
-            this.sumSettlementRevenue(new Date(Date.now() - 7 * 86400000), todayEnd),
-            this.sumSettlementRevenue(new Date(Date.now() - 30 * 86400000), todayEnd),
         ]);
         return {
             totalBookings,
             todayBookings,
             pendingBookings,
             todayDispatched,
-            pendingSettlements,
             totalTours,
             totalUsers,
             totalRoles,
@@ -88,33 +84,13 @@ let DashboardService = class DashboardService {
             totalAssignments,
             todayLogins,
             lockedAccounts,
-            revenueToday,
-            revenueWeek,
-            revenueMonth,
         };
-    }
-    async sumSettlementRevenue(from, to) {
-        const rows = await this.prisma.settlement.findMany({
-            where: {
-                createdAt: { gte: from, lte: to },
-                category: { is: { flowType: client_1.FeeFlowType.COLLECT_MONEY } },
-            },
-            select: { amount: true },
-        });
-        return rows.reduce((sum, s) => sum + Number(s.amount ?? 0), 0);
     }
     async charts(range) {
         const buckets = this.buildBuckets(range);
         const startTime = buckets[0].start;
         const endTime = buckets[buckets.length - 1].end;
-        const [settlements, bookings, sessions, auditLogs] = await Promise.all([
-            this.prisma.settlement.findMany({
-                where: {
-                    createdAt: { gte: new Date(startTime), lte: new Date(endTime) },
-                    category: { is: { flowType: client_1.FeeFlowType.COLLECT_MONEY } },
-                },
-                select: { amount: true, createdAt: true },
-            }),
+        const [bookings, sessions, auditLogs] = await Promise.all([
             this.prisma.booking.findMany({
                 where: { createdAt: { gte: new Date(startTime), lte: new Date(endTime) } },
                 select: { createdAt: true, payment: true, status: true },
@@ -128,17 +104,6 @@ let DashboardService = class DashboardService {
                 select: { action: true },
             }),
         ]);
-        const revenueByBucket = buckets.map((b) => {
-            let revenue = 0;
-            let collected = 0;
-            for (const s of settlements) {
-                if (this.bucketIndex(buckets, s.createdAt.getTime()) === buckets.indexOf(b)) {
-                    revenue += Number(s.amount ?? 0);
-                    collected += Number(s.amount ?? 0);
-                }
-            }
-            return { label: b.label, revenue, collected };
-        });
         const bookingsByBucket = buckets.map((b) => ({
             label: b.label,
             count: bookings.filter((x) => this.bucketIndex(buckets, x.createdAt.getTime()) === buckets.indexOf(b)).length,
@@ -162,7 +127,6 @@ let DashboardService = class DashboardService {
         const activityByAction = [...actionCounts.entries()].map(([action, count]) => ({ action, count }));
         return {
             range,
-            revenueByBucket,
             bookingsByBucket,
             loginsByBucket,
             paymentStatusDistribution,

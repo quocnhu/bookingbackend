@@ -14,14 +14,20 @@ import { AutoCrewService } from './auto-crew.service';
 import { ASSIGN_QUEUE } from './queue.constants';
 import { AssignJobData } from './assignment.queue';
 
-/** Một chuyến xe (bus) chở tối đa 12 khách — theo bookingflow.md. */
+/** A trip (bus) carrying at most 12 passengers — per bookingflow.md. */
 const BUS_MAX_PAX = 12;
+
+/** Normalize a Date to YYYY-MM-DD string in UTC (date-only comparison). */
+function toDateKey(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
 
 /**
  * BullMQ worker Stage 3: booking → Assignment.
- * Tìm 1 chuyến xe đang MỞ (DRAFT_ASSIGNED/PENDING) cùng ngày, cùng tourType,
- * còn sức chứa → attach booking (status => ASSIGNED) + refresh summary.
- * Không tìm được bus → booking giữ PENDING để admin xếp tay trên Dispatch Board.
+ * Find an OPEN trip (DRAFT_ASSIGNED/PENDING) on the same date, with the same
+ * tourType and enough capacity → attach the booking (status => ASSIGNED) and
+ * refresh the summary. If no bus is found → the booking stays PENDING so the
+ * admin can assign it manually on the Dispatch Board.
  */
 @Injectable()
 @Processor(ASSIGN_QUEUE, { concurrency: 5 })
@@ -56,8 +62,9 @@ export class AssignmentProcessor extends WorkerHost {
       return { skipped: true, reason: 'NO_START_DATE' };
 
     const candidate = await this.findCandidate(booking);
-    // Không có chuyến mở (PENDING/DRAFT) cùng ngày → tự tạo 1 bus mới
-    // cho tour của booking (bookingflow.md bước 3) để Dispatch Board có dữ liệu.
+    // No open trip (PENDING/DRAFT) on the same date → automatically create a new
+    // bus for the booking's tour (bookingflow.md step 3) so the Dispatch Board
+    // has data to work with.
     if (!candidate) {
       const bus = await this.createBusForBooking(booking);
       this.logger.log(
@@ -112,7 +119,7 @@ export class AssignmentProcessor extends WorkerHost {
     };
   }
 
-  /** Điền crew (HDV + tài xế) còn thiếu cho bus — auto-crew không bao giờ override gán thủ công. */
+  /** Fill in the crew (guide + driver) still missing for the bus — auto-crew never overrides a manual assignment. */
   private async assignCrew(assignmentId: string) {
     try {
       const { assigned } = await this.autoCrew.assignCrewForBus(assignmentId);
@@ -129,17 +136,18 @@ export class AssignmentProcessor extends WorkerHost {
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
   /**
-   * Tạo 1 bus (assignment) cho booking khi chưa có chuyến mở nào phù hợp
-   * (bookingflow.md: "nếu booking với tour chưa có sẽ tạo 1 khối tượng trưng cho bus").
-   * Bus mới ở trạng thái PENDING để admin xếp HDV/tài xế trên Dispatch Board.
+   * Create a bus (assignment) for a booking when no suitable open trip exists
+   * (bookingflow.md: "if a booking's tour has none yet, create a placeholder object for the bus").
+   * The new bus starts in PENDING status so the admin can assign the guide/driver
+   * on the Dispatch Board.
    */
   private async createBusForBooking(booking: any) {
-    const startDate = new Date(booking.startingDate);
-    startDate.setUTCHours(0, 0, 0, 0);
+    // Use date-only from booking to avoid timezone issues
+    const bookingDateKey = toDateKey(new Date(booking.startingDate));
+    const startDate = new Date(bookingDateKey + 'T00:00:00.000Z');
     const durationDays = booking.tour?.durationDays ?? 1;
-    const endDate = new Date(
-      startDate.getTime() + Math.max(1, durationDays - 1) * 86400000,
-    );
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + Math.max(1, durationDays - 1));
     const label = booking.tourType === TourType.PRIVATE_TOUR ? 'Priv' : 'Group';
     const existing = await this.prisma.assignment.findMany({
       where: { code: { startsWith: `${label} Bus -` } },
@@ -149,8 +157,9 @@ export class AssignmentProcessor extends WorkerHost {
       .map((a) => parseInt((a.code ?? '').split('-')[1]?.trim() ?? '0', 10))
       .filter((n) => !Number.isNaN(n));
     const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
-    // Ưu tiên gắn xe của Company Fleet (nếu còn khả dụng cùng ngày) để tận dụng
-    // tài sản công ty trước khi thuê ngoài — xe công ty phí 0 VND (priceOverride = 0).
+    // Prefer a Company Fleet vehicle (if one is still free on the same dates) to
+    // make use of company assets before hiring externally — company vehicles cost
+    // 0 VND (priceOverride = 0).
     const companyVehicle = await this.findCompanyVehicle(
       booking,
       startDate,
@@ -175,7 +184,7 @@ export class AssignmentProcessor extends WorkerHost {
     });
   }
 
-  /** Tìm xe của Company Fleet còn rảnh trong khoảng [startDate, endDate] và đủ sức chứa. */
+  /** Find a Company Fleet vehicle free during [startDate, endDate] with enough capacity. */
   private async findCompanyVehicle(booking: any, startDate: Date, endDate: Date) {
     const pax = booking.totalPax ?? 1;
     return this.prisma.vehicle.findFirst({
@@ -198,16 +207,23 @@ export class AssignmentProcessor extends WorkerHost {
   }
 
   private async findCandidate(booking: any) {
+    // Use tour name from booking.tour relation (already included in query)
+    const bookingTourName = booking.tour?.name ?? booking.tourName;
+    const bookingTourType = booking.tour?.type ?? booking.tourType;
+    const bookingDateKey = toDateKey(new Date(booking.startingDate));
     const candidates = await this.prisma.assignment.findMany({
       where: {
         status: {
           in: [AssignmentStatus.DRAFT_ASSIGNED, AssignmentStatus.PENDING],
         },
-        startDate: { lte: booking.startingDate },
-        endDate: { gte: booking.startingDate },
+        // Use date-only comparison to avoid timezone issues
+        startDate: { lte: new Date(booking.startingDate) },
+        endDate: { gte: new Date(booking.startingDate) },
       },
       include: {
-        bookings: true,
+        bookings: {
+          include: { tour: { select: { name: true, type: true } } }
+        },
         vehicle: {
           select: {
             id: true,
@@ -219,10 +235,19 @@ export class AssignmentProcessor extends WorkerHost {
       orderBy: [{ startDate: 'asc' }],
     });
 
-    const typeOk = (a: any) =>
-      booking.tourType == null ||
-      a.tourType == null ||
-      a.tourType === booking.tourType;
+    const typeOk = (a: any) => {
+      // Get tour name from assignment's first booking's tour relation
+      const aTourName = a.tourName ?? a.bookings[0]?.tour?.name;
+      const aTourType = a.tourType ?? a.bookings[0]?.tour?.type;
+      
+      // Must have same tourType
+      if (bookingTourType && aTourType && aTourType !== bookingTourType) return false;
+      // Must have same tourName (when both have it)
+      if (bookingTourName && aTourName && aTourName !== bookingTourName) return false;
+      // Must be same date (startDate)
+      if (toDateKey(a.startDate) !== bookingDateKey) return false;
+      return true;
+    };
     const capOk = (a: any) => {
       const used = a.bookings.reduce(
         (sum: number, b: any) => sum + (b.totalPax ?? 0),
@@ -237,14 +262,19 @@ export class AssignmentProcessor extends WorkerHost {
     const matches = candidates.filter((a) => typeOk(a) && capOk(a));
     if (matches.length === 0) return null;
 
-    // Ưu tiên: bus của Company Fleet (xe công ty) > đúng tourType > còn ít chỗ nhất.
+    // Priority: exact tourName match > company fleet > most free seats
     matches.sort((a, b) => {
+      const aTourName = a.tourName ?? a.bookings[0]?.tour?.name;
+      const bTourName = b.tourName ?? b.bookings[0]?.tour?.name;
+      // Exact tour name match priority (highest)
+      const aExactName = aTourName === bookingTourName ? 0 : 1;
+      const bExactName = bTourName === bookingTourName ? 0 : 1;
+      if (aExactName !== bExactName) return aExactName - bExactName;
+      // Company Fleet buses (company vehicles) second
       const aCompany = a.vehicle?.provider?.isCompany ? 0 : 1;
       const bCompany = b.vehicle?.provider?.isCompany ? 0 : 1;
       if (aCompany !== bCompany) return aCompany - bCompany;
-      const aExact = a.tourType === booking.tourType ? 0 : 1;
-      const bExact = b.tourType === booking.tourType ? 0 : 1;
-      if (aExact !== bExact) return aExact - bExact;
+      // Most free seats last
       return this.freeSeats(a) - this.freeSeats(b);
     });
     return matches[0];

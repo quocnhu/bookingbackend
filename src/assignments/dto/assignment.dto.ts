@@ -12,7 +12,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
-import { AssignmentOrigin, AssignmentStatus, TourReportStatus } from '@prisma/client';
+import {
+  AssignmentOrigin,
+  AssignmentStatus,
+  TourReportStatus,
+} from '@prisma/client';
 
 export class CreateAssignmentDto {
   @IsOptional()
@@ -117,7 +121,7 @@ export class UpdateAssignmentStatusDto {
   status: AssignmentStatus;
 }
 
-/** Bật/tắt nguồn tạo cho toàn bộ assignment trên Dispatch Board (Manual / Auto). */
+/** Enable/disable the creation source for all assignments on the Dispatch Board (Manual / Auto). */
 export class SetBoardOriginDto {
   @IsEnum(AssignmentOrigin)
   origin: AssignmentOrigin;
@@ -129,14 +133,14 @@ export class AssignBookingsDto {
   bookingIds: string[];
 }
 
-/** Xếp lại thứ tự khách trong 1 bus (drag-and-drop, bookingflow.md bước 3). */
+/** Reorder passengers within a bus (drag-and-drop, bookingflow.md step 3). */
 export class ReorderBookingsDto {
   @IsArray()
   @IsString({ each: true })
   bookingIds: string[];
 }
 
-/** Di chuyển booking sang bus khác (drag-and-drop). */
+/** Move a booking to another bus (drag-and-drop). */
 export class MoveBookingDto {
   @IsString()
   toAssignmentId: string;
@@ -191,7 +195,7 @@ export class SubmitTourReportDto {
   @IsString()
   notes?: string;
 
-  // Ảnh chứng từ HDV upload (từ POST /assignments/:id/tour-report/images)
+  // Receipt images uploaded by the guide (from POST /assignments/:id/tour-report/images)
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -229,101 +233,10 @@ export class VerifyTourReportDto {
   verificationNotes?: string;
 }
 
-export class FinalizeServiceDto {
-  @IsOptional()
-  @IsString()
-  categoryId?: string;
-
-  @IsString()
-  name: string;
-
-  @Type(() => Number)
-  @IsNumber()
-  amount: number;
-}
-
-export class BookingSettlementInputDto {
-  @IsString()
-  bookingId: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  collect?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  refund?: number;
-}
-
 export class FinalizeAssignmentDto {
-  @Type(() => Number)
-  @IsNumber()
-  collectedAmount: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  refundedAmount?: number;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => FinalizeServiceDto)
-  services?: FinalizeServiceDto[];
-
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => EvidenceImageDto)
   evidenceImages?: EvidenceImageDto[];
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => BookingSettlementInputDto)
-  bookingSettlements?: BookingSettlementInputDto[];
-}
-
-export class SettlementSummaryDto {
-  @IsDateString()
-  from: string;
-
-  @IsDateString()
-  to: string;
-
-  @IsOptional()
-  @IsString()
-  guideId?: string;
-
-  @IsOptional()
-  @IsString()
-  driverId?: string;
-
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  unpaidOnly?: boolean;
-}
-
-export class ExportGuidePaymentDto {
-  @IsString()
-  guideId: string;
-
-  @IsDateString()
-  fromDate: string;
-
-  @IsDateString()
-  toDate: string;
-
-  @IsOptional()
-  @IsString()
-  note?: string;
-}
-
-export class GuidePaymentPeriodsQueryDto {
-  @IsOptional()
-  @IsString()
-  guideId?: string;
 }

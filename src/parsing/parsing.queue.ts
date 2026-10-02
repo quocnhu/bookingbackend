@@ -10,9 +10,9 @@ export interface ParseJobData {
 }
 
 /**
- * Producer cho queue parse (Stage 2 — rawData → booking).
- * Job {rawDataId} được enqueue ngay sau khi ingestion insert rawData,
- * trước khi ack Pub/Sub + advance historyId checkpoint.
+ * Producer for the parse queue (Stage 2 — rawData → booking).
+ * The {rawDataId} job is enqueued right after ingestion inserts rawData,
+ * before acking Pub/Sub + advancing the historyId checkpoint.
  */
 @Injectable()
 export class ParsingQueue {

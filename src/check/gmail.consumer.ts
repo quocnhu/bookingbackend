@@ -23,8 +23,8 @@ export class GmailConsumer {
   ) { }
 
   /**
-   * 🔥 STAGE 1: HẠ CÁNH SIÊU TỐC & LƯU RAW DATA
-   * Nhiệm vụ: Tiếp nhận email thô, parse nhanh, đồng bộ / tự sinh uniqueRef và lưu vết an toàn.
+   * 🔥 STAGE 1: HYPER-SPEED LANDING & RAW DATA PERSISTENCE
+   * Task: Receive the raw email, parse it quickly, sync / auto-generate uniqueRef and persist the trail safely.
    */
   @Process('process-raw-email-job')
   async handleRawEmailJob(job: Job<{ messageId: string; messageData: any }>) {
@@ -59,7 +59,7 @@ export class GmailConsumer {
         },
       });
 
-      // Đẩy gói tin siêu nhẹ sang Stage 2 qua BullMQ
+      // Push the ultra-light payload to Stage 2 via BullMQ
       await this.bookingQueue.add('enrich-booking-job', {
         rawId: rawDataRecord.id,
         parsedPayload: parsed
@@ -77,8 +77,8 @@ export class GmailConsumer {
   }
 
   /**
-   * ⚙️ STAGE 2: PHÂN TÍCH CHUYÊN SÂU & ĐÚC KHUÔN BOOKING
-   * Nhiệm vụ: Chuyển đổi dữ liệu đa cấu trúc về một khuôn DB duy nhất, xử lý địa lý, PAX và lưu trữ.
+   * ⚙️ STAGE 2: IN-DEPTH ANALYSIS & BOOKING SHAPING
+   * Task: Convert multi-structured data into a single DB schema, handle geocoding, PAX and persistence.
    */
   @Process('enrich-booking-job')
   async handleEnrichBookingJob(job: Job<{ rawId: string; parsedPayload: ParsedEmailDto }>) {
@@ -144,7 +144,7 @@ export class GmailConsumer {
           latitude: finalCoordinates.lat,
           longitude: finalCoordinates.lng,
 
-          // Nạp dữ liệu qua bộ biến đã được chuẩn hóa, chống Null hoàn toàn
+          // Load data through the normalized variable set, fully null-safe
           startingDate: bookingData?.date || bookingData?.tripDate || null,
           customerName: bookingData?.customer || bookingData?.billingName || 'Unknown Customer',
           phone: bookingData?.customerPhone || bookingData?.billingCity || null,
@@ -167,7 +167,7 @@ export class GmailConsumer {
         }
       }
 
-      // 🎉 Đánh dấu hoàn thành xử lý cho RawData Record
+      // 🎉 Mark the RawData record as fully processed
       await this.prisma.rawData.update({
         where: { id: rawId },
         data: { status: 'PROCESSED' }

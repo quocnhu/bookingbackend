@@ -18,9 +18,9 @@ export interface FileStorage {
 
   url(key: string): string;
 
-  /** Liệt kê mọi file dưới một prefix (thư mục). */
+  /** List every file under a prefix (folder). */
   list(prefix: string): Promise<StorageEntry[]>;
 
-  /** Đổi tên / di chuyển một file. */
+  /** Rename / move a file. */
   rename(fromKey: string, toKey: string): Promise<void>;
 }

@@ -3,12 +3,12 @@ import {
   PrismaService,
 } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
-import { AssignmentStatus, FeeFlowType, GuideType, RoleType, TourType } from '@prisma/client';
+import { AssignmentStatus, GuideType, RoleType, TourType } from '@prisma/client';
 
 const prisma = new PrismaService();
 const audit = new AuditService(prisma);
 
-// ─── Toạ độ khách sạn (Da Nang / Hoi An) ───────────────────────────────
+// ─── Hotel coordinates (Da Nang / Hoi An) ───────────────────────────────
 const HOTELS: Array<{
   name: string;
   address: string;
@@ -59,7 +59,7 @@ const PLAN: Array<{ offset: number; bookings: BookingSeed[] }> = [
       ['WS-2002', 'Minh Nguyen', 'Hoi An Riverside', 6, 'WEBSITE', 'GROUP_TOUR', true],
       ['TA-1007', 'Chloe Martin', 'Vinpearl Resort', 5, 'TRIPADVISOR', 'GROUP_TOUR', true],
       ['BK-0003', 'Peter Parker', 'Emeralda Ninh Binh', 20, 'MANUAL', 'GROUP_TOUR', true],
-      ['BK-0004', 'James Brown', 'Aria Grand Hotel', 2, 'MANUAL', 'GROUP_TOUR', true], // sau đó bị hủy
+      ['BK-0004', 'James Brown', 'Aria Grand Hotel', 2, 'MANUAL', 'GROUP_TOUR', true], // cancelled afterwards
     ],
   },
   {
@@ -85,8 +85,6 @@ async function main() {
   });
   if (demoBuses.length) {
     const busIds = demoBuses.map((b) => b.id);
-    await prisma.settlement.deleteMany({ where: { assignmentId: { in: busIds } } });
-    await prisma.settlement.deleteMany({ where: { booking: { is: { assignmentId: { in: busIds } } } } });
     await prisma.tourReport.deleteMany({ where: { assignmentId: { in: busIds } } });
     await prisma.assignment.deleteMany({ where: { id: { in: busIds } } });
   }
@@ -106,7 +104,7 @@ async function main() {
     });
   }
 
-  // ─── 3. Providers + vehicles (công ty + nhà xe ngoài) ──────────────────
+  // ─── 3. Providers + vehicles (company + external transport providers) ────
   const companyFleet = await prisma.transportationProvider.upsert({
     where: { id: 'demo-company-fleet' },
     update: { name: 'Company Fleet' },
@@ -177,7 +175,22 @@ async function main() {
     ],
   });
 
-  // Binh nghỉ phép ngày mai → hệ thống sẽ chọn driver khác cho ngày mai.
+  // Assign the TOUR_GUIDE role to the 3 demo guides. This role is created by seed.ts (narrow permissions:
+  // submit report + edit notes). Without it the guides have no permissions at all and every
+  // endpoint guarded by @Permissions returns 403.
+  const guideRole = await prisma.role.findUnique({
+    where: { name: 'TOUR_GUIDE' },
+  });
+  if (guideRole) {
+    const guideIds = [huong.id, anh.id, mai.id];
+    await prisma.userRole.deleteMany({ where: { userId: { in: guideIds } } });
+    await prisma.userRole.createMany({
+      data: guideIds.map((userId) => ({ userId, roleId: guideRole.id })),
+      skipDuplicates: true,
+    });
+  }
+
+  // Binh is on leave tomorrow → the system will pick another driver for tomorrow.
   await prisma.userLeave.deleteMany({
     where: { userId: binh.id, startDate: { gte: day(0) } },
   });
@@ -191,33 +204,14 @@ async function main() {
     },
   });
 
-  // ─── 5. Danh mục khoản thu/chi (cho quyết toán 2 lớp) ──────────────────
-  const demoCategories: Array<{ code: string; name: string; flowType: FeeFlowType }> = [
-    { code: 'COLLECT_ON_BEHALF', name: 'Thu hộ COD', flowType: FeeFlowType.COLLECT_MONEY },
-    { code: 'CUSTOMER_PAYMENT', name: 'Thu tiền khách', flowType: FeeFlowType.COLLECT_MONEY },
-    { code: 'RESTAURANT', name: 'Tiền nhà hàng', flowType: FeeFlowType.PAY_MONEY },
-    { code: 'VEHICLE_FEE', name: 'Phí xe', flowType: FeeFlowType.PAY_MONEY },
-    { code: 'TOLL_FEE', name: 'Phí cầu đường', flowType: FeeFlowType.PAY_MONEY },
-    { code: 'OTHERS', name: 'Khác', flowType: FeeFlowType.PAY_MONEY },
-  ];
-  const categoryMap = new Map<string, string>();
-  for (const c of demoCategories) {
-    const cat = await prisma.settlementCategory.upsert({
-      where: { code: c.code },
-      update: { name: c.name, flowType: c.flowType },
-      create: { code: c.code, name: c.name, flowType: c.flowType, isSystem: true },
-    });
-    categoryMap.set(c.code, cat.id);
-  }
-
-  // Người kế toán/quản lý (người tạo các khoản quyết toán mặc định).
+  // ─── 5. Office user (closes/verifies trips in the demo) ───────────────────
   const accounting = await prisma.user.upsert({
     where: { id: 'demo-accounting' },
-    update: { name: 'Accounting Room', role: RoleType.OFFICE, userType: 'office' },
+    update: { name: 'Operations Room', role: RoleType.OFFICE, userType: 'office' },
     create: {
       id: 'demo-accounting',
-      name: 'Accounting Room',
-      email: 'accounting@demo.local',
+      name: 'Operations Room',
+      email: 'operations@demo.local',
       passwordHash: pwd,
       role: RoleType.OFFICE,
       userType: 'office',
@@ -275,8 +269,8 @@ async function main() {
     }
   }
 
-  // ─── 6. Tạo chuyến xe thủ công (engine auto-assign đã bị gỡ) ───────────
-  // Mỗi booking sạch được xếp vào 1 bus riêng (giống thao tác tay trên Dispatch Board).
+  // ─── 6. Manually create bus trips (the engine auto-assign was removed) ─────
+  // Every clean booking is put on its own bus (same as a manual action on the Dispatch Board).
   const pending = await prisma.booking.findMany({
     where: { bookingRef: { in: refs }, status: 'PENDING' },
     orderBy: [{ startingDate: 'asc' }, { bookingRef: 'asc' }],
@@ -316,53 +310,18 @@ async function main() {
     });
   }
 
-  // ─── 6b. Kích hoạt quyết toán 2 lớp cho từng chuyến xe ────────────────
-  // Lớp 1: mỗi booking trên chuyến có 1 khoản "Thu hộ COD" → giao diện hiển thị
-  //        biểu tượng thu tiền từ khách. Lớp 2: phí xe trả nhà xe.
-  // Đồng thời đưa một số chuyến sang trạng thái VERIFYING (fake progress
-  // "chờ Admin/Kế toán xác minh").
+  // ─── 6b. Activate the 2-layer settlement for each bus trip ────────────────
+  // Layer 1: every booking on the trip has one "Collect on behalf COD" entry → the UI shows
+  //        the collect-cash-from-passenger icon. Layer 2: the bus fee paid to the transport provider.
+  // At the same time, move some trips to the VERIFYING state (fake progress
+  // "waiting for Admin/Accounting to verify").
   const demoBusesAfter = await prisma.assignment.findMany({
     where: { code: { contains: ' Bus ' } },
     include: { bookings: true, provider: true },
   });
 
-  const collectCatId = categoryMap.get('COLLECT_ON_BEHALF') ?? null;
-  const vehicleCatId = categoryMap.get('VEHICLE_FEE') ?? null;
-
   for (const bus of demoBusesAfter) {
-    // Lớp 1 — từng booking.
-    for (const bk of bus.bookings) {
-      const existing = await prisma.settlement.findFirst({ where: { bookingId: bk.id } });
-      if (existing) continue;
-      await prisma.settlement.create({
-        data: {
-          amount: bk.totalPax && bk.totalPax >= 4 ? 50 : 25,
-          note: `Thu hộ COD — ${bk.customerName}`,
-          bookingId: bk.id,
-          assignmentId: bus.id,
-          categoryId: collectCatId,
-          createdById: accounting.id,
-        },
-      });
-    }
-    // Lớp 2 — phí xe.
-    if (bus.provider && bus.provider.id !== 'demo-company-fleet') {
-      const existing = await prisma.settlement.findFirst({
-        where: { assignmentId: bus.id, categoryId: vehicleCatId },
-      });
-      if (!existing) {
-        await prisma.settlement.create({
-          data: {
-            amount: 120,
-            note: `Phí xe — ${bus.code}`,
-            assignmentId: bus.id,
-            categoryId: vehicleCatId,
-            createdById: accounting.id,
-          },
-        });
-      }
-    }
-    // Fake progress: một nửa số chuyến của ngày hôm nay đang "chờ xác minh".
+    // Fake progress: half of today's trips are "waiting for verification".
     if (bus.status !== AssignmentStatus.COMPLETED && bus.status !== AssignmentStatus.CANCELED) {
       await prisma.assignment.update({
         where: { id: bus.id },
@@ -377,9 +336,7 @@ async function main() {
     include: {
       bookings: {
         orderBy: { paxSequence: 'asc' },
-        include: { settlements: true },
       },
-      settlements: true,
       vehicle: true,
       driver: { select: { name: true } },
       guide: { select: { name: true } },
@@ -390,18 +347,15 @@ async function main() {
   console.log('\n==================== DISPATCH BOARD (demo) ====================');
   for (const bus of buses) {
     const pax = bus.bookings.reduce((s, b) => s + (b.totalPax ?? 0), 0);
-    const busSettlementAmt = bus.settlements.reduce((s, x) => s + Number(x.amount ?? 0), 0);
     console.log(
-      `\n🚌 [${bus.code}] ${bus.tourType} · ${new Date(bus.startDate).toLocaleDateString()} · ${bus.status} · ${pax}/${bus.vehicle?.capacity ?? 12} pax · Lớp2 phí: ${busSettlementAmt}`,
+      `\n🚌 [${bus.code}] ${bus.tourType} · ${new Date(bus.startDate).toLocaleDateString()} · ${bus.status} · ${pax}/${bus.vehicle?.capacity ?? 12} pax`,
     );
     console.log(
       `   Driver: ${bus.driver?.name ?? '—'}  |  Guide: ${bus.guide?.name ?? '—'}  |  Vehicle: ${bus.vehicle?.plateNumber ?? '—'}`,
     );
     for (const b of bus.bookings) {
       const coord = b.latitude != null ? ` (${b.latitude},${b.longitude})` : '';
-      const s0 = b.settlements[0];
-      const pay = s0 ? `💵 Thu hộ ${s0.amount} (${s0.note})` : '💵 chưa có settlement';
-      console.log(`   #${b.paxSequence} ${b.bookingRef} · ${b.customerName} · ${b.hotelName ?? b.address}${coord} · ${b.totalPax} pax · ${pay}`);
+      console.log(`   #${b.paxSequence} ${b.bookingRef} · ${b.customerName} · ${b.hotelName ?? b.address}${coord} · ${b.totalPax} pax`);
     }
   }
   const totalPax = buses.reduce((s, b) => s + b.bookings.reduce((x, y) => x + (y.totalPax ?? 0), 0), 0);

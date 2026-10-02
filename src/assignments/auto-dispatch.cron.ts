@@ -4,9 +4,9 @@ import { AutoCrewService } from '@/queues/auto-crew.service';
 import { AssignmentsService } from './assignments.service';
 
 /**
- * Cron 4:00 sáng (+07, timezone máy) — vận hành tự động trước khi xuất bến:
- * 1. Điền crew (HDV + tài xế) còn thiếu cho các chuyến hôm nay / sắp tới.
- * 2. Dispatch toàn bộ chuyến PENDING đang hoạt động hôm nay.
+ * Cron at 4:00 AM (+07, machine timezone) — runs automatically before departure:
+ * 1. Fill in missing crew (guide + driver) for today's / upcoming trips.
+ * 2. Dispatch all active PENDING trips for today.
  */
 @Injectable()
 export class AutoDispatchCron {

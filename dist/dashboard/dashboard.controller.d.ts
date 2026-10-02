@@ -8,7 +8,6 @@ export declare class DashboardController {
         todayBookings: number;
         pendingBookings: number;
         todayDispatched: number;
-        pendingSettlements: number;
         totalTours: number;
         totalUsers: number;
         totalRoles: number;
@@ -16,17 +15,9 @@ export declare class DashboardController {
         totalAssignments: number;
         todayLogins: number;
         lockedAccounts: number;
-        revenueToday: number;
-        revenueWeek: number;
-        revenueMonth: number;
     }>;
     charts(range?: RangeKey): Promise<{
         range: RangeKey;
-        revenueByBucket: {
-            label: string;
-            revenue: number;
-            collected: number;
-        }[];
         bookingsByBucket: {
             label: string;
             count: number;
@@ -60,28 +51,26 @@ export declare class DashboardController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
+            startingDate: Date | null;
             bookingRef: string;
-            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            customerName: string | null;
-            hotelName: string;
-            phone: string;
-            mail: string | null;
-            startingDate: Date | null;
-            totalPax: number;
-            paxDetail: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            totalPax: number;
+            paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
+            confirmationCode: string | null;
             rawDataId: string | null;
-            collectAmount: import("@prisma/client/runtime/library").Decimal | null;
-            refundAmount: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
             assignmentId: string | null;
             paxSequence: number;
@@ -103,11 +92,11 @@ export declare class DashboardController {
             status: import("@prisma/client").$Enums.AssignmentStatus;
             durationDays: number | null;
             vehicleId: string | null;
-            totalPax: number;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             latitude: number | null;
             longitude: number | null;
+            totalPax: number;
             createdWho: string | null;
             startDate: Date;
             endDate: Date;

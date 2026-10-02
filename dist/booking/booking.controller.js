@@ -16,6 +16,7 @@ exports.BookingController = void 0;
 const common_1 = require("@nestjs/common");
 const booking_service_1 = require("./booking.service");
 const booking_dto_1 = require("./dto/booking.dto");
+const client_1 = require("@prisma/client");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let BookingController = class BookingController {
@@ -26,14 +27,22 @@ let BookingController = class BookingController {
     findAll(query, actor) {
         return this.bookingService.findAll(query, actor);
     }
+    nextRef(tourType) {
+        const type = tourType === 'PRIVATE_TOUR'
+            ? client_1.TourType.PRIVATE_TOUR
+            : tourType === 'GROUP_TOUR'
+                ? client_1.TourType.GROUP_TOUR
+                : undefined;
+        return this.bookingService.previewBookingRef(type);
+    }
     findOne(id) {
         return this.bookingService.findOne(id);
     }
     create(dto, actor) {
         return this.bookingService.create(dto, actor);
     }
-    updateBatch(dto) {
-        return this.bookingService.updateBatch(dto.items);
+    updateBatch(dto, actor) {
+        return this.bookingService.updateBatch(dto.items, actor);
     }
     update(id, dto) {
         return this.bookingService.update(id, dto);
@@ -53,6 +62,14 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "findAll", null);
 __decorate([
+    (0, common_1.Get)('next-ref'),
+    (0, permissions_decorator_1.Permissions)('booking.create'),
+    __param(0, (0, common_1.Query)('tourType')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "nextRef", null);
+__decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('booking.read'),
     __param(0, (0, common_1.Param)('id')),
@@ -71,10 +88,11 @@ __decorate([
 ], BookingController.prototype, "create", null);
 __decorate([
     (0, common_1.Put)('batch'),
-    (0, permissions_decorator_1.Permissions)('booking.update'),
+    (0, permissions_decorator_1.AnyPermissions)('booking.update', 'booking.note.update'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [booking_dto_1.BatchUpdateBookingsDto]),
+    __metadata("design:paramtypes", [booking_dto_1.BatchUpdateBookingsDto, Object]),
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "updateBatch", null);
 __decorate([

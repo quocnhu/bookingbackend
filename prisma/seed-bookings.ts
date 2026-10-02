@@ -106,11 +106,10 @@ async function main() {
   console.log('🔄 Clearing old booking & assignment data...');
 
   // Delete in dependency order
-  await prisma.settlement.deleteMany();
   await prisma.tourReport.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.assignment.deleteMany();
-  console.log('✅ Cleared bookings, assignments, settlements, tour reports');
+  console.log('✅ Cleared bookings, assignments, tour reports');
 
   // ─── Ensure providers, vehicles, drivers, guides exist ──────────────
   const company = await prisma.transportationProvider.upsert({

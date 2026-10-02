@@ -7,8 +7,8 @@ import { TripAdvisorParser } from './tripadvisor.parser';
 import { WebsiteParser } from './website.parser';
 
 /**
- * Ánh xạ templateTag (gán lúc ingestion từ header match) → instance parser.
- * Không có parser khớp → rawData.status = unparsed (manual review queue).
+ * Maps templateTag (assigned at ingestion from the header match) → parser instance.
+ * No matching parser → rawData.status = unparsed (manual review queue).
  */
 @Injectable()
 export class ParserRegistry {
@@ -38,10 +38,10 @@ export class ParserRegistry {
   }
 
   /**
-   * Trả parser đầu tiên khớp payload (fallback khi tag = unknown).
-   * Parser của tag đã match cũng phải vượt qua canParse(payload) — nếu chưa
-   * biết template (vd TripAdvisor chưa build parser HTML) thì rơi vào `unparsed`
-   * để review thủ công, không bị đánh parse_failed.
+   * Return the first parser that matches the payload (fallback when tag = unknown).
+   * The parser for an already matched tag must also pass canParse(payload) — if the
+   * template is still unknown (e.g. TripAdvisor has no HTML parser yet) it falls to
+   * `unparsed` for manual review instead of being flagged as parse_failed.
    */
   resolve(
     payload: Record<string, unknown>,

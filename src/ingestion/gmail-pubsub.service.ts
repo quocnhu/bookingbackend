@@ -26,7 +26,7 @@ interface ParsedMail {
   internalDate?: string;
 }
 
-/** Subset Gmail API MessagePart — đủ cho việc extract body. */
+/** Subset of the Gmail API MessagePart — enough to extract the body. */
 interface MessagePart {
   mimeType?: string | null;
   body?: { data?: string | null };
@@ -34,8 +34,8 @@ interface MessagePart {
 }
 
 /**
- * Stage 1 — Ingestion (theo .md bước 3-10):
- * push Pub/Sub → history.list(startHistoryId) → resolve messageIds thay đổi
+ * Stage 1 — Ingestion (per .md steps 3-10):
+ * push Pub/Sub → history.list(startHistoryId) → resolve changed messageIds
  * → Redis dedup claim (SET NX EX) → messages.get → tag sender/template
  * → insert rawData (status=pending) → enqueue parse job → advance checkpoint.
  */
@@ -87,7 +87,7 @@ export class GmailPubSubService {
     let ignored = 0;
 
     for (const messageId of messageIds) {
-      // Dedup claim (bước 5): atomic, an toàn dưới concurrency.
+      // Dedup claim (step 5): atomic, safe under concurrency.
       const claimed = await this.redis.set(
         dedupKey(messageId),
         '1',
@@ -103,7 +103,7 @@ export class GmailPubSubService {
       try {
         const mail = await this.fetchMessage(gmail, messageId, emailAddress);
 
-        // Chỉ ingest mail từ sender trong MAIL_ALLOWED_SENDERS — còn lại IGNORE.
+        // Only ingest mail from senders in MAIL_ALLOWED_SENDERS — everything else is IGNORED.
         if (!this.isAllowedSender(mail.from)) {
           ignored++;
           this.logger.log(
@@ -112,7 +112,7 @@ export class GmailPubSubService {
           continue;
         }
 
-        // >>> PARSED MAIL — console.log để debug/extend parser <<<
+        // >>> PARSED MAIL — console.log for debugging/extending the parser <<<
         console.log('[ingestion] parsed mail:', {
           messageId: mail.messageId,
           emailAddress: mail.emailAddress,
@@ -125,7 +125,7 @@ export class GmailPubSubService {
 
         const templateTag = this.tagTemplate(mail);
 
-        // >>> TEMPLATE TAG — console.log để biết parser nào sẽ chạy <<<
+        // >>> TEMPLATE TAG — console.log to see which parser will run <<<
         console.log('[ingestion] template tag:', {
           emailAddress,
           messageId,
@@ -152,7 +152,7 @@ export class GmailPubSubService {
       }
     }
 
-    // Advance checkpoint (bước 10) — chỉ sau khi đã enqueue an toàn.
+    // Advance checkpoint (step 10) — only after a safe enqueue.
     const nextHistoryId = history.data.historyId;
     if (nextHistoryId) {
       await this.redis.set(
@@ -168,7 +168,7 @@ export class GmailPubSubService {
     return { handled, duplicates, ignored, nextHistoryId: nextHistoryId ?? null };
   }
 
-  /** Test kết nối bằng refresh token đã lưu (dùng cho nút "Test" trên frontend). */
+  /** Test the connection using the stored refresh token (used by the frontend "Test" button). */
   async testConnection(accountId: string) {
     const account = await this.prisma.gmailAccount.findUnique({
       where: { id: accountId },
@@ -212,7 +212,7 @@ export class GmailPubSubService {
     };
   }
 
-  /** Lấy text/plain từ payload (xử lý nested parts). */
+  /** Extract text/plain from the payload (handles nested parts). */
   private extractTextBody(payload: MessagePart | undefined): string {
     if (!payload) return '';
     if (payload.mimeType === 'text/plain' && payload.body?.data) {
@@ -225,7 +225,7 @@ export class GmailPubSubService {
     return text.trim();
   }
 
-  /** Lấy text/html từ payload (ưu tiên html để parser table đọc được). */
+  /** Extract text/html from the payload (html is preferred so the table parser can read it). */
   private extractHtmlBody(payload: MessagePart | undefined): string {
     if (!payload) return '';
     if (payload.mimeType === 'text/html' && payload.body?.data) {
@@ -238,7 +238,7 @@ export class GmailPubSubService {
     return html.trim();
   }
 
-  /** Đọc MAIL_ALLOWED_SENDERS từ env (domain/email, ngăn cách bằng dấu phẩy). */
+  /** Read MAIL_ALLOWED_SENDERS from env (domain/email, comma-separated). */
   private get allowedSenders(): Set<string> {
     if (!this.allowedSendersCache) {
       const raw =
@@ -254,7 +254,7 @@ export class GmailPubSubService {
     return this.allowedSendersCache;
   }
 
-  /** Mail chỉ được ingest nếu From trùng domain/email trong MAIL_ALLOWED_SENDERS. */
+  /** Mail is only ingested if the From matches a domain/email in MAIL_ALLOWED_SENDERS. */
   private isAllowedSender(fromRaw: string): boolean {
     const tokens = this.allowedSenders;
     if (tokens.size === 0) return true;
@@ -273,8 +273,8 @@ export class GmailPubSubService {
   }
 
   /**
-   * Gán templateTag từ header From/Subject (bước 7) — chỉ match rẻ, chưa extract.
-   * Gọi console.log tại điểm này để dễ thấy template nào được chọn.
+   * Assign templateTag from the From/Subject headers (step 7) — cheap matching only, no extraction.
+   * console.log is called here to make it easy to see which template was selected.
    */
   private tagTemplate(mail: ParsedMail): string {
     const from = mail.from.toLowerCase();

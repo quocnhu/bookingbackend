@@ -5,13 +5,13 @@ const TEN_DIGIT_REF = /\b(\d{10})\b/;
 const DATE_PAIR_RE =
   /(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{4})/gi;
 
-/** Ép mọi value thành string an toàn (tránh '[object Object]'). */
+/** Safely coerce any value to a string (avoids '[object Object]'). */
 const asString = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
 /**
- * Booking.com confirmation email parser (heuristic trên headers + body plain text).
- * Ref chuẩn của Booking.com là chuỗi 10 chữ số.
+ * Booking.com confirmation email parser (heuristic over headers + plain text body).
+ * A standard Booking.com ref is a 10-digit string.
  */
 @Injectable()
 export class BookingComParser implements TemplateParser {

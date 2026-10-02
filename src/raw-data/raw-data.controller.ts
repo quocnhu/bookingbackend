@@ -5,9 +5,9 @@ import { RawDataService } from './raw-data.service';
 import { RAW_DATA_STATUS } from './raw-data.entity';
 
 /**
- * Endpoint để review rawData (theo .md: mục "unparsed mail" cần review thủ công).
- * Cho phép lọc theo status/templateTag/email + xem payload gốc (kể cả html)
- * để viết/hoàn thiện parser.
+ * Endpoint for reviewing rawData (per the .md: the "unparsed mail" items that
+ * need manual review). Supports filtering by status/templateTag/email and
+ * viewing the raw payload (including html) to write/complete the parser.
  */
 @Controller('raw-data')
 export class RawDataController {

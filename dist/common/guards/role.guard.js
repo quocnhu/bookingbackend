@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 const roles_decorator_1 = require("../decorators/roles.decorator");
 const permissions_decorator_1 = require("../decorators/permissions.decorator");
+const permissions_decorator_2 = require("../decorators/permissions.decorator");
 const public_decorator_1 = require("../decorators/public.decorator");
 const client_1 = require("@prisma/client");
 let RoleGuard = class RoleGuard {
@@ -29,15 +30,12 @@ let RoleGuard = class RoleGuard {
         if (isPublic) {
             return true;
         }
-        const requiredRoles = this.reflector.getAllAndOverride(roles_decorator_1.ROLES_KEY, [
-            context.getHandler(),
-            context.getClass(),
-        ]);
-        const requiredPermissions = this.reflector.getAllAndOverride(permissions_decorator_1.PERMISSIONS_KEY, [
-            context.getHandler(),
-            context.getClass(),
-        ]);
-        if (!requiredRoles?.length && !requiredPermissions?.length) {
+        const requiredRoles = this.reflector.getAllAndOverride(roles_decorator_1.ROLES_KEY, [context.getHandler(), context.getClass()]);
+        const requiredPermissions = this.reflector.getAllAndOverride(permissions_decorator_1.PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
+        const anyRequiredPermissions = this.reflector.getAllAndOverride(permissions_decorator_2.ANY_PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
+        if (!requiredRoles?.length &&
+            !requiredPermissions?.length &&
+            !anyRequiredPermissions?.length) {
             return true;
         }
         const user = context.switchToHttp().getRequest().user;
@@ -51,7 +49,12 @@ let RoleGuard = class RoleGuard {
             throw new common_1.ForbiddenException('Insufficient role');
         }
         const userPermissions = new Set(user.permissions ?? []);
-        if (requiredPermissions?.length && !requiredPermissions.every((p) => userPermissions.has(p))) {
+        if (requiredPermissions?.length &&
+            !requiredPermissions.every((p) => userPermissions.has(p))) {
+            throw new common_1.ForbiddenException('Insufficient permissions');
+        }
+        if (anyRequiredPermissions?.length &&
+            !anyRequiredPermissions.some((p) => userPermissions.has(p))) {
             throw new common_1.ForbiddenException('Insufficient permissions');
         }
         return true;

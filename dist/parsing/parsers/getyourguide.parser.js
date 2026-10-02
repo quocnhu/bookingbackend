@@ -340,8 +340,8 @@ let GetYourGuideParser = class GetYourGuideParser {
             return undefined;
         const iso = this.matchDate(raw);
         if (iso)
-            return iso;
-        const d = new Date(raw);
+            return new Date(iso + '+07:00').toISOString();
+        const d = new Date(raw + '+07:00');
         return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
     }
 };

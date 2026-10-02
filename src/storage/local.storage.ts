@@ -3,8 +3,8 @@ import * as path from 'path';
 import { FileStorage, StorageEntry } from './storage.types';
 
 /**
- * Driver mặc định khi chưa cấu hình cloud: lưu vào backend/uploads,
- * phục vụ qua ServeStaticModule tại http://localhost:4000/uploads.
+ * Default driver when no cloud is configured: stores files in backend/uploads,
+ * served through ServeStaticModule at http://localhost:4000/uploads.
  */
 export class LocalStorage implements FileStorage {
   readonly driver = 'local' as const;
@@ -13,8 +13,17 @@ export class LocalStorage implements FileStorage {
   private readonly publicBase =
     process.env.PUBLIC_UPLOADS_BASE || 'http://localhost:4000/uploads';
 
+  private resolveSafe(key: string): string {
+    const abs = path.resolve(this.root, key);
+    const rootResolved = path.resolve(this.root);
+    if (!abs.startsWith(rootResolved + path.sep) && abs !== rootResolved) {
+      throw new Error('Path traversal attempt blocked');
+    }
+    return abs;
+  }
+
   async save(key: string, buffer: Buffer) {
-    const abs = path.join(this.root, key);
+    const abs = this.resolveSafe(key);
     await fsp.mkdir(path.dirname(abs), { recursive: true });
     await fsp.writeFile(abs, buffer);
     return { key, url: this.url(key) };
@@ -22,14 +31,14 @@ export class LocalStorage implements FileStorage {
 
   async remove(key: string) {
     try {
-      await fsp.unlink(path.join(this.root, key));
+      await fsp.unlink(this.resolveSafe(key));
     } catch {
-      // file không tồn tại — bỏ qua
+      // file does not exist — skip
     }
   }
 
   async list(prefix: string): Promise<StorageEntry[]> {
-    const dir = path.join(this.root, prefix);
+    const dir = this.resolveSafe(prefix);
     let entries: import('fs').Dirent[];
     try {
       entries = await fsp.readdir(dir, { withFileTypes: true });
@@ -46,8 +55,8 @@ export class LocalStorage implements FileStorage {
   }
 
   async rename(fromKey: string, toKey: string) {
-    const from = path.join(this.root, fromKey);
-    const to = path.join(this.root, toKey);
+    const from = this.resolveSafe(fromKey);
+    const to = this.resolveSafe(toKey);
     await fsp.mkdir(path.dirname(to), { recursive: true });
     await fsp.rename(from, to);
   }

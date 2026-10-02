@@ -8,9 +8,9 @@ export interface AssignJobData {
 }
 
 /**
- * Producer cho queue auto-assign (Stage 3 — booking → Assignment/bus).
- * Job {bookingId} được enqueue ngay sau khi booking được ghi thành công
- * (postWrite), nhưng KHÔNG cho booking đã bị hủy.
+ * Producer for the auto-assign queue (Stage 3 — booking → Assignment/bus).
+ * The {bookingId} job is enqueued right after a booking is written successfully
+ * (postWrite), but NOT for bookings that have been cancelled.
  */
 @Injectable()
 export class AssignmentQueue {
@@ -40,7 +40,7 @@ export class AssignmentQueue {
         err?.name === 'JobNotUniqueError' ||
         /duplicate|already exists/i.test(err?.message ?? '')
       ) {
-        // Job đã tồn tại cho booking này — tránh enqueue trùng.
+        // A job already exists for this booking — avoid enqueueing a duplicate.
         return { enqueued: false, bookingId, reason: 'ALREADY_QUEUED' };
       }
       this.logger.warn(`Enqueue assign ${bookingId} failed: ${err?.message}`);

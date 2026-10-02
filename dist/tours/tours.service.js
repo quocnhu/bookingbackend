@@ -21,8 +21,7 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const storage_1 = require("../storage");
 const sharp_1 = __importDefault(require("sharp"));
-const MAX_GALLERY_IMAGE_BYTES = 15 * 1024 * 1024;
-const ALLOWED_GALLERY_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const file_validation_util_1 = require("../common/utils/file-validation.util");
 let ToursService = class ToursService {
     prisma;
     auditService;
@@ -206,13 +205,7 @@ let ToursService = class ToursService {
         if (!file?.buffer) {
             throw new common_1.BadRequestException('No file uploaded');
         }
-        const mime = (file.mimetype || '').toLowerCase();
-        if (!ALLOWED_GALLERY_TYPES.includes(mime)) {
-            throw new common_1.BadRequestException('Gallery only accepts JPG, PNG or WEBP images');
-        }
-        if (file.size > MAX_GALLERY_IMAGE_BYTES) {
-            throw new common_1.BadRequestException('Max image size is 15MB');
-        }
+        await (0, file_validation_util_1.validateFile)(file.buffer, file_validation_util_1.ALLOWED_IMAGE_TYPES, file_validation_util_1.MAX_FILE_SIZE);
         let buffer;
         try {
             buffer = await (0, sharp_1.default)(file.buffer, { failOn: 'none' })
@@ -227,11 +220,7 @@ let ToursService = class ToursService {
         const folder = this.galleryPrefix(tourId);
         const existing = await this.storage.list(folder);
         const padded = String(existing.length).padStart(3, '0');
-        const baseName = (file.originalname || 'photo')
-            .split('/')
-            .pop()
-            .replace(/[^\w.\- ]/g, '_')
-            .replace(/\.[^.]+$/, '');
+        const baseName = (0, file_validation_util_1.sanitizeFileName)(file.originalname || 'photo').replace(/\.[^.]+$/, '');
         const storageKey = `${folder}/${padded}-${Date.now()}-${baseName}.webp`;
         await this.storage.save(storageKey, buffer, { contentType: 'image/webp' });
         await this.auditService.log({

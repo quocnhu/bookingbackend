@@ -17,7 +17,7 @@ export class GmailService implements OnApplicationBootstrap {
 
   constructor(
     private readonly prisma: PrismaService,
-    // private readonly redisService: RedisService, // Giữ lại cho tương lai
+    // private readonly redisService: RedisService, // Kept for the future
 
     @InjectQueue('booking-processing-queue')
     private readonly bookingQueue: Queue,
@@ -134,20 +134,20 @@ export class GmailService implements OnApplicationBootstrap {
   }
 
   /**
-   * ⚡ ĐỈNH CAO REAL-TIME: Lấy message.data từ Google và đẩy thẳng sang Bull Queue
+   * ⚡ REAL-TIME PEAK: Fetch message.data from Google and push it straight to the Bull Queue
    */
   private async processMessage(gmail: any, messageId: string): Promise<void> {
     try {
-      // 1. Gọi Google API lấy trọn vẹn cục JSON dữ liệu email thô tại đây
+      // 1. Call the Google API to fetch the complete raw email JSON payload here
       const message = await gmail.users.messages.get({ userId: 'me', id: messageId });
 
-      // 2. Bắn TRỌN GÓI message.data sang cho Bull Queue.
-      // Giải phóng hoàn toàn GmailService, Consumer sẽ không cần token Google nữa.
+// 2. Fire the ENTIRE message.data package to the Bull Queue.
+// Fully frees GmailService, the Consumer will no longer need a Google token.
       await this.bookingQueue.add(
         'process-raw-email-job',
         { 
           messageId,
-          messageData: message.data // 📦 Đóng gói payload thô từ Google
+          messageData: message.data // 📦 Package the raw payload from Google
         },
         {
           jobId: `msg:${messageId}`, 

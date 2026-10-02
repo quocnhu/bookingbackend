@@ -10,10 +10,21 @@ export interface CookieOptions {
 
 export function cookieOptions(maxAgeSeconds: number): CookieOptions {
   const secure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
-  const sameSite = process.env.COOKIE_SAME_SITE as CookieOptions['sameSite'] | undefined;
+  const sameSiteEnv = process.env.COOKIE_SAME_SITE as CookieOptions['sameSite'] | undefined;
+
+  let sameSite: CookieOptions['sameSite'];
+  if (sameSiteEnv) {
+    if (sameSiteEnv === 'none' && !secure) {
+      throw new Error('COOKIE_SAME_SITE=none requires COOKIE_SECURE=true (HTTPS)');
+    }
+    sameSite = sameSiteEnv;
+  } else {
+    sameSite = secure ? 'none' : 'lax';
+  }
+
   return {
     httpOnly: true,
-    sameSite: sameSite || (secure ? 'none' : 'lax'),
+    sameSite,
     secure,
     path: '/',
     ...(maxAgeSeconds > 0 ? { maxAge: maxAgeSeconds * 1000 } : {}),

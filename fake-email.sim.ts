@@ -1,14 +1,14 @@
 /* eslint-disable no-console */
 /**
- * Fake-email simulation (KHÔNG cần Gmail/Pub/Sub thật — backend phải đang chạy
- * để BullMQ ParsingProcessor consume queue):
- *  1. Tạo một "box" giả (GmailAccount tracked) nếu chưa có.
- *  2. Insert rawData + enqueue parse job — giống hệt output của
- *     GmailPubSubService.handlePush() sau fetchMessage().
- *  3. Chờ worker backend xử lý → parser → validate → booking upsert.
- *  4. In ra rawData statuses + bookings.
+ * Fake-email simulation (no real Gmail/Pub/Sub needed — the backend must be
+ * running so BullMQ ParsingProcessor can consume the queue):
+ *  1. Create a fake "box" (tracked GmailAccount) if it does not exist yet.
+ *  2. Insert rawData + enqueue a parse job — exactly the output of
+ *     GmailPubSubService.handlePush() after fetchMessage().
+ *  3. Wait for the backend worker to process → parser → validate → booking upsert.
+ *  4. Print rawData statuses + bookings.
  *
- * Chạy: npx tsx fake-email.sim.ts
+ * Run: npx tsx fake-email.sim.ts
  */
 import 'tsconfig-paths/register';
 import { PrismaClient } from '@prisma/client';
@@ -122,14 +122,16 @@ async function main() {
       watchExpiration: new Date(Date.now() + 6 * 86400000),
     },
   });
-  console.log(`✅ Fake box sẵn sàng: ${box.email} (id=${box.id})`);
+  console.log(`✅ Fake box ready: ${box.email} (id=${box.id})`);
   console.log(
     `   watchExpiration=${box.watchExpiration.toISOString()} · lastHistoryId=${box.lastHistoryId}`,
   );
-  console.log(`   → Xem như Gmail watch + Pub/Sub subscription đã trỏ về webhook.`);
+  console.log(
+    `   → Treat this as the Gmail watch + Pub/Sub subscription pointing at the webhook.`,
+  );
 
-  // ── 2. Insert rawData + enqueue parse (giống handlePush sau fetchMessage) ──
-  console.log('\n▶ Mô phỏng ingestion → rawData → enqueue parse...');
+  // ── 2. Insert rawData + enqueue parse (same as handlePush after fetchMessage) ──
+  console.log('\n▶ Simulating ingestion → rawData → enqueue parse...');
   const ids: string[] = [];
   for (const sample of SAMPLES) {
     const sourceId = `gmail-${sample.messageId as string}`;
@@ -160,8 +162,8 @@ async function main() {
     );
   }
 
-  // ── 3. Chờ backend worker xử lý ──
-  console.log('\n⏳ Đợi ParsingProcessor (backend) consume queue parse...');
+  // ── 3. Wait for the backend worker to process ──
+  console.log('\n⏳ Waiting for ParsingProcessor (backend) to consume the parse queue...');
   const deadline = Date.now() + 30000;
   let statuses: Array<{ sourceId: string; status: string; templateTag: string | null }> = [];
   while (Date.now() < deadline) {
@@ -187,8 +189,8 @@ async function main() {
     orderBy: { createdAt: 'desc' },
     take: 10,
   });
-  console.log('\n🎫 Bookings (10 mới nhất):');
-  if (bookings.length === 0) console.log('   (chưa có booking nào)');
+  console.log('\n🎫 Bookings (10 most recent):');
+  if (bookings.length === 0) console.log('   (no bookings yet)');
   for (const b of bookings) {
     console.log(
       `   • ${b.bookingRef} | channel=${b.channel} | status=${b.status} | customer=${b.customerName ?? '—'} | start=${b.startingDate?.toISOString() ?? '—'}`,
@@ -199,7 +201,7 @@ async function main() {
   const failed = statuses.filter((s) => s.status === 'parse_failed').length;
   const pending = statuses.filter((s) => s.status === 'pending').length;
   console.log(
-    `\n📊 Kết luận: ${parsed} parsed · ${failed} parse_failed · ${pending} còn pending`,
+    `\n📊 Summary: ${parsed} parsed · ${failed} parse_failed · ${pending} still pending`,
   );
 
   await parseQueue.close();

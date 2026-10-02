@@ -7,10 +7,20 @@ exports.ACCESS_TOKEN_COOKIE = 'booking_access_token';
 exports.REFRESH_TOKEN_COOKIE = 'booking_refresh_token';
 function cookieOptions(maxAgeSeconds) {
     const secure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
-    const sameSite = process.env.COOKIE_SAME_SITE;
+    const sameSiteEnv = process.env.COOKIE_SAME_SITE;
+    let sameSite;
+    if (sameSiteEnv) {
+        if (sameSiteEnv === 'none' && !secure) {
+            throw new Error('COOKIE_SAME_SITE=none requires COOKIE_SECURE=true (HTTPS)');
+        }
+        sameSite = sameSiteEnv;
+    }
+    else {
+        sameSite = secure ? 'none' : 'lax';
+    }
     return {
         httpOnly: true,
-        sameSite: sameSite || (secure ? 'none' : 'lax'),
+        sameSite,
         secure,
         path: '/',
         ...(maxAgeSeconds > 0 ? { maxAge: maxAgeSeconds * 1000 } : {}),

@@ -1,4 +1,4 @@
-// Trạng thái lifecycle của RawData (theo .md): pending → parsed | unparsed | parse_failed.
+// RawData lifecycle states (per the .md): pending → parsed | unparsed | parse_failed.
 export const RAW_DATA_STATUS = {
   PENDING: 'pending',
   PARSED: 'parsed',

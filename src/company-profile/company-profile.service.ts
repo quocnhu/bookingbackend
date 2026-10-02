@@ -11,12 +11,12 @@ export class CompanyProfileService {
     private readonly auditService: AuditService,
   ) {}
 
-  /** Lấy hồ sơ công ty — bảng singleton, trả null nếu chưa được cấu hình. */
+  /** Get the company profile — singleton table, returns null if not configured yet. */
   async getProfile() {
     return this.prisma.companyProfile.findFirst();
   }
 
-  /** Upsert singleton: dòng đầu tiên nếu có, ngược lại tạo mới. */
+  /** Upsert the singleton: the first row if one exists, otherwise create a new one. */
   async updateProfile(dto: UpdateCompanyProfileDto, actor: AuthenticatedUser) {
     const existing = await this.prisma.companyProfile.findFirst();
 

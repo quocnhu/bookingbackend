@@ -42,7 +42,7 @@ export class NotificationService {
     return this.attachSenders(notifications);
   }
 
-  /** Gắn thông tin người gửi (nếu có) vào mỗi thông báo từ `data.fromUserId`. */
+  /** Attach sender information (if available) to each notification from `data.fromUserId`. */
   private async attachSenders(notifications: any[]): Promise<any[]> {
     const senderIds = [
       ...new Set(notifications.map((n) => (n.data as any)?.fromUserId).filter(Boolean)),
@@ -96,7 +96,7 @@ export class NotificationService {
     });
   }
 
-  /** Danh sách nhóm người nhận (role type) + người dùng để chọn trong UI gửi thông báo. */
+  /** List of recipient groups (role type) + users for selection in the send-notification UI. */
   async getTargets(search?: string) {
     const groups = await this.prisma.user.groupBy({
       by: ['role'],
@@ -133,7 +133,7 @@ export class NotificationService {
     return { roleGroups, users };
   }
 
-  /** Gửi thông báo tới một nhóm role (tất cả user active) và/hoặc các user cụ thể. */
+  /** Send a notification to a role group (all active users) and/or specific users. */
   async send(dto: SendNotificationDto, actor: AuthenticatedUser) {
     const recipientIds = new Set<string>(dto.userIds ?? []);
 

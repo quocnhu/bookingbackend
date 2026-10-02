@@ -9,7 +9,7 @@ import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.i
 export class CompanyProfileController {
   constructor(private readonly companyProfileService: CompanyProfileService) {}
 
-  /** Mọi user đã đăng nhập đều đọc được (bộ phận kế toán in phiếu quyết toán). */
+  /** Readable by every logged-in user (the accounting department prints the settlement voucher). */
   @Get()
   get() {
     return this.companyProfileService.getProfile();
