@@ -532,7 +532,10 @@ export class AccountingService {
         driver: { select: { id: true, name: true } },
         _count: { select: { settlements: true } },
       },
-      orderBy: { tourReport: { submittedAt: 'asc' } },
+      // Stable order (startDate + code), NOT submittedAt:
+      // ordering by submittedAt pushed an edited/resubmitted trip to the
+      // bottom on every change. Start date + code never change on edit.
+      orderBy: [{ startDate: 'asc' }, { code: 'asc' }, { id: 'asc' }],
     });
 
     const now = Date.now();

@@ -225,6 +225,9 @@ let BookingService = BookingService_1 = class BookingService {
     }
     async create(dto, actor) {
         this.assertEmailForChannel(dto);
+        if (dto.status === client_1.BookingStatus.ASSIGNED) {
+            dto = { ...dto, status: client_1.BookingStatus.PENDING };
+        }
         const submitted = dto.bookingRef?.trim();
         let bookingRef = submitted || this.randomBookingRef(dto.tourType);
         let booking = null;
@@ -284,6 +287,9 @@ let BookingService = BookingService_1 = class BookingService {
         const data = { ...dto };
         if (dto.startingDate)
             data.startingDate = new Date(dto.startingDate);
+        if (data.status === client_1.BookingStatus.ASSIGNED && !before.assignmentId) {
+            data.status = client_1.BookingStatus.PENDING;
+        }
         const booking = await this.prisma.booking.update({ where: { id }, data });
         await this.auditService.log({
             entityType: 'Booking',

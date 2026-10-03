@@ -335,6 +335,13 @@ startingDate: data.startingDate
 
   async create(dto: CreateBookingDto, actor?: AuthenticatedUser) {
     this.assertEmailForChannel(dto);
+    // Guard invalid state: ASSIGNED requires a bus. The bookings-table
+    // status dropdown used to allow ASSIGNED with assignmentId=null,
+    // which hides the row from both Assignments (no bus) and the
+    // PENDING unassigned pool. Force PENDING instead.
+    if (dto.status === BookingStatus.ASSIGNED) {
+      dto = { ...dto, status: BookingStatus.PENDING };
+    }
 
     // The ref sent by the client is only a PREVIEW — two people may preview the
     // same ref and both click save. If that ref collides, issue a new one
@@ -419,6 +426,14 @@ startingDate: data.startingDate
 
     const data: any = { ...dto };
     if (dto.startingDate) data.startingDate = new Date(dto.startingDate);
+    // Never persist orphan ASSIGNED: a hand-flipped ASSIGNED without a bus
+    // used to hide the row from both tables. Coerce to PENDING and let the
+    // assign pipeline (or Reassign) set ASSIGNED together with assignmentId.
+    // No throw here — the bookings-table dropdown fires this on every change,
+    // throwing broke the manual flow.
+    if (data.status === BookingStatus.ASSIGNED && !before.assignmentId) {
+      data.status = BookingStatus.PENDING;
+    }
     const booking = await this.prisma.booking.update({ where: { id }, data });
     await this.auditService.log({
       entityType: 'Booking',

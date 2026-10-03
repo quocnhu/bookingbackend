@@ -387,7 +387,7 @@ let AccountingService = class AccountingService {
                 driver: { select: { id: true, name: true } },
                 _count: { select: { settlements: true } },
             },
-            orderBy: { tourReport: { submittedAt: 'asc' } },
+            orderBy: [{ startDate: 'asc' }, { code: 'asc' }, { id: 'asc' }],
         });
         const now = Date.now();
         const items = await Promise.all(assignments.map(async (a) => {

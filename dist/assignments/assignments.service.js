@@ -90,7 +90,7 @@ let AssignmentsService = class AssignmentsService {
         const items = await this.prisma.assignment.findMany({
             where,
             include: this.include,
-            orderBy: [{ startDate: 'asc' }],
+            orderBy: [{ startDate: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
             take: 500,
         });
         return items.map((a) => {
@@ -204,6 +204,7 @@ let AssignmentsService = class AssignmentsService {
                 endDate: true,
                 guideId: true,
                 driverId: true,
+                vehicle: { select: { plateNumber: true } },
             },
             orderBy: { startDate: 'asc' },
         });
@@ -244,6 +245,7 @@ let AssignmentsService = class AssignmentsService {
             status: a.status,
             startDate: a.startDate,
             endDate: a.endDate,
+            plateNumber: a.vehicle?.plateNumber ?? null,
         });
         const leaveMap = await this.fetchLeaveMap();
         const guides = users
@@ -475,7 +477,7 @@ let AssignmentsService = class AssignmentsService {
             this.prisma.assignment.findMany({
                 where,
                 include: this.include,
-                orderBy: [{ startDate: sortOrder ?? 'asc' }],
+                orderBy: [{ startDate: sortOrder ?? 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
                 skip: (page - 1) * limit,
                 take: limit,
             }),

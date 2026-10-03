@@ -119,7 +119,11 @@ export class AssignmentsService {
     const items = await this.prisma.assignment.findMany({
       where,
       include: this.include,
-      orderBy: [{ startDate: 'asc' }],
+      // Stable order: startDate first, then immutable tie-breakers.
+      // startDate-only ordering is non-deterministic for same-day buses —
+      // Postgres returns equal-startDate rows in arbitrary (physical) order,
+      // so any update (edit, submit to accounting) reshuffled top/under.
+      orderBy: [{ startDate: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       take: 500,
     });
 
@@ -254,6 +258,7 @@ export class AssignmentsService {
         endDate: true,
         guideId: true,
         driverId: true,
+        vehicle: { select: { plateNumber: true } },
       },
       orderBy: { startDate: 'asc' },
     });
@@ -297,6 +302,7 @@ export class AssignmentsService {
       status: a.status,
       startDate: a.startDate,
       endDate: a.endDate,
+      plateNumber: a.vehicle?.plateNumber ?? null,
     });
 
     const leaveMap = await this.fetchLeaveMap();
@@ -613,7 +619,7 @@ export class AssignmentsService {
       this.prisma.assignment.findMany({
         where,
         include: this.include,
-        orderBy: [{ startDate: sortOrder ?? 'asc' }],
+        orderBy: [{ startDate: sortOrder ?? 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
       }),

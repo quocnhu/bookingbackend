@@ -66,17 +66,10 @@ export class AssignmentProcessor extends WorkerHost {
     if (!booking.startingDate)
       return { skipped: true, reason: 'NO_START_DATE' };
 
-    // Manual mode: the board toggle is off — leave the booking PENDING so the
-    // admin drags it onto a bus by hand instead of auto-creating one.
-    const modeRow = await this.prisma.systemSetting.findUnique({
-      where: { key: 'assignMode' },
-    });
-    if (modeRow?.value === AssignmentOrigin.MANUAL) {
-      this.logger.log(
-        `Manual mode — booking ${booking.bookingRef} stays PENDING for manual assign`,
-      );
-      return { skipped: true, reason: 'MANUAL_MODE' };
-    }
+    // AUTO and MANUAL share the same booking → bus + crew logic.
+    // The toggle does NOT gate assignment here — it only gates the 4am
+    // auto-dispatch cron (see auto-dispatch.cron.ts). Every booking with a
+    // start date finds/shares a bus or inits a new one, then auto-fills crew.
     // EXTENSION POINT (auto/manual): add per-booking overrides here as needed,
     // e.g. per-tour mode (SystemSetting key `assignMode:<tourId>`), auto-assign
     // time windows (only auto-run 03:00–23:00), VIP-channel auto-pass, or
@@ -181,14 +174,12 @@ export class AssignmentProcessor extends WorkerHost {
       .map((a) => parseInt((a.code ?? '').split('-')[1]?.trim() ?? '0', 10))
       .filter((n) => !Number.isNaN(n));
     const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
-    // Prefer a Company Fleet vehicle (if one is still free on the same dates) to
-    // make use of company assets before hiring externally — company vehicles cost
-    // 0 VND (priceOverride = 0).
-    const companyVehicle = await this.findCompanyVehicle(
-      booking,
-      startDate,
-      endDate,
-    );
+    // NOTE: no vehicle is bound at creation on purpose. Binding the smallest
+    // fitting vehicle here (e.g. a 7-seater for a 4-pax booking) locked the
+    // bus to that capacity, so a later same-tour booking (4+5=9 <= 12) could
+    // no longer fit and was split onto a second bus. Grouping pools purely
+    // by BUS_MAX_PAX=12; the vehicle is picked by hand (or at dispatch time)
+    // once the passenger list is settled.
     return this.prisma.assignment.create({
       data: {
         code: `${label} Bus - ${nextNumber}`,
@@ -201,9 +192,9 @@ export class AssignmentProcessor extends WorkerHost {
         durationDays,
         totalPax: booking.totalPax ?? 0,
         createdWho: 'Auto-Assign System',
-        vehicleId: companyVehicle?.id ?? null,
-        providerId: companyVehicle?.providerId ?? null,
-        priceOverride: companyVehicle?.provider?.isCompany ? 0 : undefined,
+        vehicleId: null,
+        providerId: null,
+        priceOverride: undefined,
       },
     });
   }

@@ -57,13 +57,6 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             };
         if (!booking.startingDate)
             return { skipped: true, reason: 'NO_START_DATE' };
-        const modeRow = await this.prisma.systemSetting.findUnique({
-            where: { key: 'assignMode' },
-        });
-        if (modeRow?.value === client_1.AssignmentOrigin.MANUAL) {
-            this.logger.log(`Manual mode — booking ${booking.bookingRef} stays PENDING for manual assign`);
-            return { skipped: true, reason: 'MANUAL_MODE' };
-        }
         const candidate = await this.findCandidate(booking);
         if (!candidate) {
             const bus = await this.createBusForBooking(booking);
@@ -139,7 +132,6 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             .map((a) => parseInt((a.code ?? '').split('-')[1]?.trim() ?? '0', 10))
             .filter((n) => !Number.isNaN(n));
         const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
-        const companyVehicle = await this.findCompanyVehicle(booking, startDate, endDate);
         return this.prisma.assignment.create({
             data: {
                 code: `${label} Bus - ${nextNumber}`,
@@ -152,9 +144,9 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
                 durationDays,
                 totalPax: booking.totalPax ?? 0,
                 createdWho: 'Auto-Assign System',
-                vehicleId: companyVehicle?.id ?? null,
-                providerId: companyVehicle?.providerId ?? null,
-                priceOverride: companyVehicle?.provider?.isCompany ? 0 : undefined,
+                vehicleId: null,
+                providerId: null,
+                priceOverride: undefined,
             },
         });
     }

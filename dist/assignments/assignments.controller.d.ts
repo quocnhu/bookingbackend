@@ -73,6 +73,7 @@ export declare class AssignmentsController {
                 status: import("@prisma/client").$Enums.AssignmentStatus;
                 startDate: Date;
                 endDate: Date;
+                plateNumber: string | null;
             }[];
             leaves: {
                 id: string;
@@ -98,6 +99,7 @@ export declare class AssignmentsController {
                 status: import("@prisma/client").$Enums.AssignmentStatus;
                 startDate: Date;
                 endDate: Date;
+                plateNumber: string | null;
             }[];
             leaves: {
                 id: string;
