@@ -1268,16 +1268,19 @@ export class AccountingService {
         paymentLines: {
           where: { period: { voidedAt: null } },
           select: {
+            payableToId: true,
             payableTo: { select: { id: true, name: true } },
             period: { select: { id: true, fromDate: true, toDate: true } },
           },
-          take: 1,
         },
       },
       orderBy: { startDate: 'asc' },
     });
     return trips.map((a) => {
       const line = a.paymentLines[0] ?? null;
+      // Paid means paid TO THIS PERSON — a provider-level line (payable to
+      // the driver) must not mark the guide's row paid and vice versa.
+      const mine = a.paymentLines.find((l) => l.payableToId === personId) ?? null;
       const roles: string[] = [];
       if (a.guideId === personId) roles.push('GUIDE');
       if (a.driverId === personId) roles.push('DRIVER');
@@ -1299,9 +1302,9 @@ export class AccountingService {
             : null,
         flow: a.tourReport?.settlementFlow ?? null,
         locked: !!a.tourReport?.moneyVerifiedAt,
-        paid: !!line,
-        paidToName: line?.payableTo?.name ?? null,
-        periodToDate: line?.period?.toDate ?? null,
+        paid: !!mine,
+        paidToName: (mine ?? line)?.payableTo?.name ?? null,
+        periodToDate: (mine ?? line)?.period?.toDate ?? null,
         exportable: exportableIds.has(a.id),
         settlesWith: a.tourReport?.moneyPayableTo?.name ?? null,
       };
@@ -1346,15 +1349,18 @@ export class AccountingService {
           where: { period: { voidedAt: null } },
           select: {
             netAmount: true,
-            period: { select: { id: true, fromDate: true, toDate: true } },
+            period: { select: { id: true, personId: true, fromDate: true, toDate: true } },
           },
-          take: 1,
         },
       },
       orderBy: { startDate: 'asc' },
     });
     return trips.map((a) => {
       const line = a.paymentLines[0] ?? null;
+      // Paid means paid UNDER THIS PROVIDER's period — a guide-level line
+      // for the same trip must not mark the provider's row paid.
+      const mine =
+        a.paymentLines.find((l) => l.period.personId === providerId) ?? null;
       const tourId = a.bookings?.[0]?.tourId ?? null;
       const fromTable = tourId
         ? priceByKey.get(`${tourId}|${a.vehicleId ?? ''}`)
@@ -1372,20 +1378,20 @@ export class AccountingService {
         providerName: a.provider?.name ?? null,
         driverName: a.driver?.name ?? null,
         myRole: 'PROVIDER',
-        netAmount: line ? num(line.netAmount) : null,
+        netAmount: mine ? num(mine.netAmount) : null,
         flow: null,
         locked: !!a.tourReport?.moneyVerifiedAt,
-        paid: !!line,
+        paid: !!mine,
         paidToName: null,
-        periodToDate: line?.period?.toDate ?? null,
+        periodToDate: mine?.period?.toDate ?? null,
         exportable: exportableIds.has(a.id),
         settlesWith: null,
-        amount: line
-          ? num(line.netAmount)
+        amount: mine
+          ? num(mine.netAmount)
           : hasOverride
             ? num(a.priceOverride)
             : (fromTable ?? 0),
-        priceMissing: line ? false : !hasOverride && fromTable === undefined,
+        priceMissing: mine ? false : !hasOverride && fromTable === undefined,
       };
     });
   }
