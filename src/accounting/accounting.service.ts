@@ -1692,7 +1692,19 @@ export class AccountingService {
     const periods = await this.prisma.paymentPeriod.findMany({
       where: personId ? { personId } : {},
       include: {
-        lines: { orderBy: { tourDate: 'asc' } },
+        lines: {
+          orderBy: { tourDate: 'asc' },
+          include: {
+            assignment: {
+              select: {
+                code: true,
+                vehicle: { select: { plateNumber: true, capacity: true } },
+                provider: { select: { name: true } },
+              },
+            },
+            payableTo: { select: { name: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 200,
@@ -1753,8 +1765,13 @@ export class AccountingService {
       createdAt: p.createdAt,
       lines: p.lines.map((l) => ({
         assignmentId: l.assignmentId,
+        code: l.assignment?.code ?? null,
         tourName: l.tourName,
         tourDate: l.tourDate,
+        plateNumber: l.assignment?.vehicle?.plateNumber ?? null,
+        vehicleCapacity: l.assignment?.vehicle?.capacity ?? null,
+        providerName: l.assignment?.provider?.name ?? null,
+        payableToName: l.payableTo?.name ?? null,
         netAmount: num(l.netAmount),
         flow: l.flow,
         note: l.note,
