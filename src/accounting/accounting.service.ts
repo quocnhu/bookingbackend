@@ -1166,13 +1166,15 @@ export class AccountingService {
         totalPrice,
         companyReturnsToProvider: totalPrice,
         direction: 'COMPANY_TO_PROVIDER' as const,
-        // Read-only statement: every closed trip in the range for this
+        // Read-only statement: every trip in the range for this
         // provider with its paid status (never exported from here).
         statement: payee
           ? await this.statementForProvider(
               payee.id,
-              closedInRange,
+              from,
+              to,
               priceByKey,
+              new Set(lines.map((l) => l.assignmentId)),
             )
           : [],
       };
@@ -1204,47 +1206,60 @@ export class AccountingService {
           : totalNet < 0
             ? 'COMPANY_TO_PERSON'
             : 'SETTLED',
-      // Read-only statement: every verified trip in the range involving
+      // Read-only statement: every trip in the range involving
       // this person (as guide, driver, or money payee) with its paid
-      // status. Drivers settle nothing themselves — one trip has one net,
-      // settled with the guide — but this lets Accounting check per crew
-      // member per range whether each trip is paid or not.
+      // status. The range means WORK DAYS (trip start/end overlapping the
+      // range) — not the money-locked date — so crew can check "what did
+      // I work and is it paid". Drivers settle nothing themselves (one
+      // trip has one net, settled with the guide) — but this lets
+      // Accounting check per crew member per range whether each trip is
+      // paid or not.
       statement: payee
-        ? await this.statementForPerson(payee.id, verifiedInRange)
+        ? await this.statementForPerson(
+            payee.id,
+            from,
+            to,
+            new Set(lines.map((l) => l.assignmentId)),
+          )
         : [],
     };
   }
 
   /**
-   * Statement rows for one person: verified trips in range where they took
-   * part (guide and/or driver). `exportable` is true only for the money
-   * payee's own not-yet-exported trips — exactly what `lines` contains —
-   * so a driver can never export another person's money (no double-pay).
+   * Statement rows for one person: trips overlapping the range (work days)
+   * where they took part (guide and/or driver). `exportable` mirrors the
+   * export list exactly (same set as `lines`), so a driver can never
+   * export another person's money (no double-pay).
    */
   private async statementForPerson(
     personId: string,
-    verified: Prisma.TourReportWhereInput,
+    from: Date,
+    to: Date,
+    exportableIds: Set<string>,
   ) {
     const trips = await this.prisma.assignment.findMany({
       where: {
-        status: AssignmentStatus.COMPLETED,
-        tourReport: { is: verified },
+        status: { not: AssignmentStatus.CANCELED },
+        startDate: { lte: to },
+        endDate: { gte: from },
         OR: [{ guideId: personId }, { driverId: personId }],
       },
       select: {
         id: true,
         code: true,
         tourName: true,
+        status: true,
+        startDate: true,
+        endDate: true,
         guideId: true,
         driverId: true,
         vehicle: { select: { plateNumber: true } },
+        provider: { select: { id: true, name: true } },
         tourReport: {
           select: {
-            finalizedAt: true,
             moneyVerifiedAt: true,
             netAmount: true,
             settlementFlow: true,
-            moneyPayableToId: true,
             moneyPayableTo: { select: { id: true, name: true } },
           },
         },
@@ -1257,7 +1272,7 @@ export class AccountingService {
           take: 1,
         },
       },
-      orderBy: { tourReport: { finalizedAt: 'asc' } },
+      orderBy: { startDate: 'asc' },
     });
     return trips.map((a) => {
       const line = a.paymentLines[0] ?? null;
@@ -1268,51 +1283,61 @@ export class AccountingService {
         assignmentId: a.id,
         code: a.code,
         tourName: a.tourName,
-        tourDate: a.tourReport?.finalizedAt ?? null,
+        tourDate: a.startDate,
+        endDate: a.endDate,
+        status: a.status,
         plateNumber: a.vehicle?.plateNumber ?? null,
+        providerName: a.provider?.name ?? null,
         myRole: roles.join('+') || '—',
         netAmount:
           a.tourReport?.netAmount != null
             ? num(a.tourReport.netAmount)
             : null,
         flow: a.tourReport?.settlementFlow ?? null,
+        locked: !!a.tourReport?.moneyVerifiedAt,
         paid: !!line,
         paidToName: line?.payableTo?.name ?? null,
         periodToDate: line?.period?.toDate ?? null,
-        exportable:
-          !line && a.tourReport?.moneyPayableToId === personId,
+        exportable: exportableIds.has(a.id),
         settlesWith: a.tourReport?.moneyPayableTo?.name ?? null,
       };
     });
   }
 
   /**
-   * Statement rows for one transport provider: closed trips in range run
-   * with its vehicles, with paid status. Amounts mirror the preview rule
-   * (trip price override, else the provider's tour price list; a paid
-   * trip keeps its frozen exported amount).
+   * Statement rows for one transport provider: trips overlapping the range
+   * (work days) run with its vehicles, with paid status. Amounts mirror
+   * the preview rule (trip price override, else the provider's tour price
+   * list; a paid trip keeps its frozen exported amount).
    */
   private async statementForProvider(
     providerId: string,
-    closed: Prisma.TourReportWhereInput,
+    from: Date,
+    to: Date,
     priceByKey: Map<string, number>,
+    exportableIds: Set<string>,
   ) {
     const trips = await this.prisma.assignment.findMany({
       where: {
-        status: AssignmentStatus.COMPLETED,
+        status: { not: AssignmentStatus.CANCELED },
         providerId,
-        tourReport: { is: closed },
+        startDate: { lte: to },
+        endDate: { gte: from },
       },
       select: {
         id: true,
         code: true,
         tourName: true,
+        status: true,
+        startDate: true,
+        endDate: true,
         vehicleId: true,
         priceOverride: true,
         vehicle: { select: { plateNumber: true } },
+        provider: { select: { id: true, name: true } },
         driver: { select: { id: true, name: true } },
         bookings: { select: { tourId: true }, take: 1 },
-        tourReport: { select: { finalizedAt: true } },
+        tourReport: { select: { moneyVerifiedAt: true } },
         paymentLines: {
           where: { period: { voidedAt: null } },
           select: {
@@ -1322,7 +1347,7 @@ export class AccountingService {
           take: 1,
         },
       },
-      orderBy: { tourReport: { finalizedAt: 'asc' } },
+      orderBy: { startDate: 'asc' },
     });
     return trips.map((a) => {
       const line = a.paymentLines[0] ?? null;
@@ -1336,15 +1361,19 @@ export class AccountingService {
         assignmentId: a.id,
         code: a.code,
         tourName: a.tourName,
-        tourDate: a.tourReport?.finalizedAt ?? null,
+        tourDate: a.startDate,
+        endDate: a.endDate,
+        status: a.status,
         plateNumber: a.vehicle?.plateNumber ?? null,
+        providerName: a.provider?.name ?? null,
         myRole: 'PROVIDER',
         netAmount: line ? num(line.netAmount) : null,
         flow: null,
+        locked: !!a.tourReport?.moneyVerifiedAt,
         paid: !!line,
         paidToName: null,
         periodToDate: line?.period?.toDate ?? null,
-        exportable: !line,
+        exportable: exportableIds.has(a.id),
         settlesWith: null,
         amount: line
           ? num(line.netAmount)
