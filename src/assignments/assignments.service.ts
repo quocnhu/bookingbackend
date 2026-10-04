@@ -74,11 +74,15 @@ export class AssignmentsService {
     reportVerifier: { select: { id: true, name: true, email: true } },
     tourReport: true,
     // Accounting Watermark: the export periods that already contain this trip.
+    // Only non-voided periods count as Paid — a voided period re-opens the
+    // trip for export, so it must not keep the Paid tag.
     paymentLines: {
+      where: { period: { voidedAt: null } },
       select: {
         id: true,
         tourDate: true,
         periodId: true,
+        payableToId: true,
         payableTo: { select: { id: true, name: true } },
       },
     },
@@ -259,6 +263,20 @@ export class AssignmentsService {
         guideId: true,
         driverId: true,
         vehicle: { select: { plateNumber: true } },
+        // Paid mark: any non-voided export period containing this trip.
+        // moneyVerifiedAt = locked by Accounting but not yet exported → Unpaid.
+        tourReport: {
+          select: { moneyVerifiedAt: true, moneyPayableToId: true },
+        },
+        paymentLines: {
+          where: { period: { voidedAt: null } },
+          select: {
+            id: true,
+            payableToId: true,
+            payableTo: { select: { id: true, name: true } },
+            period: { select: { id: true, fromDate: true, toDate: true } },
+          },
+        },
       },
       orderBy: { startDate: 'asc' },
     });
@@ -303,6 +321,11 @@ export class AssignmentsService {
       startDate: a.startDate,
       endDate: a.endDate,
       plateNumber: a.vehicle?.plateNumber ?? null,
+      // Paid = exported in a non-voided payment period (Accounting clicked
+      // Accept/Export). Verified-but-not-exported stays Unpaid.
+      paid: (a.paymentLines?.length ?? 0) > 0,
+      moneyVerifiedAt: a.tourReport?.moneyVerifiedAt ?? null,
+      paidToName: a.paymentLines?.[0]?.payableTo?.name ?? null,
     });
 
     const leaveMap = await this.fetchLeaveMap();

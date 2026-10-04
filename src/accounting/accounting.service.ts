@@ -1469,6 +1469,7 @@ export class AccountingService {
   async watermarkOverview(actor: AuthenticatedUser) {
     this.assertAccounting(actor);
     const periods = await this.prisma.paymentPeriod.findMany({
+      where: { voidedAt: null },
       orderBy: { toDate: 'desc' },
       select: { personId: true, toDate: true },
     });

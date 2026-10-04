@@ -575,15 +575,15 @@ model TourReport {
   // The person RECEIVING money for this trip (guide or driver), fixed at verify time.
   // Required: one trip has only one net amount. Without storing it, both the guide
   // and the driver would see that amount and could both export a period → paid twice.
-  moneyPayableToId     String?
-  moneyPayableTo       User?        @relation("MoneyPayableTo", fields: [moneyPayableToId], references: [id])
+  moneyPayableToId String?
+  moneyPayableTo   User?   @relation("MoneyPayableTo", fields: [moneyPayableToId], references: [id])
 
   // Accounting reviews then clicks Verify or Reject. Reject → notify the submitter
   // to check again; the trip leaves the queue until it is resubmitted.
-  moneyRejectedAt       DateTime?
-  moneyRejectedById     String?
-  moneyRejectedByName   String?
-  moneyRejectionReason  String?      @db.Text
+  moneyRejectedAt      DateTime?
+  moneyRejectedById    String?
+  moneyRejectedByName  String?
+  moneyRejectionReason String?   @db.Text
 
   // Receipt / evidence photos the guide took after the tour. [{ name, url, uploadedAt }].
   // From upload until Admin verification, everything stays in "pending verification" state.
@@ -676,7 +676,7 @@ model PaymentPeriod {
   voidedAt     DateTime?
   voidedById   String?
   voidedByName String?
-  voidReason   String?      @db.Text
+  voidReason   String?   @db.Text
 
   lines PaymentPeriodLine[]
 
@@ -703,6 +703,7 @@ model PaymentPeriodLine {
   note      String?
 
   @@unique([periodId, assignmentId])
+  @@index([assignmentId])
   @@index([payableToId])
 }
 
