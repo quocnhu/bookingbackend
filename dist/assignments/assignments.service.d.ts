@@ -74,6 +74,9 @@ export declare class AssignmentsService {
                 startDate: Date;
                 endDate: Date;
                 plateNumber: string | null;
+                paid: boolean;
+                moneyVerifiedAt: Date | null;
+                paidToName: string | null;
             }[];
             leaves: {
                 id: string;
@@ -100,6 +103,9 @@ export declare class AssignmentsService {
                 startDate: Date;
                 endDate: Date;
                 plateNumber: string | null;
+                paid: boolean;
+                moneyVerifiedAt: Date | null;
+                paidToName: string | null;
             }[];
             leaves: {
                 id: string;
@@ -235,6 +241,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -375,6 +382,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -515,6 +523,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -658,6 +667,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -799,6 +809,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -939,6 +950,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1079,6 +1091,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1219,6 +1232,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1361,6 +1375,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1544,6 +1559,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1684,6 +1700,7 @@ export declare class AssignmentsService {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;

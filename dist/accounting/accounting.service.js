@@ -26,6 +26,7 @@ exports.PAYEE_LABELS = {
 };
 const num = (v) => Number(v ?? 0);
 const round2 = (v) => Math.round(v * 100) / 100;
+const fmtVnd = (v) => `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.abs(Math.round(num(v))))} ₫`;
 let AccountingService = class AccountingService {
     prisma;
     audit;
@@ -723,9 +724,78 @@ let AccountingService = class AccountingService {
                 payeeType: client_1.PayeeType.TRANSPORT_PROVIDER,
             });
         }
+        const [settledTrips, paidLines] = await Promise.all([
+            this.prisma.assignment.findMany({
+                where: {
+                    status: client_1.AssignmentStatus.COMPLETED,
+                    tourReport: {
+                        is: {
+                            OR: [
+                                { moneyVerifiedAt: { not: null } },
+                                { finalizedAt: { not: null } },
+                            ],
+                        },
+                    },
+                },
+                select: {
+                    id: true,
+                    providerId: true,
+                    tourReport: {
+                        select: {
+                            moneyVerifiedAt: true,
+                            finalizedAt: true,
+                            moneyPayableToId: true,
+                        },
+                    },
+                },
+            }),
+            this.prisma.paymentPeriodLine.findMany({
+                where: { period: { voidedAt: null } },
+                select: {
+                    assignmentId: true,
+                    payableToId: true,
+                    period: { select: { personId: true } },
+                },
+            }),
+        ]);
+        const paidToByTrip = new Map();
+        const periodPaidByTrip = new Map();
+        for (const l of paidLines) {
+            const a = paidToByTrip.get(l.assignmentId) ?? new Set();
+            a.add(l.payableToId);
+            paidToByTrip.set(l.assignmentId, a);
+            const b = periodPaidByTrip.get(l.assignmentId) ?? new Set();
+            b.add(l.period.personId);
+            periodPaidByTrip.set(l.assignmentId, b);
+        }
+        const unpaidFor = (payeeId, kind) => {
+            let n = 0;
+            for (const t of settledTrips) {
+                if (kind === 'PERSON') {
+                    if (!t.tourReport?.moneyVerifiedAt)
+                        continue;
+                    if (t.tourReport.moneyPayableToId !== payeeId)
+                        continue;
+                    if (paidToByTrip.get(t.id)?.has(payeeId))
+                        continue;
+                    n++;
+                }
+                else {
+                    if (!t.tourReport?.finalizedAt)
+                        continue;
+                    if (t.providerId !== payeeId)
+                        continue;
+                    if (periodPaidByTrip.get(t.id)?.has(payeeId))
+                        continue;
+                    n++;
+                }
+            }
+            return n;
+        };
         const withWatermark = await Promise.all(payees.map(async (p) => ({
             ...p,
             paidThrough: await this.watermarkFor(p.id),
+            unpaidCount: unpaidFor(p.id, p.kind),
         })));
         const groups = Object.keys(exports.PAYEE_LABELS).map((t) => ({
             payeeType: t,
@@ -849,6 +919,9 @@ let AccountingService = class AccountingService {
                 totalPrice,
                 companyReturnsToProvider: totalPrice,
                 direction: 'COMPANY_TO_PROVIDER',
+                statement: payee
+                    ? await this.statementForProvider(payee.id, from, to, priceByKey, new Set(lines.map((l) => l.assignmentId)))
+                    : [],
             };
         }
         let personReturnsToCompany = 0;
@@ -876,7 +949,153 @@ let AccountingService = class AccountingService {
                 : totalNet < 0
                     ? 'COMPANY_TO_PERSON'
                     : 'SETTLED',
+            statement: payee
+                ? await this.statementForPerson(payee.id, from, to, new Set(lines.map((l) => l.assignmentId)))
+                : [],
         };
+    }
+    async statementForPerson(personId, from, to, exportableIds) {
+        const trips = await this.prisma.assignment.findMany({
+            where: {
+                status: { not: client_1.AssignmentStatus.CANCELED },
+                startDate: { lte: to },
+                endDate: { gte: from },
+                OR: [{ guideId: personId }, { driverId: personId }],
+            },
+            select: {
+                id: true,
+                code: true,
+                tourName: true,
+                status: true,
+                startDate: true,
+                endDate: true,
+                guideId: true,
+                driverId: true,
+                vehicle: { select: { plateNumber: true, capacity: true } },
+                provider: { select: { id: true, name: true } },
+                guide: { select: { name: true } },
+                driver: { select: { name: true } },
+                tourReport: {
+                    select: {
+                        moneyVerifiedAt: true,
+                        netAmount: true,
+                        settlementFlow: true,
+                        moneyPayableTo: { select: { id: true, name: true } },
+                    },
+                },
+                paymentLines: {
+                    where: { period: { voidedAt: null } },
+                    select: {
+                        payableToId: true,
+                        payableTo: { select: { id: true, name: true } },
+                        period: { select: { id: true, fromDate: true, toDate: true } },
+                    },
+                },
+            },
+            orderBy: { startDate: 'asc' },
+        });
+        return trips.map((a) => {
+            const line = a.paymentLines[0] ?? null;
+            const mine = a.paymentLines.find((l) => l.payableToId === personId) ?? null;
+            const roles = [];
+            if (a.guideId === personId)
+                roles.push('GUIDE');
+            if (a.driverId === personId)
+                roles.push('DRIVER');
+            return {
+                assignmentId: a.id,
+                code: a.code,
+                tourName: a.tourName,
+                tourDate: a.startDate,
+                endDate: a.endDate,
+                status: a.status,
+                plateNumber: a.vehicle?.plateNumber ?? null,
+                vehicleCapacity: a.vehicle?.capacity ?? null,
+                providerName: a.provider?.name ?? null,
+                guideName: a.guide?.name ?? null,
+                driverName: a.driver?.name ?? null,
+                myRole: roles.join('+') || '—',
+                netAmount: a.tourReport?.netAmount != null
+                    ? num(a.tourReport.netAmount)
+                    : null,
+                flow: a.tourReport?.settlementFlow ?? null,
+                locked: !!a.tourReport?.moneyVerifiedAt,
+                paid: !!mine,
+                paidToName: (mine ?? line)?.payableTo?.name ?? null,
+                periodToDate: (mine ?? line)?.period?.toDate ?? null,
+                exportable: exportableIds.has(a.id),
+                settlesWith: a.tourReport?.moneyPayableTo?.name ?? null,
+            };
+        });
+    }
+    async statementForProvider(providerId, from, to, priceByKey, exportableIds) {
+        const trips = await this.prisma.assignment.findMany({
+            where: {
+                status: { not: client_1.AssignmentStatus.CANCELED },
+                providerId,
+                startDate: { lte: to },
+                endDate: { gte: from },
+            },
+            select: {
+                id: true,
+                code: true,
+                tourName: true,
+                status: true,
+                startDate: true,
+                endDate: true,
+                vehicleId: true,
+                priceOverride: true,
+                vehicle: { select: { plateNumber: true, capacity: true } },
+                provider: { select: { id: true, name: true } },
+                driver: { select: { id: true, name: true } },
+                bookings: { select: { tourId: true }, take: 1 },
+                tourReport: { select: { moneyVerifiedAt: true } },
+                paymentLines: {
+                    where: { period: { voidedAt: null } },
+                    select: {
+                        netAmount: true,
+                        period: { select: { id: true, personId: true, fromDate: true, toDate: true } },
+                    },
+                },
+            },
+            orderBy: { startDate: 'asc' },
+        });
+        return trips.map((a) => {
+            const line = a.paymentLines[0] ?? null;
+            const mine = a.paymentLines.find((l) => l.period.personId === providerId) ?? null;
+            const tourId = a.bookings?.[0]?.tourId ?? null;
+            const fromTable = tourId
+                ? priceByKey.get(`${tourId}|${a.vehicleId ?? ''}`)
+                : undefined;
+            const hasOverride = a.priceOverride !== null && a.priceOverride !== undefined;
+            return {
+                assignmentId: a.id,
+                code: a.code,
+                tourName: a.tourName,
+                tourDate: a.startDate,
+                endDate: a.endDate,
+                status: a.status,
+                plateNumber: a.vehicle?.plateNumber ?? null,
+                vehicleCapacity: a.vehicle?.capacity ?? null,
+                providerName: a.provider?.name ?? null,
+                driverName: a.driver?.name ?? null,
+                myRole: 'PROVIDER',
+                netAmount: mine ? num(mine.netAmount) : null,
+                flow: null,
+                locked: !!a.tourReport?.moneyVerifiedAt,
+                paid: !!mine,
+                paidToName: null,
+                periodToDate: mine?.period?.toDate ?? null,
+                exportable: exportableIds.has(a.id),
+                settlesWith: null,
+                amount: mine
+                    ? num(mine.netAmount)
+                    : hasOverride
+                        ? num(a.priceOverride)
+                        : (fromTable ?? 0),
+                priceMissing: mine ? false : !hasOverride && fromTable === undefined,
+            };
+        });
     }
     async exportPeriod(actor, dto) {
         this.assertAccounting(actor, 'accounting.period.export');
@@ -970,6 +1189,22 @@ let AccountingService = class AccountingService {
             });
             return created;
         });
+        const moneyText = preview.mode === 'ROUTE_PRICE'
+            ? `Company pays ${payee.name} ${fmtVnd(preview.totalPrice)} for ${preview.tourCount} trip(s)`
+            : preview.totalNet > 0
+                ? `${payee.name} returns ${fmtVnd(preview.totalNet)} to the company for ${preview.tourCount} trip(s)`
+                : preview.totalNet < 0
+                    ? `Company returns ${fmtVnd(preview.totalNet)} to ${payee.name} for ${preview.tourCount} trip(s)`
+                    : `Settled with ${payee.name} — no money due for ${preview.tourCount} trip(s)`;
+        const receiverIds = [...new Set(period.lines.map((l) => l.payableToId))];
+        for (const rid of receiverIds) {
+            try {
+                const notif = await this.notificationService.create(rid, client_2.NotificationType.GENERAL, `Payment exported (${dto.fromDate} → ${dto.toDate})`, `${moneyText}. Exported by ${actor.name ?? actor.email} — please confirm your trips, and tell Accounting if anything is wrong.`, { periodId: period.id, payeeId: payee.id });
+                this.gateway.notifyUser(rid, 'notification', notif);
+            }
+            catch {
+            }
+        }
         return {
             periodId: period.id,
             ...preview,
@@ -1024,7 +1259,19 @@ let AccountingService = class AccountingService {
         const periods = await this.prisma.paymentPeriod.findMany({
             where: personId ? { personId } : {},
             include: {
-                lines: { orderBy: { tourDate: 'asc' } },
+                lines: {
+                    orderBy: { tourDate: 'asc' },
+                    include: {
+                        assignment: {
+                            select: {
+                                code: true,
+                                vehicle: { select: { plateNumber: true, capacity: true } },
+                                provider: { select: { name: true } },
+                            },
+                        },
+                        payableTo: { select: { name: true } },
+                    },
+                },
             },
             orderBy: { createdAt: 'desc' },
             take: 200,
@@ -1074,8 +1321,13 @@ let AccountingService = class AccountingService {
             createdAt: p.createdAt,
             lines: p.lines.map((l) => ({
                 assignmentId: l.assignmentId,
+                code: l.assignment?.code ?? null,
                 tourName: l.tourName,
                 tourDate: l.tourDate,
+                plateNumber: l.assignment?.vehicle?.plateNumber ?? null,
+                vehicleCapacity: l.assignment?.vehicle?.capacity ?? null,
+                providerName: l.assignment?.provider?.name ?? null,
+                payableToName: l.payableTo?.name ?? null,
                 netAmount: num(l.netAmount),
                 flow: l.flow,
                 note: l.note,
@@ -1085,6 +1337,7 @@ let AccountingService = class AccountingService {
     async watermarkOverview(actor) {
         this.assertAccounting(actor);
         const periods = await this.prisma.paymentPeriod.findMany({
+            where: { voidedAt: null },
             orderBy: { toDate: 'desc' },
             select: { personId: true, toDate: true },
         });

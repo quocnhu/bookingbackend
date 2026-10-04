@@ -16,6 +16,7 @@ export interface Payee {
     providerName: string | null;
     providerIsCompany: boolean | null;
     payeeType: PayeeType;
+    unpaidCount?: number;
 }
 export declare class AccountingService {
     private readonly prisma;
@@ -75,10 +76,10 @@ export declare class AccountingService {
             assignmentId: string | null;
             bookingId: string | null;
             note: string | null;
-            amount: Prisma.Decimal;
-            categoryId: string | null;
             createdById: string;
             createdByName: string | null;
+            amount: Prisma.Decimal;
+            categoryId: string | null;
             reversesId: string | null;
         })[];
         categories: {
@@ -105,10 +106,10 @@ export declare class AccountingService {
         assignmentId: string | null;
         bookingId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
-        categoryId: string | null;
         createdById: string;
         createdByName: string | null;
+        amount: Prisma.Decimal;
+        categoryId: string | null;
         reversesId: string | null;
     }>;
     listSettlements(actor: AuthenticatedUser, assignmentId: string): Promise<({
@@ -132,10 +133,10 @@ export declare class AccountingService {
         assignmentId: string | null;
         bookingId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
-        categoryId: string | null;
         createdById: string;
         createdByName: string | null;
+        amount: Prisma.Decimal;
+        categoryId: string | null;
         reversesId: string | null;
     })[]>;
     createSettlement(actor: AuthenticatedUser, assignmentId: string, dto: CreateSettlementDto): Promise<{
@@ -155,10 +156,10 @@ export declare class AccountingService {
         assignmentId: string | null;
         bookingId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
-        categoryId: string | null;
         createdById: string;
         createdByName: string | null;
+        amount: Prisma.Decimal;
+        categoryId: string | null;
         reversesId: string | null;
     }>;
     private createSettlementCore;
@@ -173,10 +174,10 @@ export declare class AccountingService {
         assignmentId: string | null;
         bookingId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
-        categoryId: string | null;
         createdById: string;
         createdByName: string | null;
+        amount: Prisma.Decimal;
+        categoryId: string | null;
         reversesId: string | null;
     }>;
     deleteTourMoney(actor: AuthenticatedUser, assignmentId: string, settlementId: string): Promise<{
@@ -186,10 +187,10 @@ export declare class AccountingService {
         assignmentId: string | null;
         bookingId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
-        categoryId: string | null;
         createdById: string;
         createdByName: string | null;
+        amount: Prisma.Decimal;
+        categoryId: string | null;
         reversesId: string | null;
     }>;
     deleteSettlement(actor: AuthenticatedUser, id: string): Promise<{
@@ -199,10 +200,10 @@ export declare class AccountingService {
         assignmentId: string | null;
         bookingId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
-        categoryId: string | null;
         createdById: string;
         createdByName: string | null;
+        amount: Prisma.Decimal;
+        categoryId: string | null;
         reversesId: string | null;
     }>;
     private sumRows;
@@ -326,6 +327,7 @@ export declare class AccountingService {
             label: string;
             payees: {
                 paidThrough: Date | null;
+                unpaidCount: number;
                 id: string;
                 kind: "PERSON" | "PROVIDER";
                 name: string;
@@ -339,6 +341,7 @@ export declare class AccountingService {
         }[];
         payees: {
             paidThrough: Date | null;
+            unpaidCount: number;
             id: string;
             kind: "PERSON" | "PROVIDER";
             name: string;
@@ -417,6 +420,29 @@ export declare class AccountingService {
         totalPrice: number;
         companyReturnsToProvider: number;
         direction: "COMPANY_TO_PROVIDER";
+        statement: {
+            assignmentId: string;
+            code: string | null;
+            tourName: string | null;
+            tourDate: Date;
+            endDate: Date;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            plateNumber: string | null;
+            vehicleCapacity: number | null;
+            providerName: string | null;
+            driverName: string | null;
+            myRole: string;
+            netAmount: number | null;
+            flow: null;
+            locked: boolean;
+            paid: boolean;
+            paidToName: null;
+            periodToDate: Date | null;
+            exportable: boolean;
+            settlesWith: null;
+            amount: number;
+            priceMissing: boolean;
+        }[];
         personReturnsToCompany?: undefined;
         companyReturnsToPerson?: undefined;
         totalNet?: undefined;
@@ -488,9 +514,33 @@ export declare class AccountingService {
         companyReturnsToPerson: number;
         totalNet: number;
         direction: string;
+        statement: {
+            assignmentId: string;
+            code: string | null;
+            tourName: string | null;
+            tourDate: Date;
+            endDate: Date;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            plateNumber: string | null;
+            vehicleCapacity: number | null;
+            providerName: string | null;
+            guideName: string | null;
+            driverName: string | null;
+            myRole: string;
+            netAmount: number | null;
+            flow: import("@prisma/client").$Enums.FeeFlowType | null;
+            locked: boolean;
+            paid: boolean;
+            paidToName: string | null;
+            periodToDate: Date;
+            exportable: boolean;
+            settlesWith: string | null;
+        }[];
         totalPrice?: undefined;
         companyReturnsToProvider?: undefined;
     }>;
+    private statementForPerson;
+    private statementForProvider;
     exportPeriod(actor: AuthenticatedUser, dto: ExportPeriodDto): Promise<{
         person: Payee & {
             id: string;
@@ -559,6 +609,29 @@ export declare class AccountingService {
         totalPrice: number;
         companyReturnsToProvider: number;
         direction: "COMPANY_TO_PROVIDER";
+        statement: {
+            assignmentId: string;
+            code: string | null;
+            tourName: string | null;
+            tourDate: Date;
+            endDate: Date;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            plateNumber: string | null;
+            vehicleCapacity: number | null;
+            providerName: string | null;
+            driverName: string | null;
+            myRole: string;
+            netAmount: number | null;
+            flow: null;
+            locked: boolean;
+            paid: boolean;
+            paidToName: null;
+            periodToDate: Date | null;
+            exportable: boolean;
+            settlesWith: null;
+            amount: number;
+            priceMissing: boolean;
+        }[];
         personReturnsToCompany?: undefined;
         companyReturnsToPerson?: undefined;
         totalNet?: undefined;
@@ -632,6 +705,28 @@ export declare class AccountingService {
         companyReturnsToPerson: number;
         totalNet: number;
         direction: string;
+        statement: {
+            assignmentId: string;
+            code: string | null;
+            tourName: string | null;
+            tourDate: Date;
+            endDate: Date;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+            plateNumber: string | null;
+            vehicleCapacity: number | null;
+            providerName: string | null;
+            guideName: string | null;
+            driverName: string | null;
+            myRole: string;
+            netAmount: number | null;
+            flow: import("@prisma/client").$Enums.FeeFlowType | null;
+            locked: boolean;
+            paid: boolean;
+            paidToName: string | null;
+            periodToDate: Date;
+            exportable: boolean;
+            settlesWith: string | null;
+        }[];
         totalPrice?: undefined;
         companyReturnsToProvider?: undefined;
         periodId: string;
@@ -640,17 +735,17 @@ export declare class AccountingService {
         id: string;
         createdAt: Date;
         note: string | null;
-        createdById: string;
-        createdByName: string | null;
+        personId: string;
         payeeType: import("@prisma/client").$Enums.PayeeType;
+        payeeName: string | null;
         fromDate: Date;
         toDate: Date;
-        personId: string;
-        payeeName: string | null;
         tourCount: number;
         personReturnsToCompany: Prisma.Decimal;
         companyReturnsToPerson: Prisma.Decimal;
         totalNet: Prisma.Decimal;
+        createdById: string;
+        createdByName: string | null;
         voidedAt: Date | null;
         voidedById: string | null;
         voidedByName: string | null;
@@ -679,8 +774,13 @@ export declare class AccountingService {
         createdAt: Date;
         lines: {
             assignmentId: string;
+            code: string | null;
             tourName: string | null;
             tourDate: Date;
+            plateNumber: string | null;
+            vehicleCapacity: number | null;
+            providerName: string | null;
+            payableToName: string | null;
             netAmount: number;
             flow: import("@prisma/client").$Enums.FeeFlowType;
             note: string | null;

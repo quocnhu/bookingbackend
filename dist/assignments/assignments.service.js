@@ -60,10 +60,12 @@ let AssignmentsService = class AssignmentsService {
         reportVerifier: { select: { id: true, name: true, email: true } },
         tourReport: true,
         paymentLines: {
+            where: { period: { voidedAt: null } },
             select: {
                 id: true,
                 tourDate: true,
                 periodId: true,
+                payableToId: true,
                 payableTo: { select: { id: true, name: true } },
             },
         },
@@ -205,6 +207,18 @@ let AssignmentsService = class AssignmentsService {
                 guideId: true,
                 driverId: true,
                 vehicle: { select: { plateNumber: true } },
+                tourReport: {
+                    select: { moneyVerifiedAt: true, moneyPayableToId: true },
+                },
+                paymentLines: {
+                    where: { period: { voidedAt: null } },
+                    select: {
+                        id: true,
+                        payableToId: true,
+                        payableTo: { select: { id: true, name: true } },
+                        period: { select: { id: true, fromDate: true, toDate: true } },
+                    },
+                },
             },
             orderBy: { startDate: 'asc' },
         });
@@ -246,6 +260,9 @@ let AssignmentsService = class AssignmentsService {
             startDate: a.startDate,
             endDate: a.endDate,
             plateNumber: a.vehicle?.plateNumber ?? null,
+            paid: (a.paymentLines?.length ?? 0) > 0,
+            moneyVerifiedAt: a.tourReport?.moneyVerifiedAt ?? null,
+            paidToName: a.paymentLines?.[0]?.payableTo?.name ?? null,
         });
         const leaveMap = await this.fetchLeaveMap();
         const guides = users

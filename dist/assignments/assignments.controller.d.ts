@@ -74,6 +74,9 @@ export declare class AssignmentsController {
                 startDate: Date;
                 endDate: Date;
                 plateNumber: string | null;
+                paid: boolean;
+                moneyVerifiedAt: Date | null;
+                paidToName: string | null;
             }[];
             leaves: {
                 id: string;
@@ -100,6 +103,9 @@ export declare class AssignmentsController {
                 startDate: Date;
                 endDate: Date;
                 plateNumber: string | null;
+                paid: boolean;
+                moneyVerifiedAt: Date | null;
+                paidToName: string | null;
             }[];
             leaves: {
                 id: string;
@@ -241,6 +247,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -381,6 +388,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -521,6 +529,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -661,6 +670,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -801,6 +811,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -941,6 +952,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1081,6 +1093,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1221,6 +1234,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1361,6 +1375,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1546,6 +1561,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
@@ -1607,10 +1623,10 @@ export declare class AssignmentsController {
             assignmentId: string | null;
             bookingId: string | null;
             note: string | null;
-            amount: import("@prisma/client/runtime/library").Decimal;
-            categoryId: string | null;
             createdById: string;
             createdByName: string | null;
+            amount: import("@prisma/client/runtime/library").Decimal;
+            categoryId: string | null;
             reversesId: string | null;
         })[];
         categories: {
@@ -1637,10 +1653,10 @@ export declare class AssignmentsController {
         assignmentId: string | null;
         bookingId: string | null;
         note: string | null;
-        amount: import("@prisma/client/runtime/library").Decimal;
-        categoryId: string | null;
         createdById: string;
         createdByName: string | null;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        categoryId: string | null;
         reversesId: string | null;
     }>;
     deleteTourMoney(id: string, settlementId: string, actor: AuthenticatedUser): Promise<{
@@ -1650,10 +1666,10 @@ export declare class AssignmentsController {
         assignmentId: string | null;
         bookingId: string | null;
         note: string | null;
-        amount: import("@prisma/client/runtime/library").Decimal;
-        categoryId: string | null;
         createdById: string;
         createdByName: string | null;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        categoryId: string | null;
         reversesId: string | null;
     }>;
     finalize(id: string, dto: FinalizeAssignmentDto, actor: AuthenticatedUser): Promise<{
@@ -1764,6 +1780,7 @@ export declare class AssignmentsController {
         paymentLines: {
             id: string;
             periodId: string;
+            payableToId: string;
             tourDate: Date;
             payableTo: {
                 id: string;
