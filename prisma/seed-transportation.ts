@@ -22,9 +22,22 @@ const PROVIDERS: Array<{ id: string; name: string; contact: string }> = [
   { id: 'prov-mekong-v2', name: 'Mekong Express', contact: 'mekong@demo.local' },
 ];
 
+// ─── Transport provider costs, VND per tour day by vehicle size ─────────
+// What the company pays an external provider to run one tour day.
+const VND_PER_DAY_BY_SEAT: Record<number, number> = {
+  7: 1200000,
+  12: 1500000,
+  16: 1800000,
+  29: 2800000,
+  45: 3800000,
+};
+
 async function main() {
   const pwd = await bcrypt.hash('demo123', 10);
-  const tours = await prisma.tour.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } });
+  const tours = await prisma.tour.findMany({
+    select: { id: true, name: true, durationDays: true },
+    orderBy: { name: 'asc' },
+  });
 
   let providerCount = 0;
   let vehicleCount = 0;
@@ -85,12 +98,13 @@ async function main() {
       vehicleCount++;
     }
 
-    // Route price per (tour x provider x vehicle).
+    // Route price per (tour x provider x vehicle), in VND.
     for (const tour of tours) {
       for (const v of vehicles) {
         const seats = v.capacity ?? 12;
+        const days = tour.durationDays ?? 1;
         // Đội xe công ty (Company Fleet) phục vụ miễn phí: luôn 0 VND.
-        const price = isCompany ? 0 : 40 + seats * 3 + (tour.name.length % 5) * 10;
+        const price = isCompany ? 0 : (VND_PER_DAY_BY_SEAT[seats] ?? 1500000) * days;
         await prisma.routePrice.upsert({
           where: {
             tourId_providerId_vehicleId: {

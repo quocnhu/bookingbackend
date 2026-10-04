@@ -5,15 +5,40 @@ const prisma = new PrismaClient();
 
 const SEATS = [7, 12, 16, 29, 45];
 
+// ─── Transport provider costs, VND per tour day by vehicle size ─────────
+// Must match seed-transportation.ts: what the company pays an external
+// provider to run one tour day. Company Fleet always prices at 0 VND.
+const VND_PER_DAY_BY_SEAT: Record<number, number> = {
+  7: 1200000,
+  12: 1500000,
+  16: 1800000,
+  29: 2800000,
+  45: 3800000,
+};
+
 async function main() {
-  await prisma.routePrice.deleteMany({ where: { vehicleId: null } });
+  // vehicleId is required on RoutePrice, so there are no null-vehicle rows
+  // to clean — the upserts below are idempotent by themselves.
 
   const providers = await prisma.transportationProvider.findMany({
     select: { id: true, name: true },
     orderBy: { id: 'asc' },
   });
 
-  const tours = await prisma.tour.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } });
+  const tours = await prisma.tour.findMany({
+    select: { id: true, name: true, durationDays: true },
+    orderBy: { name: 'asc' },
+  });
+
+  // Company Fleet prices at 0 VND; everyone else follows the VND table.
+  const companyFlags = new Map<string, boolean>();
+  for (const provider of providers) {
+    const full = await prisma.transportationProvider.findUnique({
+      where: { id: provider.id },
+      select: { isCompany: true },
+    });
+    companyFlags.set(provider.id, full?.isCompany ?? false);
+  }
 
   let routeCount = 0;
   for (const provider of providers) {
@@ -49,7 +74,10 @@ async function main() {
     for (const tour of tours) {
       for (const v of vehicles) {
         const seats = v.capacity ?? 12;
-        const price = 40 + seats * 3 + (tour.name.length % 5) * 10;
+        const days = tour.durationDays ?? 1;
+        const price = companyFlags.get(provider.id)
+          ? 0
+          : (VND_PER_DAY_BY_SEAT[seats] ?? 1500000) * days;
         await prisma.routePrice.upsert({
           where: {
             tourId_providerId_vehicleId: { tourId: tour.id, providerId: provider.id, vehicleId: v.id },

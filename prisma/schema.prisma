@@ -290,7 +290,7 @@ model Tour {
   adultPrice   Decimal? @default(0)
   childPrice   Decimal? @default(0)
   infantPrice  Decimal? @default(0)
-  currency     String   @default("USD")
+  currency     String   @default("VND")
   durationDays Int?     @default(1) // Half-day tours = 1; otherwise number of days
 
   // Promotion / discount — separate per tour type
@@ -327,7 +327,7 @@ model TourTypePrice {
   adultPrice  Decimal  @default(0)
   childPrice  Decimal  @default(0)
   infantPrice Decimal  @default(0)
-  currency    String   @default("USD")
+  currency    String   @default("VND")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
