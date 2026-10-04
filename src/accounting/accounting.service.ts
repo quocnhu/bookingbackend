@@ -1255,6 +1255,8 @@ export class AccountingService {
         driverId: true,
         vehicle: { select: { plateNumber: true } },
         provider: { select: { id: true, name: true } },
+        guide: { select: { name: true } },
+        driver: { select: { name: true } },
         tourReport: {
           select: {
             moneyVerifiedAt: true,
@@ -1288,6 +1290,8 @@ export class AccountingService {
         status: a.status,
         plateNumber: a.vehicle?.plateNumber ?? null,
         providerName: a.provider?.name ?? null,
+        guideName: a.guide?.name ?? null,
+        driverName: a.driver?.name ?? null,
         myRole: roles.join('+') || '—',
         netAmount:
           a.tourReport?.netAmount != null
@@ -1366,6 +1370,7 @@ export class AccountingService {
         status: a.status,
         plateNumber: a.vehicle?.plateNumber ?? null,
         providerName: a.provider?.name ?? null,
+        driverName: a.driver?.name ?? null,
         myRole: 'PROVIDER',
         netAmount: line ? num(line.netAmount) : null,
         flow: null,
