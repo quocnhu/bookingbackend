@@ -58,6 +58,8 @@ export interface Payee {
   providerName: string | null;
   providerIsCompany: boolean | null;
   payeeType: PayeeType;
+  /** Locked/closed trips with no non-voided export for this payee (all time). */
+  unpaidCount?: number;
 }
 
 @Injectable()
@@ -1000,10 +1002,78 @@ export class AccountingService {
       });
     }
 
+    // Unpaid workload per payee (all time): settled trips with no
+    // non-voided export line for that payee — drives the red "N unpaid"
+    // badges in the Payee dropdown so Accounting picks who to export next.
+    // Person: verified trip, payable to them, no line payable to them.
+    // Provider: finalized trip with their vehicles, no line in their period.
+    const [settledTrips, paidLines] = await Promise.all([
+      this.prisma.assignment.findMany({
+        where: {
+          status: AssignmentStatus.COMPLETED,
+          tourReport: {
+            is: {
+              OR: [
+                { moneyVerifiedAt: { not: null } },
+                { finalizedAt: { not: null } },
+              ],
+            },
+          },
+        },
+        select: {
+          id: true,
+          providerId: true,
+          tourReport: {
+            select: {
+              moneyVerifiedAt: true,
+              finalizedAt: true,
+              moneyPayableToId: true,
+            },
+          },
+        },
+      }),
+      this.prisma.paymentPeriodLine.findMany({
+        where: { period: { voidedAt: null } },
+        select: {
+          assignmentId: true,
+          payableToId: true,
+          period: { select: { personId: true } },
+        },
+      }),
+    ]);
+    const paidToByTrip = new Map<string, Set<string>>();
+    const periodPaidByTrip = new Map<string, Set<string>>();
+    for (const l of paidLines) {
+      const a = paidToByTrip.get(l.assignmentId) ?? new Set<string>();
+      a.add(l.payableToId);
+      paidToByTrip.set(l.assignmentId, a);
+      const b = periodPaidByTrip.get(l.assignmentId) ?? new Set<string>();
+      b.add(l.period.personId);
+      periodPaidByTrip.set(l.assignmentId, b);
+    }
+    const unpaidFor = (payeeId: string, kind: 'PERSON' | 'PROVIDER'): number => {
+      let n = 0;
+      for (const t of settledTrips) {
+        if (kind === 'PERSON') {
+          if (!t.tourReport?.moneyVerifiedAt) continue;
+          if (t.tourReport.moneyPayableToId !== payeeId) continue;
+          if (paidToByTrip.get(t.id)?.has(payeeId)) continue;
+          n++;
+        } else {
+          if (!t.tourReport?.finalizedAt) continue;
+          if (t.providerId !== payeeId) continue;
+          if (periodPaidByTrip.get(t.id)?.has(payeeId)) continue;
+          n++;
+        }
+      }
+      return n;
+    };
+
     const withWatermark = await Promise.all(
       payees.map(async (p) => ({
         ...p,
         paidThrough: await this.watermarkFor(p.id),
+        unpaidCount: unpaidFor(p.id, p.kind),
       })),
     );
 
