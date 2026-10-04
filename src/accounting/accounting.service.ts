@@ -43,6 +43,8 @@ export const PAYEE_LABELS: Record<PayeeType, string> = {
 
 const num = (v: unknown): number => Number(v ?? 0);
 const round2 = (v: number): number => Math.round(v * 100) / 100;
+const fmtVnd = (v: unknown): string =>
+  `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.abs(Math.round(num(v))))} ₫`;
 
 type Tx = Prisma.TransactionClient;
 
@@ -1524,6 +1526,33 @@ export class AccountingService {
       });
       return created;
     });
+
+    // Notify the receivers: everyone marked payable in the frozen lines gets
+    // an in-app notification + realtime push, so the driver/guide sees the
+    // export and can confirm (or dispute) their money.
+    const moneyText =
+      preview.mode === 'ROUTE_PRICE'
+        ? `Company pays ${payee.name} ${fmtVnd(preview.totalPrice)} for ${preview.tourCount} trip(s)`
+        : preview.totalNet > 0
+          ? `${payee.name} returns ${fmtVnd(preview.totalNet)} to the company for ${preview.tourCount} trip(s)`
+          : preview.totalNet < 0
+            ? `Company returns ${fmtVnd(preview.totalNet)} to ${payee.name} for ${preview.tourCount} trip(s)`
+            : `Settled with ${payee.name} — no money due for ${preview.tourCount} trip(s)`;
+    const receiverIds = [...new Set(period.lines.map((l) => l.payableToId))];
+    for (const rid of receiverIds) {
+      try {
+        const notif = await this.notificationService.create(
+          rid,
+          NotificationType.GENERAL,
+          `Payment exported (${dto.fromDate} → ${dto.toDate})`,
+          `${moneyText}. Exported by ${actor.name ?? actor.email} — please confirm your trips, and tell Accounting if anything is wrong.`,
+          { periodId: period.id, payeeId: payee.id },
+        );
+        this.gateway.notifyUser(rid, 'notification', notif);
+      } catch {
+        // Notifications must never break a committed export.
+      }
+    }
 
     return {
       periodId: period.id,
