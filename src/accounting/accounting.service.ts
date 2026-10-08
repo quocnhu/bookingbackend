@@ -1104,14 +1104,16 @@ export class AccountingService {
     );
 
     // Anything already exported is left out of the preview (prevents double payment).
+    // Provider independence: only this payee's own periods count (period.personId),
+    // so a guide settlement for the same trip never blocks the provider payout.
     const exportedAssignments = payee
       ? (
           await this.prisma.paymentPeriodLine.findMany({
             where: {
               // A voided period's trips must be exportable again.
-              period: { voidedAt: null },
+              period: { voidedAt: null, personId: payee.id },
               ...(payee.kind === 'PROVIDER'
-                ? { assignment: { providerId: payee.id } }
+                ? {}
                 : { payableToId: payee.id }),
             },
             select: { assignmentId: true },
@@ -1121,18 +1123,25 @@ export class AccountingService {
 
     const isProvider = payee?.kind === 'PROVIDER';
 
-    const closedInRange: Prisma.TourReportWhereInput = {
-      finalizedAt: { gte: from, lte: to },
+    // Range basis = trip WORK DATES (booking: startDate/endDate overlapping
+    // [from, to]), matching the statement. finalizedAt / moneyVerifiedAt are
+    // eligibility only (trip must be closed/locked), not range placement — so
+    // exporting 28/30 days leaves the other days for the next period, and a
+    // trip finalized late still belongs to its work-date period.
+    const closedEligible: Prisma.TourReportWhereInput = {
+      finalizedAt: { not: null },
     };
-    const verifiedInRange: Prisma.TourReportWhereInput = {
-      ...closedInRange,
+    const verifiedEligible: Prisma.TourReportWhereInput = {
+      ...closedEligible,
       moneyVerifiedAt: { not: null },
       ...(query.unpaidOnly ? { netAmount: { not: null } } : {}),
     };
 
     const where: Prisma.AssignmentWhereInput = {
       status: AssignmentStatus.COMPLETED,
-      tourReport: { is: isProvider ? closedInRange : verifiedInRange },
+      startDate: { lte: to },
+      endDate: { gte: from },
+      tourReport: { is: isProvider ? closedEligible : verifiedEligible },
     };
     if (payee) {
       if (isProvider) {
@@ -1144,7 +1153,7 @@ export class AccountingService {
         // guideId/driverId would make both of them see it and export it →
         // double payment.
         where.tourReport = {
-          is: { ...verifiedInRange, moneyPayableToId: payee.id },
+          is: { ...verifiedEligible, moneyPayableToId: payee.id },
         };
       }
     }
@@ -1159,7 +1168,7 @@ export class AccountingService {
         vehicle: { select: { id: true, plateNumber: true } },
         bookings: { select: { tourId: true }, take: 1 },
       },
-      orderBy: { tourReport: { finalizedAt: 'asc' } },
+      orderBy: { startDate: 'asc' },
     });
 
     // Provider price list: the price settled specifically for the trip takes
@@ -1193,7 +1202,7 @@ export class AccountingService {
             plateNumber: a.vehicle?.plateNumber ?? null,
             driver: a.driver,
             provider: a.provider,
-            tourDate: a.tourReport?.finalizedAt ?? null,
+            tourDate: a.startDate ?? a.tourReport?.finalizedAt ?? null,
             amount: price,
             basis: 'ROUTE_PRICE' as const,
             // No price in either place → warn the admin, do NOT silently use 0.
@@ -1212,7 +1221,7 @@ export class AccountingService {
           guide: a.guide,
           driver: a.driver,
           provider: a.provider,
-          tourDate: a.tourReport?.finalizedAt ?? null,
+          tourDate: a.startDate ?? a.tourReport?.finalizedAt ?? null,
           verifiedAt: a.tourReport?.moneyVerifiedAt ?? null,
           amount: net,
           basis: 'NET_SETTLEMENT' as const,
@@ -1514,13 +1523,13 @@ export class AccountingService {
       }
     }
 
-    const watermark = await this.watermarkFor(payee.id);
+    // Double-pay is already prevented by excluding exported assignmentIds from
+    // the preview (tourCount === 0 throws above). Overlapping ranges are allowed
+    // so late-closed trips inside an old range can still be caught up — the
+    // frontend still warns when from <= paidThrough, but the backend no longer
+    // hard-blocks it. Watermark (MAX toDate) only moves forward on export.
+
     const from = new Date(dto.fromDate);
-    if (watermark && from <= watermark) {
-      throw new ConflictException(
-        'This range starts on or before the last exported period — exporting it risks paying twice. Pick a later start date.',
-      );
-    }
 
     const period = await this.prisma.$transaction(async (tx: Tx) => {
       const created = await tx.paymentPeriod.create({

@@ -398,6 +398,7 @@ export class AssignmentsService {
           a.driverId,
           a.startDate,
           a.endDate,
+          a.id,
         );
         ready.push(a);
       } catch {
@@ -478,6 +479,7 @@ export class AssignmentsService {
     driverId: string | null | undefined,
     startDate: Date,
     endDate: Date,
+    excludeAssignmentId?: string,
   ) {
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
@@ -502,6 +504,56 @@ export class AssignmentsService {
         const who = user?.name ?? user?.email ?? userId;
         throw new BadRequestException(
           `${who} is on leave during this date range and cannot be assigned as ${label}.`,
+        );
+      }
+    }
+    await this.assertCrewNoOverlap(guideId, driverId, start, end, excludeAssignmentId);
+  }
+
+  /**
+   * A guide/driver still running a multi-day tour cannot take another bus
+   * overlapping those dates. Checked on every assign (create/update/dispatch),
+   * alongside the leave check above.
+   */
+  private async assertCrewNoOverlap(
+    guideId: string | null | undefined,
+    driverId: string | null | undefined,
+    startDate: Date,
+    endDate: Date,
+    excludeAssignmentId?: string,
+  ) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    for (const [label, userId] of [
+      ['guide', guideId],
+      ['driver', driverId],
+    ] as const) {
+      if (!userId) continue;
+      const clash = await this.prisma.assignment.findFirst({
+        where: {
+          status: { not: AssignmentStatus.CANCELED },
+          ...(excludeAssignmentId ? { id: { not: excludeAssignmentId } } : {}),
+          startDate: { lte: end },
+          endDate: { gte: start },
+          OR:
+            label === 'guide'
+              ? [{ guideId: userId }]
+              : [{ driverId: userId }],
+        },
+        select: { id: true, code: true, startDate: true, endDate: true },
+      });
+      if (clash) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { name: true, email: true },
+        });
+        const who = user?.name ?? user?.email ?? userId;
+        const fmt = (d: Date) => new Date(d).toLocaleDateString('en-GB');
+        throw new BadRequestException(
+          `${who} is already on ${clash.code ?? 'another tour'} (${fmt(clash.startDate)} → ${fmt(clash.endDate)}) and cannot be assigned as ${label} for overlapping dates.`,
         );
       }
     }
@@ -706,12 +758,13 @@ export class AssignmentsService {
       ? new Date(dto.startDate)
       : before.startDate;
     const endDate = dto.endDate ? new Date(dto.endDate) : before.endDate;
-    if (dto.guideId !== undefined || dto.driverId !== undefined) {
+    if (dto.guideId !== undefined || dto.driverId !== undefined || dto.startDate !== undefined || dto.endDate !== undefined) {
       await this.assertCrewAvailableForDates(
         dto.guideId !== undefined ? dto.guideId : before.guideId,
         dto.driverId !== undefined ? dto.driverId : before.driverId,
         startDate,
         endDate,
+        id,
       );
     }
 
@@ -812,6 +865,7 @@ export class AssignmentsService {
         before.driverId,
         before.startDate,
         before.endDate,
+        id,
       );
     }
     // ── Guard: Recall (DISPATCHED → PENDING) is locked after 06:30 on the
