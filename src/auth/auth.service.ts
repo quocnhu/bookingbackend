@@ -173,7 +173,8 @@ export class AuthService {
           email: profile.email,
           name: profile.name,
           authProvider: AuthProvider.GOOGLE,
-          providerId: profile.providerId,
+          // NOTE: providerId is an FK to TransportationProvider (transport crew link),
+          // NOT the Google account id — do not store profile.providerId here.
           role: RoleType.CUSTOMER,
           userType: 'customer',
         },

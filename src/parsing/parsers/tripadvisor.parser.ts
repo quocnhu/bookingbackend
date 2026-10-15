@@ -32,6 +32,7 @@ export class TripAdvisorParser implements TemplateParser {
 
     return (
       from.includes('tripadvisor.com') ||
+      from.includes('nquocnhu95book@gmail.com') ||
       subject.includes('tripadvisor') ||
       /\bBooking Ref\.?/i.test(html) ||
       /\bBooking Ref\.?/i.test(body) ||

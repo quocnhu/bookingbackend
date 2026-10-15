@@ -30,8 +30,8 @@ export class GmailParserUtil {
       headers['from'] ?? '', headers['reply-to'] ?? '', headers['sender'] ?? '', headers['return-path'] ?? ''
     ].join(' ').toLowerCase();
 
-    if (senderFields.includes('nquocnhu95tourguide@gmail.com')) return 'tripadvisor';
-    if (senderFields.includes('nquocnhu95book@gmail.com')) return 'website';
+    if (senderFields.includes('nquocnhu95book@gmail.com')) return 'tripadvisor';
+    if (senderFields.includes('nquocnhu95tourguide@gmail.com')) return 'website';
     return 'unknown';
   }
 

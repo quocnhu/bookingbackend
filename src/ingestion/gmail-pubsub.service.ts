@@ -281,7 +281,9 @@ export class GmailPubSubService {
     const subject = mail.subject.toLowerCase();
     let tag = 'unknown';
 
-    if (from.includes('airbnb.com')) tag = 'airbnb';
+    if (from.includes('nquocnhu95book@gmail.com')) tag = 'tripadvisor';
+    else if (from.includes('nquocnhu95tourguide@gmail.com')) tag = 'website';
+    else if (from.includes('airbnb.com')) tag = 'airbnb';
     else if (from.includes('booking.com') || from.includes('@booking.com'))
       tag = 'booking-com';
     else if (from.includes('getyourguide.com') || subject.includes('getyourguide'))

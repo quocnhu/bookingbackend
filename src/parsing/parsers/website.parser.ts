@@ -69,7 +69,7 @@ export class WebsiteParser implements TemplateParser {
     }
 
     return (
-      from.includes('nquocnhu95book@gmail.com') ||
+      from.includes('nquocnhu95tourguide@gmail.com') ||
       subject.includes('new booking') ||
       /wptravelengine|wp travel engine/i.test(text) ||
       text.includes('Billing Details') ||
