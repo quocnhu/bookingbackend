@@ -1,5 +1,5 @@
 import { PrismaService } from "../prisma/prisma.service";
-import { CreatePermissionDto, QueryPermissionDto, UpdatePermissionDto } from './dto/permission.dto';
+import { QueryPermissionDto } from './dto/permission.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
 export declare class PermissionsService {
     private readonly prisma;
@@ -16,20 +16,5 @@ export declare class PermissionsService {
         name: string;
         code: string;
         group: string | null;
-    }>;
-    create(dto: CreatePermissionDto): Promise<{
-        id: string;
-        name: string;
-        code: string;
-        group: string | null;
-    }>;
-    update(id: string, dto: UpdatePermissionDto): Promise<{
-        id: string;
-        name: string;
-        code: string;
-        group: string | null;
-    }>;
-    remove(id: string): Promise<{
-        message: string;
     }>;
 }

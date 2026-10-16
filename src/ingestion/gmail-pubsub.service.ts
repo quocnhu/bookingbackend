@@ -281,17 +281,20 @@ export class GmailPubSubService {
     const subject = mail.subject.toLowerCase();
     let tag = 'unknown';
 
-    if (from.includes('nquocnhu95book@gmail.com')) tag = 'tripadvisor';
+    if (from.includes('nquocnhu95book@gmail.com')) tag = 'viator';
     else if (from.includes('nquocnhu95tourguide@gmail.com')) tag = 'website';
     else if (from.includes('airbnb.com')) tag = 'airbnb';
     else if (from.includes('booking.com') || from.includes('@booking.com'))
       tag = 'booking-com';
     else if (from.includes('getyourguide.com') || subject.includes('getyourguide'))
       tag = 'getyourguide';
-    else if (from.includes('viator.com') || subject.includes('viator'))
+    else if (
+      from.includes('viator.com') ||
+      from.includes('tripadvisor.com') ||
+      subject.includes('viator') ||
+      subject.includes('tripadvisor')
+    )
       tag = 'viator';
-    else if (from.includes('tripadvisor.com')) tag = 'tripadvisor';
-    else if (subject.includes('tripadvisor')) tag = 'tripadvisor';
     else if (/booking|reservation|confirmation|trip to/i.test(subject))
       tag = 'website';
 

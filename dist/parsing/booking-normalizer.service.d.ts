@@ -11,6 +11,7 @@ export interface NormalizeResult {
 }
 export declare class BookingNormalizerService {
     normalize(payload: Record<string, unknown>, source?: string): NormalizeResult;
+    private buildExtra;
     channelForSource(source?: string): BookingProvider | undefined;
     private normalizeSource;
     private normalizeChannel;

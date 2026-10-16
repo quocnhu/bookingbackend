@@ -19,6 +19,27 @@ const audit_service_1 = require("../audit/audit.service");
 const booking_normalizer_service_1 = require("../parsing/booking-normalizer.service");
 const assignment_board_service_1 = require("../queues/assignment-board.service");
 const assignment_queue_1 = require("../queues/assignment.queue");
+const TOUR_MATCH_MIN_SCORE = 0.5;
+function normalizeTourName(name) {
+    return name
+        .toLowerCase()
+        .replace(/^\s*[a-z0-9]{4,}\s*[-–—:]\s*/i, ' ')
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+        .replace(/\s+/g, ' ');
+}
+function tokenOverlap(a, b) {
+    const A = new Set(a.split(' ').filter(Boolean));
+    const B = new Set(b.split(' ').filter(Boolean));
+    if (A.size === 0 || B.size === 0)
+        return 0;
+    let common = 0;
+    for (const t of A)
+        if (B.has(t))
+            common += 1;
+    return common / Math.min(A.size, B.size);
+}
 let BookingService = BookingService_1 = class BookingService {
     prisma;
     auditService;
@@ -38,9 +59,10 @@ let BookingService = BookingService_1 = class BookingService {
         const existing = await this.findExisting(data.source, bookingRef);
         let tourName = data.tourName;
         let tourType = data.tourType;
-        if (data.tourId && (!tourName || !tourType)) {
+        let tourId = data.tourId;
+        if (tourId && (!tourName || !tourType)) {
             const tour = await this.prisma.tour.findUnique({
-                where: { id: data.tourId },
+                where: { id: tourId },
                 select: { name: true, type: true },
             });
             if (tour) {
@@ -48,17 +70,25 @@ let BookingService = BookingService_1 = class BookingService {
                 tourType ??= tour.type;
             }
         }
+        if (!tourId && tourName) {
+            const matched = await this.resolveTourByName(tourName, tourType);
+            if (matched) {
+                tourId = matched.id;
+                tourType ??= matched.type;
+                this.logger.log(`Linked booking ${bookingRef} to tour "${matched.name}" (name match)`);
+            }
+        }
         const bookingData = {
             bookingRef,
             confirmationCode: data.bookingRef,
             source: data.source,
-            channel: this.normalizer.channelForSource(data.source) ??
-                data.channel ??
+            channel: data.channel ??
+                this.normalizer.channelForSource(data.source) ??
                 client_1.BookingProvider.WEBSITE,
             status: data.action === 'CANCEL'
                 ? client_1.BookingStatus.CANCELED
                 : (data.status ?? client_1.BookingStatus.PENDING),
-            tourId: data.tourId,
+            tourId,
             tourName,
             tourType,
             address: data.address,
@@ -76,6 +106,7 @@ let BookingService = BookingService_1 = class BookingService {
             payment: data.payment,
             isNoShow: data.isNoShow,
             noShowReason: data.noShowReason,
+            extra: data.extra,
             rawDataId: existing?.rawDataId ?? rawDataId,
         };
         const _createdWho = createdWho ?? (actorId ? undefined : 'Pub-Sub System');
@@ -168,6 +199,33 @@ let BookingService = BookingService_1 = class BookingService {
                 return byKey;
         }
         return this.prisma.booking.findUnique({ where: { bookingRef } });
+    }
+    async resolveTourByName(rawName, tourType) {
+        const target = normalizeTourName(rawName);
+        if (!target)
+            return null;
+        const tours = await this.prisma.tour.findMany({
+            select: { id: true, name: true, type: true },
+        });
+        let best = null;
+        let bestScore = 0;
+        for (const tour of tours) {
+            const norm = normalizeTourName(tour.name);
+            if (!norm)
+                continue;
+            let score = tokenOverlap(norm, target);
+            if (norm === target)
+                score = 1;
+            else if (norm.includes(target) || target.includes(norm))
+                score = Math.max(score, 0.85);
+            if (tourType && tour.type === tourType)
+                score += 0.05;
+            if (score > bestScore) {
+                bestScore = score;
+                best = { id: tour.id, name: tour.name, type: tour.type };
+            }
+        }
+        return bestScore >= TOUR_MATCH_MIN_SCORE ? best : null;
     }
     async previewBookingRef(tourType) {
         return this.randomBookingRef(tourType);

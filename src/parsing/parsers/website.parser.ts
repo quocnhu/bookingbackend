@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BookingProvider, TourType } from '@prisma/client';
 import { load } from 'cheerio';
 import { BookingNormalizerService } from '../booking-normalizer.service';
+import { buildExtra } from '../extra.util';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
 /** Safely coerce any value to a string (avoids '[object Object]'). */
@@ -258,6 +259,7 @@ export class WebsiteParser implements TemplateParser {
       tourType: rich.tourType === 'UNKNOWN' ? undefined : rich.tourType,
       hotelName: rich.pickUp || undefined,
       address: rich.pickUpAddress || rich.billingAddress || undefined,
+      extra: buildExtra(rich as unknown as Record<string, unknown>),
     };
   }
 

@@ -811,26 +811,28 @@ let AccountingService = class AccountingService {
         const exportedAssignments = payee
             ? (await this.prisma.paymentPeriodLine.findMany({
                 where: {
-                    period: { voidedAt: null },
+                    period: { voidedAt: null, personId: payee.id },
                     ...(payee.kind === 'PROVIDER'
-                        ? { assignment: { providerId: payee.id } }
+                        ? {}
                         : { payableToId: payee.id }),
                 },
                 select: { assignmentId: true },
             })).map((l) => l.assignmentId)
             : [];
         const isProvider = payee?.kind === 'PROVIDER';
-        const closedInRange = {
-            finalizedAt: { gte: from, lte: to },
+        const closedEligible = {
+            finalizedAt: { not: null },
         };
-        const verifiedInRange = {
-            ...closedInRange,
+        const verifiedEligible = {
+            ...closedEligible,
             moneyVerifiedAt: { not: null },
             ...(query.unpaidOnly ? { netAmount: { not: null } } : {}),
         };
         const where = {
             status: client_1.AssignmentStatus.COMPLETED,
-            tourReport: { is: isProvider ? closedInRange : verifiedInRange },
+            startDate: { lte: to },
+            endDate: { gte: from },
+            tourReport: { is: isProvider ? closedEligible : verifiedEligible },
         };
         if (payee) {
             if (isProvider) {
@@ -838,7 +840,7 @@ let AccountingService = class AccountingService {
             }
             else {
                 where.tourReport = {
-                    is: { ...verifiedInRange, moneyPayableToId: payee.id },
+                    is: { ...verifiedEligible, moneyPayableToId: payee.id },
                 };
             }
         }
@@ -852,7 +854,7 @@ let AccountingService = class AccountingService {
                 vehicle: { select: { id: true, plateNumber: true } },
                 bookings: { select: { tourId: true }, take: 1 },
             },
-            orderBy: { tourReport: { finalizedAt: 'asc' } },
+            orderBy: { startDate: 'asc' },
         });
         const routePrices = isProvider
             ? await this.prisma.routePrice.findMany({
@@ -878,7 +880,7 @@ let AccountingService = class AccountingService {
                     plateNumber: a.vehicle?.plateNumber ?? null,
                     driver: a.driver,
                     provider: a.provider,
-                    tourDate: a.tourReport?.finalizedAt ?? null,
+                    tourDate: a.startDate ?? a.tourReport?.finalizedAt ?? null,
                     amount: price,
                     basis: 'ROUTE_PRICE',
                     priceMissing: !hasOverride && fromTable === undefined,
@@ -895,7 +897,7 @@ let AccountingService = class AccountingService {
                 guide: a.guide,
                 driver: a.driver,
                 provider: a.provider,
-                tourDate: a.tourReport?.finalizedAt ?? null,
+                tourDate: a.startDate ?? a.tourReport?.finalizedAt ?? null,
                 verifiedAt: a.tourReport?.moneyVerifiedAt ?? null,
                 amount: net,
                 basis: 'NET_SETTLEMENT',
@@ -1125,11 +1127,7 @@ let AccountingService = class AccountingService {
                     'for the provider + vehicle, or override the trip price, before exporting.');
             }
         }
-        const watermark = await this.watermarkFor(payee.id);
         const from = new Date(dto.fromDate);
-        if (watermark && from <= watermark) {
-            throw new common_1.ConflictException('This range starts on or before the last exported period — exporting it risks paying twice. Pick a later start date.');
-        }
         const period = await this.prisma.$transaction(async (tx) => {
             const created = await tx.paymentPeriod.create({
                 data: {

@@ -56,7 +56,12 @@ let GmailController = class GmailController {
         const result = await this.pubSubService.handlePush(payload);
         return { received: true, ...result };
     }
-    connect(res, accountId) {
+    async connect(res, accountId) {
+        if (!accountId && (await this.connectService.hasAnyAccount())) {
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const message = encodeURIComponent('Only one mailbox can be tracked — reconnect or remove the existing mailbox first');
+            return res.redirect(`${frontendUrl}/users?mailbox=error&message=${message}`);
+        }
         return res.redirect(this.connectService.buildConnectUrl(accountId));
     }
     async callback(code, state, res) {
@@ -107,7 +112,7 @@ __decorate([
     __param(1, (0, common_1.Query)('accountId')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], GmailController.prototype, "connect", null);
 __decorate([
     (0, public_decorator_1.Public)(),

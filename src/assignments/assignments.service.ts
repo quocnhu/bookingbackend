@@ -1241,6 +1241,7 @@ export class AssignmentsService {
 
     const first = bookings[0];
     const tourName =
+      bookings.find((b) => b.tour?.name)?.tour?.name ??
       bookings.find((b) => b.tourName)?.tourName ??
       first?.tour?.name ??
       undefined;

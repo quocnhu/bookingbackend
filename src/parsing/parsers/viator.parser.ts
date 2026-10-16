@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { BookingProvider, TourType } from '@prisma/client';
 import { load } from 'cheerio';
+import { buildExtra } from '../extra.util';
+import { resolveBookingChannel } from '../channel.util';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
 /** Safely coerce any value to a string (avoids '[object Object]'). */
@@ -8,8 +10,9 @@ const asString = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
 /**
- * TripAdvisor — the email template is an HTML table: each `tr` has 2 cells
- * (label on the left → value on the right). Mapping per PROCESS_FLOW.md §5.2:
+ * Viator (delivered through the Bókun / TripAdvisor relay) — the email template
+ * is an HTML table: each `tr` has 2 cells (label on the left → value on the right).
+ * Mapping per PROCESS_FLOW.md §5.2:
  *
  *   Booking Ref. → bookingRef   Customer Email → mail
  *   Product      → tourName     Customer Phone → phone
@@ -17,11 +20,13 @@ const asString = (value: unknown): string =>
  *   Pax          → totalPax     Pick-up        → hotelName + address
  *   Customer     → customerName Notes/Extras   → (kept as-is)
  *
+ * The actual OTA provider is resolved from the "Booking channel" / "Sold by"
+ * fields (e.g. "Viator.com"), because one relay mailbox carries every brand.
  * A payload already parsed as JSON (`payload.booking`) from the old flow is also supported.
  */
 @Injectable()
-export class TripAdvisorParser implements TemplateParser {
-  readonly templateTag = 'tripadvisor';
+export class ViatorParser implements TemplateParser {
+  readonly templateTag = 'viator';
 
   canParse(payload: Record<string, unknown>): boolean {
     const from = asString(payload.from).toLowerCase();
@@ -34,11 +39,14 @@ export class TripAdvisorParser implements TemplateParser {
       from.includes('tripadvisor.com') ||
       from.includes('nquocnhu95book@gmail.com') ||
       subject.includes('tripadvisor') ||
+      subject.includes('viator') ||
       /\bBooking Ref\.?/i.test(html) ||
       /\bBooking Ref\.?/i.test(body) ||
       (hasParsedBooking &&
-        (asString(payload.source).includes('tripadvisor') ||
-          asString(payload.channel).toUpperCase() === 'TRIPADVISOR'))
+        (asString(payload.source).includes('viator') ||
+          asString(payload.source).includes('tripadvisor') ||
+          asString(payload.channel).toUpperCase() === 'TRIPADVISOR' ||
+          asString(payload.channel).toUpperCase() === 'VIATOR'))
     );
   }
 
@@ -203,8 +211,10 @@ export class TripAdvisorParser implements TemplateParser {
         ? 'CANCEL'
         : 'CREATE',
       bookingRef,
-      source: 'tripadvisor',
-      channel: BookingProvider.TRIPADVISOR,
+      source: 'viator',
+      channel:
+        resolveBookingChannel(rows.get('bookingChannel'), rows.get('soldBy')) ??
+        BookingProvider.VIATOR,
       customerName: rows.get('customer') || undefined,
       mail:
         rows.get('customerEmail') ||
@@ -222,8 +232,8 @@ export class TripAdvisorParser implements TemplateParser {
 
     // Store all template fields in payload.booking (→ rawData.payload),
     // keeping the rich fields that are not part of Booking (supplier, inclusions, totalcost...).
-    payload.booking = {
-      provider: 'tripadvisor',
+    const rich: Record<string, unknown> = {
+      provider: 'viator',
       bookingRef,
       productBookingRef: rows.get('productBookingRef') || null,
       extBookingRef: rows.get('extBookingRef') || null,
@@ -248,6 +258,8 @@ export class TripAdvisorParser implements TemplateParser {
       totalcost,
       createdAt: rows.get('created') || null,
     };
+    payload.booking = rich;
+    fields.extra = buildExtra(rich);
 
     return fields;
   }
@@ -308,8 +320,10 @@ export class TripAdvisorParser implements TemplateParser {
         ? 'CANCEL'
         : 'CREATE',
       bookingRef,
-      source: 'tripadvisor',
-      channel: BookingProvider.TRIPADVISOR,
+      source: 'viator',
+      channel:
+        resolveBookingChannel(b.bookingChannel, b.soldBy) ??
+        BookingProvider.VIATOR,
       customerName: asString(b.customer ?? b.customerName) || undefined,
       mail:
         asString(b.customerEmail ?? b.mail) ||
@@ -323,6 +337,7 @@ export class TripAdvisorParser implements TemplateParser {
       paxDetail: asString(b.pax ?? b.paxDetail) || undefined,
       hotelName: pickUp.hotel,
       address: pickUp.address,
+      extra: buildExtra(b),
     };
   }
 
@@ -374,12 +389,30 @@ export class TripAdvisorParser implements TemplateParser {
       const hour = Number(m[4]);
       const minute = Number(m[5]);
       if (month != null && year != null) {
-        const date = new Date(year, month, day, hour, minute);
-        if (!Number.isNaN(date.getTime())) return new Date(date.toISOString() + '+07:00').toISOString();
+        const naive = this.naiveLocalIso(year, month, day, hour, minute);
+        const parsed = this.toIso(`${naive}+07:00`);
+        if (parsed) return parsed;
       }
     }
-    const plain = new Date(value + '+07:00');
-    return Number.isNaN(plain.getTime()) ? undefined : plain.toISOString();
+    const zoned = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+    return this.toIso(zoned ? value : `${value}+07:00`);
+  }
+
+  /** Format wall-clock components as "YYYY-MM-DDTHH:mm:00" (no timezone). */
+  private naiveLocalIso(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+  ): string {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${year}-${p(month + 1)}-${p(day)}T${p(hour)}:${p(minute)}:00`;
+  }
+
+  private toIso(candidate: string): string | undefined {
+    const d = new Date(candidate);
+    return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
   }
 
   private monthIndex(name: string): number | undefined {

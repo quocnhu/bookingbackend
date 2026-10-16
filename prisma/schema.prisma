@@ -82,6 +82,7 @@ enum BookingProvider {
   BOOKING_COM // Automatic from Gmail Pub/Sub for Booking.com bookings
   WEBSITE // Automatic from Gmail Pub/Sub for Website bookings
   MANUAL // Admin/Office created by hand on the dashboard
+  VIATOR // OTA resolved from the template's "Booking channel" / "Sold by" field
 }
 
 enum LeaveStatus {
@@ -452,6 +453,12 @@ model Booking {
   isNoShow     Boolean @default(false)
   noShowReason String?
 
+  // Dynamic catch-all for provider-specific fields parsed from the source email
+  // (productBookingRef, extBookingRef, supplier, soldBy, bookingChannel, rate,
+  //  guidedLanguages, extras, inclusions, externalTicketRefs, totalcost...).
+  // Stored verbatim so new template fields "fit" without a schema change.
+  extra Json?
+
   // Internal note for this booking (dietary needs, pickup point, collect/refund instructions...)
   notes     String?  @db.Text
   rawDataId String?  @unique
@@ -726,7 +733,7 @@ model RawData {
   status      String
   payloadHash String?
   email       String?
-  templateTag String? // 'airbnb' | 'booking-com' | 'tripadvisor' | 'website' | 'unknown' — tag from the ingest step (header match)
+  templateTag String? // 'airbnb' | 'booking-com' | 'getyourguide' | 'viator' | 'website' | 'unknown' — tag from the ingest step (header match)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   booking     Booking?

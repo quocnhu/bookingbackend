@@ -1,6 +1,6 @@
 import type { BookingFields, TemplateParser } from './parser.interface';
-export declare class TripAdvisorParser implements TemplateParser {
-    readonly templateTag = "tripadvisor";
+export declare class ViatorParser implements TemplateParser {
+    readonly templateTag = "viator";
     canParse(payload: Record<string, unknown>): boolean;
     extract(payload: Record<string, unknown>): BookingFields | null;
     private parseRows;
@@ -15,5 +15,7 @@ export declare class TripAdvisorParser implements TemplateParser {
     private sumPax;
     private detectTourType;
     private normalizeDate;
+    private naiveLocalIso;
+    private toIso;
     private monthIndex;
 }

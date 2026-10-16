@@ -203,8 +203,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -212,6 +212,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -221,7 +222,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -344,8 +345,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -353,6 +354,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -362,7 +364,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -485,8 +487,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -494,6 +496,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -503,7 +506,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -626,8 +629,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -635,6 +638,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -644,7 +648,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -767,8 +771,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -776,6 +780,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -785,7 +790,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -908,8 +913,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -917,6 +922,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -926,7 +932,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -1049,8 +1055,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -1058,6 +1064,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -1067,7 +1074,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -1190,8 +1197,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -1199,6 +1206,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -1208,7 +1216,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -1331,8 +1339,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -1340,6 +1348,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -1349,7 +1358,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -1517,8 +1526,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -1526,6 +1535,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -1535,7 +1545,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;
@@ -1736,8 +1746,8 @@ export declare class AssignmentsController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.BookingStatus;
             tourId: string | null;
-            startingDate: Date | null;
             bookingRef: string;
+            confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
             tourName: string | null;
@@ -1745,6 +1755,7 @@ export declare class AssignmentsController {
             address: string | null;
             latitude: number | null;
             longitude: number | null;
+            startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
             phone: string;
@@ -1754,7 +1765,7 @@ export declare class AssignmentsController {
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
             isNoShow: boolean;
             noShowReason: string | null;
-            confirmationCode: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
             rawDataId: string | null;
             notes: string | null;
             assignmentId: string | null;

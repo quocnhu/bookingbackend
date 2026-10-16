@@ -172,7 +172,8 @@ let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardSer
             b.longitude = match.longitude;
         }
         const first = bookings[0];
-        const tourName = bookings.find((b) => b.tourName)?.tourName ??
+        const tourName = bookings.find((b) => b.tour?.name)?.tour?.name ??
+            bookings.find((b) => b.tourName)?.tourName ??
             first?.tour?.name ??
             undefined;
         const tourType = bookings.find((b) => b.tourType)?.tourType ??

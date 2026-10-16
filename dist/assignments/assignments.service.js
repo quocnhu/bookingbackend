@@ -312,7 +312,7 @@ let AssignmentsService = class AssignmentsService {
         let skippedOnLeave = 0;
         for (const a of withCrew) {
             try {
-                await this.assertCrewAvailableForDates(a.guideId, a.driverId, a.startDate, a.endDate);
+                await this.assertCrewAvailableForDates(a.guideId, a.driverId, a.startDate, a.endDate, a.id);
                 ready.push(a);
             }
             catch {
@@ -372,7 +372,7 @@ let AssignmentsService = class AssignmentsService {
         this.gateway.notifyAll('board:refresh', { action: 'origin_changed' });
         return { updated: result.count, mode: origin };
     }
-    async assertCrewAvailableForDates(guideId, driverId, startDate, endDate) {
+    async assertCrewAvailableForDates(guideId, driverId, startDate, endDate, excludeAssignmentId) {
         const start = new Date(startDate);
         start.setHours(0, 0, 0, 0);
         const end = new Date(endDate);
@@ -391,6 +391,41 @@ let AssignmentsService = class AssignmentsService {
                 });
                 const who = user?.name ?? user?.email ?? userId;
                 throw new common_1.BadRequestException(`${who} is on leave during this date range and cannot be assigned as ${label}.`);
+            }
+        }
+        await this.assertCrewNoOverlap(guideId, driverId, start, end, excludeAssignmentId);
+    }
+    async assertCrewNoOverlap(guideId, driverId, startDate, endDate, excludeAssignmentId) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        for (const [label, userId] of [
+            ['guide', guideId],
+            ['driver', driverId],
+        ]) {
+            if (!userId)
+                continue;
+            const clash = await this.prisma.assignment.findFirst({
+                where: {
+                    status: { not: client_1.AssignmentStatus.CANCELED },
+                    ...(excludeAssignmentId ? { id: { not: excludeAssignmentId } } : {}),
+                    startDate: { lte: end },
+                    endDate: { gte: start },
+                    OR: label === 'guide'
+                        ? [{ guideId: userId }]
+                        : [{ driverId: userId }],
+                },
+                select: { id: true, code: true, startDate: true, endDate: true },
+            });
+            if (clash) {
+                const user = await this.prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { name: true, email: true },
+                });
+                const who = user?.name ?? user?.email ?? userId;
+                const fmt = (d) => new Date(d).toLocaleDateString('en-GB');
+                throw new common_1.BadRequestException(`${who} is already on ${clash.code ?? 'another tour'} (${fmt(clash.startDate)} → ${fmt(clash.endDate)}) and cannot be assigned as ${label} for overlapping dates.`);
             }
         }
     }
@@ -549,8 +584,8 @@ let AssignmentsService = class AssignmentsService {
             ? new Date(dto.startDate)
             : before.startDate;
         const endDate = dto.endDate ? new Date(dto.endDate) : before.endDate;
-        if (dto.guideId !== undefined || dto.driverId !== undefined) {
-            await this.assertCrewAvailableForDates(dto.guideId !== undefined ? dto.guideId : before.guideId, dto.driverId !== undefined ? dto.driverId : before.driverId, startDate, endDate);
+        if (dto.guideId !== undefined || dto.driverId !== undefined || dto.startDate !== undefined || dto.endDate !== undefined) {
+            await this.assertCrewAvailableForDates(dto.guideId !== undefined ? dto.guideId : before.guideId, dto.driverId !== undefined ? dto.driverId : before.driverId, startDate, endDate, id);
         }
         const assignment = await this.prisma.assignment.update({
             where: { id },
@@ -620,7 +655,7 @@ let AssignmentsService = class AssignmentsService {
         if (dto.status === client_1.AssignmentStatus.DISPATCHED) {
             this.assertDispatchableToday(before);
             this.assertCrewAssigned(before);
-            await this.assertCrewAvailableForDates(before.guideId, before.driverId, before.startDate, before.endDate);
+            await this.assertCrewAvailableForDates(before.guideId, before.driverId, before.startDate, before.endDate, id);
         }
         if (before.status === client_1.AssignmentStatus.DISPATCHED &&
             dto.status === client_1.AssignmentStatus.PENDING) {
@@ -897,7 +932,8 @@ let AssignmentsService = class AssignmentsService {
             b.longitude = match.longitude;
         }
         const first = bookings[0];
-        const tourName = bookings.find((b) => b.tourName)?.tourName ??
+        const tourName = bookings.find((b) => b.tour?.name)?.tour?.name ??
+            bookings.find((b) => b.tourName)?.tourName ??
             first?.tour?.name ??
             undefined;
         const tourType = bookings.find((b) => b.tourType)?.tourType ??

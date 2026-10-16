@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const cheerio_1 = require("cheerio");
 const booking_normalizer_service_1 = require("../booking-normalizer.service");
+const extra_util_1 = require("../extra.util");
 const asString = (value) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 const collapse = (value) => value.replace(/\s+/g, ' ').trim();
 let WebsiteParser = class WebsiteParser {
@@ -33,7 +34,7 @@ let WebsiteParser = class WebsiteParser {
             if (source === 'website' || source === '' || source === 'unknown')
                 return true;
         }
-        return (from.includes('nquocnhu95book@gmail.com') ||
+        return (from.includes('nquocnhu95tourguide@gmail.com') ||
             subject.includes('new booking') ||
             /wptravelengine|wp travel engine/i.test(text) ||
             text.includes('Billing Details') ||
@@ -184,6 +185,7 @@ let WebsiteParser = class WebsiteParser {
             tourType: rich.tourType === 'UNKNOWN' ? undefined : rich.tourType,
             hotelName: rich.pickUp || undefined,
             address: rich.pickUpAddress || rich.billingAddress || undefined,
+            extra: (0, extra_util_1.buildExtra)(rich),
         };
     }
     detectTourType(packageName, tourName) {

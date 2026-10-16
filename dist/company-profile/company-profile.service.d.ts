@@ -12,9 +12,9 @@ export declare class CompanyProfileService {
         name: string;
         email: string | null;
         updatedAt: Date;
-        website: string | null;
         address: string | null;
         phone: string | null;
+        website: string | null;
         rootLatitude: number | null;
         rootLongitude: number | null;
         taxId: string | null;
@@ -25,9 +25,9 @@ export declare class CompanyProfileService {
         name: string;
         email: string | null;
         updatedAt: Date;
-        website: string | null;
         address: string | null;
         phone: string | null;
+        website: string | null;
         rootLatitude: number | null;
         rootLongitude: number | null;
         taxId: string | null;

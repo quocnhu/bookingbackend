@@ -1,4 +1,4 @@
-import { Booking, TourType } from '@prisma/client';
+import { Booking, Prisma, TourType } from '@prisma/client';
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { BookingNormalizerService, CleanBookingData } from "../parsing/booking-normalizer.service";
@@ -27,6 +27,7 @@ export declare class BookingService {
     private postWrite;
     createManual(data: Record<string, any>, actorId?: string): Promise<Booking>;
     private findExisting;
+    private resolveTourByName;
     previewBookingRef(tourType?: TourType): Promise<string>;
     private randomBookingRef;
     findAll(query: QueryBookingDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
@@ -38,9 +39,9 @@ export declare class BookingService {
             code: string;
             thumbnailUrl: string | null;
             durationDays: number | null;
-            adultPrice: import("@prisma/client/runtime/library").Decimal | null;
-            childPrice: import("@prisma/client/runtime/library").Decimal | null;
-            infantPrice: import("@prisma/client/runtime/library").Decimal | null;
+            adultPrice: Prisma.Decimal | null;
+            childPrice: Prisma.Decimal | null;
+            infantPrice: Prisma.Decimal | null;
             currency: string;
             privateDiscountPercent: number | null;
             groupDiscountPercent: number | null;
@@ -58,7 +59,7 @@ export declare class BookingService {
             mapQuery: string | null;
         } | null;
         rawData: {
-            payload: import("@prisma/client/runtime/library").JsonValue;
+            payload: Prisma.JsonValue;
         } | null;
     } & {
         id: string;
@@ -66,8 +67,8 @@ export declare class BookingService {
         updatedAt: Date;
         status: import("@prisma/client").$Enums.BookingStatus;
         tourId: string | null;
-        startingDate: Date | null;
         bookingRef: string;
+        confirmationCode: string | null;
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         tourName: string | null;
@@ -75,6 +76,7 @@ export declare class BookingService {
         address: string | null;
         latitude: number | null;
         longitude: number | null;
+        startingDate: Date | null;
         customerName: string | null;
         hotelName: string;
         phone: string;
@@ -84,7 +86,7 @@ export declare class BookingService {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        confirmationCode: string | null;
+        extra: Prisma.JsonValue | null;
         rawDataId: string | null;
         notes: string | null;
         assignmentId: string | null;
@@ -98,8 +100,8 @@ export declare class BookingService {
         updatedAt: Date;
         status: import("@prisma/client").$Enums.BookingStatus;
         tourId: string | null;
-        startingDate: Date | null;
         bookingRef: string;
+        confirmationCode: string | null;
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         tourName: string | null;
@@ -107,6 +109,7 @@ export declare class BookingService {
         address: string | null;
         latitude: number | null;
         longitude: number | null;
+        startingDate: Date | null;
         customerName: string | null;
         hotelName: string;
         phone: string;
@@ -116,7 +119,7 @@ export declare class BookingService {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        confirmationCode: string | null;
+        extra: Prisma.JsonValue | null;
         rawDataId: string | null;
         notes: string | null;
         assignmentId: string | null;
@@ -132,8 +135,8 @@ export declare class BookingService {
         updatedAt: Date;
         status: import("@prisma/client").$Enums.BookingStatus;
         tourId: string | null;
-        startingDate: Date | null;
         bookingRef: string;
+        confirmationCode: string | null;
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         tourName: string | null;
@@ -141,6 +144,7 @@ export declare class BookingService {
         address: string | null;
         latitude: number | null;
         longitude: number | null;
+        startingDate: Date | null;
         customerName: string | null;
         hotelName: string;
         phone: string;
@@ -150,7 +154,7 @@ export declare class BookingService {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        confirmationCode: string | null;
+        extra: Prisma.JsonValue | null;
         rawDataId: string | null;
         notes: string | null;
         assignmentId: string | null;
@@ -165,8 +169,8 @@ export declare class BookingService {
         updatedAt: Date;
         status: import("@prisma/client").$Enums.BookingStatus;
         tourId: string | null;
-        startingDate: Date | null;
         bookingRef: string;
+        confirmationCode: string | null;
         source: string | null;
         channel: import("@prisma/client").$Enums.BookingProvider;
         tourName: string | null;
@@ -174,6 +178,7 @@ export declare class BookingService {
         address: string | null;
         latitude: number | null;
         longitude: number | null;
+        startingDate: Date | null;
         customerName: string | null;
         hotelName: string;
         phone: string;
@@ -183,7 +188,7 @@ export declare class BookingService {
         payment: import("@prisma/client").$Enums.PaymentStatus | null;
         isNoShow: boolean;
         noShowReason: string | null;
-        confirmationCode: string | null;
+        extra: Prisma.JsonValue | null;
         rawDataId: string | null;
         notes: string | null;
         assignmentId: string | null;

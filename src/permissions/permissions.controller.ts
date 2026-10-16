@@ -1,6 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { PermissionsService } from './permissions.service';
-import { CreatePermissionDto, QueryPermissionDto, UpdatePermissionDto } from './dto/permission.dto';
+import { QueryPermissionDto } from './dto/permission.dto';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 
 @Controller('permissions')
@@ -23,23 +23,5 @@ export class PermissionsController {
   @Permissions('role.manage')
   findOne(@Param('id') id: string) {
     return this.permissionsService.findOne(id);
-  }
-
-  @Post()
-  @Permissions('role.manage')
-  create(@Body() dto: CreatePermissionDto) {
-    return this.permissionsService.create(dto);
-  }
-
-  @Put(':id')
-  @Permissions('role.manage')
-  update(@Param('id') id: string, @Body() dto: UpdatePermissionDto) {
-    return this.permissionsService.update(id, dto);
-  }
-
-  @Delete(':id')
-  @Permissions('role.manage')
-  remove(@Param('id') id: string) {
-    return this.permissionsService.remove(id);
   }
 }

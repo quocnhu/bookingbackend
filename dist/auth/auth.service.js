@@ -200,7 +200,6 @@ let AuthService = class AuthService {
                     email: profile.email,
                     name: profile.name,
                     authProvider: client_1.AuthProvider.GOOGLE,
-                    providerId: profile.providerId,
                     role: client_1.RoleType.CUSTOMER,
                     userType: 'customer',
                 },

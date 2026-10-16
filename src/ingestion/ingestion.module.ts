@@ -7,6 +7,8 @@ import { redisProvider } from './redis.provider';
 import { GmailAuthService } from './gmail-auth.provider';
 import { GmailWatchService } from './gmail-watch.service';
 import { GmailPubSubService } from './gmail-pubsub.service';
+import { GmailSubscriberService } from './gmail-subscriber.service';
+import { GmailPollService } from './gmail-poll.service';
 import { GmailConnectService } from './gmail-connect.service';
 import { GoogleOidcService } from './google-oidc.service';
 import { GmailController } from './gmail.controller';
@@ -24,6 +26,8 @@ import { GmailController } from './gmail.controller';
     GmailAuthService,
     GmailWatchService,
     GmailPubSubService,
+    GmailSubscriberService,
+    GmailPollService,
     GmailConnectService,
     GoogleOidcService,
   ],

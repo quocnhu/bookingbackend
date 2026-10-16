@@ -3,7 +3,7 @@ import type { TemplateParser } from './parser.interface';
 import { AirbnbParser } from './airbnb.parser';
 import { BookingComParser } from './booking-com.parser';
 import { GetYourGuideParser } from './getyourguide.parser';
-import { TripAdvisorParser } from './tripadvisor.parser';
+import { ViatorParser } from './viator.parser';
 import { WebsiteParser } from './website.parser';
 
 /**
@@ -18,14 +18,14 @@ export class ParserRegistry {
     airbnb: AirbnbParser,
     bookingCom: BookingComParser,
     getYourGuide: GetYourGuideParser,
-    tripAdvisor: TripAdvisorParser,
+    viator: ViatorParser,
     website: WebsiteParser,
   ) {
     for (const parser of [
       airbnb,
       bookingCom,
       getYourGuide,
-      tripAdvisor,
+      viator,
       website,
     ]) {
       this.parsers.set(parser.templateTag, parser);
@@ -34,13 +34,16 @@ export class ParserRegistry {
 
   get(tag?: string | null): TemplateParser | undefined {
     if (!tag) return undefined;
+    // Legacy alias: rows ingested before the 'tripadvisor' → 'viator' rename
+    // still carry templateTag 'tripadvisor' and must resolve to the same parser.
+    if (tag === 'tripadvisor') tag = 'viator';
     return this.parsers.get(tag);
   }
 
   /**
    * Return the first parser that matches the payload (fallback when tag = unknown).
    * The parser for an already matched tag must also pass canParse(payload) — if the
-   * template is still unknown (e.g. TripAdvisor has no HTML parser yet) it falls to
+   * template is still unknown (e.g. Viator has no HTML parser yet) it falls to
    * `unparsed` for manual review instead of being flagged as parse_failed.
    */
   resolve(

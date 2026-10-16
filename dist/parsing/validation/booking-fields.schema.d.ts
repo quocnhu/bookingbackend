@@ -1,5 +1,7 @@
 import { BookingProvider, BookingStatus, PaymentStatus, TourType } from '@prisma/client';
-export type ParsedAction = 'CREATE' | 'CANCEL';
+import { ParsedAction, PARSED_SOURCES } from './template-booking.dto';
+export type { ParsedAction };
+export { PARSED_SOURCES };
 export interface BookingFields {
     action: ParsedAction;
     bookingRef: string;
@@ -22,6 +24,7 @@ export interface BookingFields {
     payment?: PaymentStatus;
     isNoShow?: boolean;
     noShowReason?: string;
+    extra?: Record<string, unknown>;
 }
 export interface ValidationResult {
     valid: boolean;

@@ -22,6 +22,11 @@ export class GmailConnectService {
     );
   }
 
+  /** True when at least one mailbox is already tracked. */
+  async hasAnyAccount(): Promise<boolean> {
+    return (await this.prisma.gmailAccount.count()) > 0;
+  }
+
   /**
    * Handle OAuth callback:
    * - New: create GmailAccount + register watch.
@@ -93,6 +98,18 @@ export class GmailConnectService {
         email: account.email,
         watchExpiration: account.watchExpiration,
       };
+    }
+
+    // Only a single mailbox may be tracked at a time. Reconnecting the same
+    // mailbox is allowed (upsert below), but a different email is rejected.
+    const conflicting = await this.prisma.gmailAccount.findFirst({
+      where: { email: { not: email } },
+    });
+    if (conflicting) {
+      throw new BadRequestException(
+        `Only one mailbox can be tracked (${conflicting.email}). ` +
+          'Remove or reconnect it before connecting a new mailbox.',
+      );
     }
 
     const account = await this.prisma.gmailAccount.upsert({

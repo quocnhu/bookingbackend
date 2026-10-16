@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BookingNormalizerService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const extra_util_1 = require("./extra.util");
 const CANCEL_KEYWORDS = /\b(cancel|cancellation|cancelled|canceled|refund)\b/i;
 const TOUR_TYPES = [client_1.TourType.PRIVATE_TOUR, client_1.TourType.GROUP_TOUR];
 const PAYMENT_STATUSES = [
@@ -20,6 +21,7 @@ const SOURCE_TO_CHANNEL = {
     airbnb: client_1.BookingProvider.AIRBNB,
     'booking-com': client_1.BookingProvider.BOOKING_COM,
     getyourguide: client_1.BookingProvider.GETYOURGUIDE,
+    viator: client_1.BookingProvider.VIATOR,
     tripadvisor: client_1.BookingProvider.TRIPADVISOR,
     website: client_1.BookingProvider.WEBSITE,
     manual: client_1.BookingProvider.MANUAL,
@@ -63,8 +65,13 @@ let BookingNormalizerService = class BookingNormalizerService {
             payment: this.normalizePayment(parsed.payment),
             isNoShow: this.pickBoolean(parsed.isNoShow ?? parsed.noShow),
             noShowReason: this.pickString(parsed.noShowReason),
+            extra: this.buildExtra(parsed),
         };
         return { clean: true, data };
+    }
+    buildExtra(parsed) {
+        const extra = (0, extra_util_1.buildExtra)(parsed);
+        return Object.keys(extra).length ? extra : undefined;
     }
     channelForSource(source) {
         if (!source)
@@ -77,19 +84,28 @@ let BookingNormalizerService = class BookingNormalizerService {
             return 'website';
         if (value === 'booking.com' || value === 'booking_com')
             return 'booking-com';
-        if (value === 'trip' || value === 'tripadvisor.com')
-            return 'tripadvisor';
+        if (value === 'trip' ||
+            value === 'tripadvisor' ||
+            value === 'tripadvisor.com' ||
+            value === 'viator' ||
+            value === 'viator.com')
+            return 'viator';
         if (SOURCE_TO_CHANNEL[value])
             return value;
         return value;
     }
     normalizeChannel(raw) {
         const value = this.pickString(raw)?.toUpperCase();
-        if (value === 'TRIPADVISOR' ||
-            value === 'AIRBNB' ||
-            value === 'BOOKING_COM')
-            return value;
-        if (value === 'WEBSITE' || value === 'MANUAL')
+        const known = [
+            client_1.BookingProvider.TRIPADVISOR,
+            client_1.BookingProvider.VIATOR,
+            client_1.BookingProvider.GETYOURGUIDE,
+            client_1.BookingProvider.AIRBNB,
+            client_1.BookingProvider.BOOKING_COM,
+            client_1.BookingProvider.WEBSITE,
+            client_1.BookingProvider.MANUAL,
+        ];
+        if (known.includes(value))
             return value;
         if (value === 'TRIP')
             return client_1.BookingProvider.TRIPADVISOR;

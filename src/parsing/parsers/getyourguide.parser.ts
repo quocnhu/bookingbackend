@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BookingProvider, TourType } from '@prisma/client';
 import { load } from 'cheerio';
+import { buildExtra } from '../extra.util';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
 /** Safely coerce any value to a string (avoids '[object Object]'). */
@@ -42,6 +43,7 @@ export class GetYourGuideParser implements TemplateParser {
       /\bsold by\s*[:#]?\s*getyourguide/i.test(text) ||
       /\bbooking channel\s*[:#]?\s*getyourguide/i.test(text) ||
       /\bGYG[-_ ]?\d{4,9}\b/i.test(text) ||
+      /\bGET[-_ ]?\d{4,9}\b/i.test(text) ||
       (hasBooking &&
         (asString(payload.source).toLowerCase().includes('getyourguide') ||
           asString(payload.channel).toUpperCase() === 'GETYOURGUIDE'))
@@ -142,6 +144,7 @@ export class GetYourGuideParser implements TemplateParser {
       pickUpAddress: this.subAddress(rows.get('pickUp')),
       guidedLanguages: rows.get('guidedLanguages') || null,
       extras: rows.get('extras') || null,
+      externalTicketRefs: rows.get('externalTicketRefs') || null,
       notes: rows.get('notes') || null,
       createdAt: rows.get('created') || null,
     };
@@ -150,7 +153,7 @@ export class GetYourGuideParser implements TemplateParser {
   private setRow(rows: Map<string, string>, label: string, value: string) {
     const normalized = label
       .toLowerCase()
-      .replace(/\./g, ' ')
+      .replace(/[-.]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
     const keys: Array<[string, string]> = [
@@ -167,6 +170,8 @@ export class GetYourGuideParser implements TemplateParser {
       ['pick up', 'pickUp'],
       ['pickup', 'pickUp'],
       ['booking languages', 'bookingLanguages'],
+      ['external ticket reference', 'externalTicketRefs'],
+      ['external ticket ref', 'externalTicketRefs'],
       ['customer', 'customer'],
       ['date', 'date'],
       ['rate', 'rate'],
@@ -218,6 +223,7 @@ export class GetYourGuideParser implements TemplateParser {
       pickUpAddress: b.pickUpAddress ?? null,
       guidedLanguages: b.guidedLanguages ?? null,
       extras: b.extras ?? null,
+      externalTicketRefs: b.externalTicketRefs ?? null,
       notes: b.notes ?? null,
       createdAt: b.createdAt ?? null,
     };
@@ -321,6 +327,7 @@ export class GetYourGuideParser implements TemplateParser {
       paxDetail: asString(rich.pax) || undefined,
       hotelName: pickUp.hotel || undefined,
       address: pickUp.address || asString(rich.pickUpAddress) || undefined,
+      extra: buildExtra(rich),
     };
   }
 
@@ -388,7 +395,7 @@ export class GetYourGuideParser implements TemplateParser {
       if (month != null && yy != null) {
         const year = yy < 100 ? 2000 + yy : yy;
         const date = new Date(year, month, Number(viator[1]), Number(viator[4]), Number(viator[5]));
-        if (!Number.isNaN(date.getTime())) return date.toISOString();
+        if (!Number.isNaN(date.getTime())) return this.naiveLocalIso(date);
       }
     }
     const m =
@@ -397,14 +404,22 @@ export class GetYourGuideParser implements TemplateParser {
       );
     if (m) {
       const date = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), Number(m[4] ?? 0), Number(m[5] ?? 0));
-      if (!Number.isNaN(date.getTime())) return date.toISOString();
+      if (!Number.isNaN(date.getTime())) return this.naiveLocalIso(date);
     }
     const plain = /([A-Z][a-z]{2,9}\.?\s+\d{1,2},?\s+2026)/.exec(text)?.[1];
     if (plain) {
       const date = new Date(plain);
-      if (!Number.isNaN(date.getTime())) return date.toISOString();
+      if (!Number.isNaN(date.getTime())) return this.naiveLocalIso(date);
     }
     return undefined;
+  }
+
+  /** Format a Date's local wall-clock as "YYYY-MM-DDTHH:mm:00" (no timezone). */
+  private naiveLocalIso(d: Date): string {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(
+      d.getHours(),
+    )}:${p(d.getMinutes())}:00`;
   }
 
   private monthIndex(name: string): number | undefined {
@@ -427,9 +442,15 @@ export class GetYourGuideParser implements TemplateParser {
   /** "Thu 14.May '26 @ 07:30" → ISO string in Vietnam timezone; fallback Date.parse. */
   private normalizeDate(raw?: string): string | undefined {
     if (!raw) return undefined;
-    const iso = this.matchDate(raw);
-    if (iso) return new Date(iso + '+07:00').toISOString();
-    const d = new Date(raw + '+07:00');
+    const value = raw.trim();
+    const naive = this.matchDate(value);
+    if (naive) return this.toIso(`${naive}+07:00`);
+    const zoned = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+    return this.toIso(zoned ? value : `${value}+07:00`);
+  }
+
+  private toIso(candidate: string): string | undefined {
+    const d = new Date(candidate);
     return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
   }
 }

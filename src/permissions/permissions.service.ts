@@ -1,6 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { CreatePermissionDto, QueryPermissionDto, UpdatePermissionDto } from './dto/permission.dto';
+import { QueryPermissionDto } from './dto/permission.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
 
 @Injectable()
@@ -30,22 +30,5 @@ export class PermissionsService {
     const permission = await this.prisma.permission.findUnique({ where: { id } });
     if (!permission) throw new NotFoundException('Permission not found');
     return permission;
-  }
-
-  async create(dto: CreatePermissionDto) {
-    const existing = await this.prisma.permission.findUnique({ where: { code: dto.code } });
-    if (existing) throw new ConflictException('Permission code already exists');
-    return this.prisma.permission.create({ data: dto });
-  }
-
-  async update(id: string, dto: UpdatePermissionDto) {
-    await this.findOne(id);
-    return this.prisma.permission.update({ where: { id }, data: dto });
-  }
-
-  async remove(id: string) {
-    await this.findOne(id);
-    await this.prisma.permission.delete({ where: { id } });
-    return { message: 'Permission deleted' };
   }
 }

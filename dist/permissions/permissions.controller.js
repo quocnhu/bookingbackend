@@ -31,15 +31,6 @@ let PermissionsController = class PermissionsController {
     findOne(id) {
         return this.permissionsService.findOne(id);
     }
-    create(dto) {
-        return this.permissionsService.create(dto);
-    }
-    update(id, dto) {
-        return this.permissionsService.update(id, dto);
-    }
-    remove(id) {
-        return this.permissionsService.remove(id);
-    }
 };
 exports.PermissionsController = PermissionsController;
 __decorate([
@@ -65,31 +56,6 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], PermissionsController.prototype, "findOne", null);
-__decorate([
-    (0, common_1.Post)(),
-    (0, permissions_decorator_1.Permissions)('role.manage'),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [permission_dto_1.CreatePermissionDto]),
-    __metadata("design:returntype", void 0)
-], PermissionsController.prototype, "create", null);
-__decorate([
-    (0, common_1.Put)(':id'),
-    (0, permissions_decorator_1.Permissions)('role.manage'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, permission_dto_1.UpdatePermissionDto]),
-    __metadata("design:returntype", void 0)
-], PermissionsController.prototype, "update", null);
-__decorate([
-    (0, common_1.Delete)(':id'),
-    (0, permissions_decorator_1.Permissions)('role.manage'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
-], PermissionsController.prototype, "remove", null);
 exports.PermissionsController = PermissionsController = __decorate([
     (0, common_1.Controller)('permissions'),
     __metadata("design:paramtypes", [permissions_service_1.PermissionsService])

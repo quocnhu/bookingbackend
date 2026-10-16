@@ -6,13 +6,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TripAdvisorParser = void 0;
+exports.ViatorParser = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const cheerio_1 = require("cheerio");
+const extra_util_1 = require("../extra.util");
+const channel_util_1 = require("../channel.util");
 const asString = (value) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
-let TripAdvisorParser = class TripAdvisorParser {
-    templateTag = 'tripadvisor';
+let ViatorParser = class ViatorParser {
+    templateTag = 'viator';
     canParse(payload) {
         const from = asString(payload.from).toLowerCase();
         const subject = asString(payload.subject).toLowerCase();
@@ -20,12 +22,16 @@ let TripAdvisorParser = class TripAdvisorParser {
         const body = asString(payload.body);
         const hasParsedBooking = Boolean(payload.booking ?? payload.parsedBooking);
         return (from.includes('tripadvisor.com') ||
+            from.includes('nquocnhu95book@gmail.com') ||
             subject.includes('tripadvisor') ||
+            subject.includes('viator') ||
             /\bBooking Ref\.?/i.test(html) ||
             /\bBooking Ref\.?/i.test(body) ||
             (hasParsedBooking &&
-                (asString(payload.source).includes('tripadvisor') ||
-                    asString(payload.channel).toUpperCase() === 'TRIPADVISOR')));
+                (asString(payload.source).includes('viator') ||
+                    asString(payload.source).includes('tripadvisor') ||
+                    asString(payload.channel).toUpperCase() === 'TRIPADVISOR' ||
+                    asString(payload.channel).toUpperCase() === 'VIATOR')));
     }
     extract(payload) {
         const html = asString(payload.html);
@@ -167,8 +173,9 @@ let TripAdvisorParser = class TripAdvisorParser {
                 ? 'CANCEL'
                 : 'CREATE',
             bookingRef,
-            source: 'tripadvisor',
-            channel: client_1.BookingProvider.TRIPADVISOR,
+            source: 'viator',
+            channel: (0, channel_util_1.resolveBookingChannel)(rows.get('bookingChannel'), rows.get('soldBy')) ??
+                client_1.BookingProvider.VIATOR,
             customerName: rows.get('customer') || undefined,
             mail: rows.get('customerEmail') ||
                 asString(payload.emailAddress) ||
@@ -182,8 +189,8 @@ let TripAdvisorParser = class TripAdvisorParser {
             hotelName: pickUp.hotel,
             address: pickUp.address,
         };
-        payload.booking = {
-            provider: 'tripadvisor',
+        const rich = {
+            provider: 'viator',
             bookingRef,
             productBookingRef: rows.get('productBookingRef') || null,
             extBookingRef: rows.get('extBookingRef') || null,
@@ -208,6 +215,8 @@ let TripAdvisorParser = class TripAdvisorParser {
             totalcost,
             createdAt: rows.get('created') || null,
         };
+        payload.booking = rich;
+        fields.extra = (0, extra_util_1.buildExtra)(rich);
         return fields;
     }
     extractViatorAmount(notes) {
@@ -252,8 +261,9 @@ let TripAdvisorParser = class TripAdvisorParser {
                 ? 'CANCEL'
                 : 'CREATE',
             bookingRef,
-            source: 'tripadvisor',
-            channel: client_1.BookingProvider.TRIPADVISOR,
+            source: 'viator',
+            channel: (0, channel_util_1.resolveBookingChannel)(b.bookingChannel, b.soldBy) ??
+                client_1.BookingProvider.VIATOR,
             customerName: asString(b.customer ?? b.customerName) || undefined,
             mail: asString(b.customerEmail ?? b.mail) ||
                 asString(payload.emailAddress) ||
@@ -266,6 +276,7 @@ let TripAdvisorParser = class TripAdvisorParser {
             paxDetail: asString(b.pax ?? b.paxDetail) || undefined,
             hotelName: pickUp.hotel,
             address: pickUp.address,
+            extra: (0, extra_util_1.buildExtra)(b),
         };
     }
     splitPickUp(raw) {
@@ -312,13 +323,22 @@ let TripAdvisorParser = class TripAdvisorParser {
             const hour = Number(m[4]);
             const minute = Number(m[5]);
             if (month != null && year != null) {
-                const date = new Date(year, month, day, hour, minute);
-                if (!Number.isNaN(date.getTime()))
-                    return new Date(date.toISOString() + '+07:00').toISOString();
+                const naive = this.naiveLocalIso(year, month, day, hour, minute);
+                const parsed = this.toIso(`${naive}+07:00`);
+                if (parsed)
+                    return parsed;
             }
         }
-        const plain = new Date(value + '+07:00');
-        return Number.isNaN(plain.getTime()) ? undefined : plain.toISOString();
+        const zoned = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+        return this.toIso(zoned ? value : `${value}+07:00`);
+    }
+    naiveLocalIso(year, month, day, hour, minute) {
+        const p = (n) => String(n).padStart(2, '0');
+        return `${year}-${p(month + 1)}-${p(day)}T${p(hour)}:${p(minute)}:00`;
+    }
+    toIso(candidate) {
+        const d = new Date(candidate);
+        return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
     }
     monthIndex(name) {
         const months = [
@@ -339,8 +359,8 @@ let TripAdvisorParser = class TripAdvisorParser {
         return index === -1 ? undefined : index;
     }
 };
-exports.TripAdvisorParser = TripAdvisorParser;
-exports.TripAdvisorParser = TripAdvisorParser = __decorate([
+exports.ViatorParser = ViatorParser;
+exports.ViatorParser = ViatorParser = __decorate([
     (0, common_1.Injectable)()
-], TripAdvisorParser);
-//# sourceMappingURL=tripadvisor.parser.js.map
+], ViatorParser);
+//# sourceMappingURL=viator.parser.js.map

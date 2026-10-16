@@ -12,6 +12,7 @@ import {
   BookingProvider,
   BookingStatus,
   PaymentStatus,
+  Prisma,
   RoleType,
   TourType,
 } from '@prisma/client';
@@ -35,6 +36,33 @@ import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interf
 export type WriteResult =
   | { status: 'SKIPPED'; reason: string; booking?: undefined }
   | { status: 'PROCESSED'; booking?: Booking | null };
+
+/** Minimum name-match confidence before a parsed booking is linked to a Tour. */
+const TOUR_MATCH_MIN_SCORE = 0.5;
+
+/**
+ * Normalize a tour name for comparison: lowercase, drop the OTA product-code
+ * prefix ("107622P19 - ..."), parentheticals ("(Max 10)") and punctuation.
+ */
+function normalizeTourName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/^\s*[a-z0-9]{4,}\s*[-–—:]\s*/i, ' ')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/** Token-set overlap (intersection / smaller set) in the range 0..1. */
+function tokenOverlap(a: string, b: string): number {
+  const A = new Set(a.split(' ').filter(Boolean));
+  const B = new Set(b.split(' ').filter(Boolean));
+  if (A.size === 0 || B.size === 0) return 0;
+  let common = 0;
+  for (const t of A) if (B.has(t)) common += 1;
+  return common / Math.min(A.size, B.size);
+}
 
 /**
  * Central service for Booking: CRUD (dashboard) + upsert from the pipeline
@@ -66,14 +94,29 @@ async upsert(
     // Auto-populate tourName from tourId if not provided
     let tourName = data.tourName;
     let tourType = data.tourType;
-    if (data.tourId && (!tourName || !tourType)) {
+    let tourId = data.tourId;
+    if (tourId && (!tourName || !tourType)) {
       const tour = await this.prisma.tour.findUnique({
-        where: { id: data.tourId },
+        where: { id: tourId },
         select: { name: true, type: true },
       });
       if (tour) {
         tourName ??= tour.name;
         tourType ??= tour.type;
+      }
+    }
+    // Reverse: parsed bookings only carry the OTA product name. Match it against
+    // the Tours table so the booking is linked to a Tour and the dashboard can
+    // show that Tour's Duration (Tour.durationDays). Never guess: below the
+    // confidence threshold the booking stays unlinked.
+    if (!tourId && tourName) {
+      const matched = await this.resolveTourByName(tourName, tourType);
+      if (matched) {
+        tourId = matched.id;
+        tourType ??= matched.type;
+        this.logger.log(
+          `Linked booking ${bookingRef} to tour "${matched.name}" (name match)`,
+        );
       }
     }
 
@@ -99,6 +142,7 @@ async upsert(
       payment?: PaymentStatus;
       isNoShow?: boolean;
       noShowReason?: string;
+      extra?: Prisma.InputJsonValue;
       rawDataId?: string;
       createdWho?: string;
     } = {
@@ -106,14 +150,14 @@ async upsert(
       confirmationCode: data.bookingRef,
       source: data.source,
       channel:
-        this.normalizer.channelForSource(data.source) ??
         data.channel ??
+        this.normalizer.channelForSource(data.source) ??
         BookingProvider.WEBSITE,
       status:
         data.action === 'CANCEL'
           ? BookingStatus.CANCELED
           : (data.status ?? BookingStatus.PENDING),
-      tourId: data.tourId,
+      tourId,
       tourName,
       tourType,
       address: data.address,
@@ -131,6 +175,7 @@ async upsert(
       payment: data.payment,
       isNoShow: data.isNoShow,
       noShowReason: data.noShowReason,
+      extra: data.extra as unknown as Prisma.InputJsonValue | undefined,
       rawDataId: existing?.rawDataId ?? rawDataId,
     };
 
@@ -249,6 +294,40 @@ startingDate: data.startingDate
       if (byKey) return byKey;
     }
     return this.prisma.booking.findUnique({ where: { bookingRef } });
+  }
+
+  /**
+   * Loop the Tours table and return the best name match for a parsed OTA tour
+   * name, or null when nothing is confident enough (see TOUR_MATCH_MIN_SCORE).
+   * A matching `tourType` nudges the score up so same-type tours win ties.
+   */
+  private async resolveTourByName(
+    rawName: string,
+    tourType?: TourType,
+  ): Promise<{ id: string; name: string; type: TourType } | null> {
+    const target = normalizeTourName(rawName);
+    if (!target) return null;
+
+    const tours = await this.prisma.tour.findMany({
+      select: { id: true, name: true, type: true },
+    });
+
+    let best: { id: string; name: string; type: TourType } | null = null;
+    let bestScore = 0;
+    for (const tour of tours) {
+      const norm = normalizeTourName(tour.name);
+      if (!norm) continue;
+      let score = tokenOverlap(norm, target);
+      if (norm === target) score = 1;
+      else if (norm.includes(target) || target.includes(norm))
+        score = Math.max(score, 0.85);
+      if (tourType && tour.type === tourType) score += 0.05;
+      if (score > bestScore) {
+        bestScore = score;
+        best = { id: tour.id, name: tour.name, type: tour.type };
+      }
+    }
+    return bestScore >= TOUR_MATCH_MIN_SCORE ? best : null;
   }
 
   /**

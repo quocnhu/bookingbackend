@@ -22,7 +22,7 @@ export declare class GmailController {
         nextHistoryId: string | null;
         received: boolean;
     }>;
-    connect(res: Response, accountId?: string): void;
+    connect(res: Response, accountId?: string): Promise<void>;
     callback(code: string, state: string, res: Response): Promise<void>;
     list(): Promise<{
         id: string;

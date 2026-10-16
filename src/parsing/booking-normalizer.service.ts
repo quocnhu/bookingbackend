@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BookingProvider, PaymentStatus, TourType } from '@prisma/client';
+import { buildExtra } from './extra.util';
 import type { BookingFields } from './validation/booking-fields.schema';
 
 const CANCEL_KEYWORDS = /\b(cancel|cancellation|cancelled|canceled|refund)\b/i;
@@ -26,6 +27,7 @@ const SOURCE_TO_CHANNEL: Record<string, BookingProvider> = {
   airbnb: BookingProvider.AIRBNB,
   'booking-com': BookingProvider.BOOKING_COM,
   getyourguide: BookingProvider.GETYOURGUIDE,
+  viator: BookingProvider.VIATOR,
   tripadvisor: BookingProvider.TRIPADVISOR,
   website: BookingProvider.WEBSITE,
   manual: BookingProvider.MANUAL,
@@ -106,9 +108,17 @@ export class BookingNormalizerService {
       payment: this.normalizePayment(parsed.payment),
       isNoShow: this.pickBoolean(parsed.isNoShow ?? parsed.noShow),
       noShowReason: this.pickString(parsed.noShowReason),
+      extra: this.buildExtra(parsed),
     };
 
     return { clean: true, data };
+  }
+
+  private buildExtra(
+    parsed: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    const extra = buildExtra(parsed);
+    return Object.keys(extra).length ? extra : undefined;
   }
 
   channelForSource(source?: string): BookingProvider | undefined {
@@ -123,20 +133,31 @@ export class BookingNormalizerService {
     if (!value) return 'website';
     if (value === 'booking.com' || value === 'booking_com')
       return 'booking-com';
-    if (value === 'trip' || value === 'tripadvisor.com') return 'tripadvisor';
+    if (
+      value === 'trip' ||
+      value === 'tripadvisor' ||
+      value === 'tripadvisor.com' ||
+      value === 'viator' ||
+      value === 'viator.com'
+    )
+      return 'viator';
     if (SOURCE_TO_CHANNEL[value]) return value;
     return value;
   }
 
   private normalizeChannel(raw: unknown): BookingProvider | undefined {
     const value = this.pickString(raw)?.toUpperCase();
-    if (
-      value === 'TRIPADVISOR' ||
-      value === 'AIRBNB' ||
-      value === 'BOOKING_COM'
-    )
-      return value;
-    if (value === 'WEBSITE' || value === 'MANUAL') return value;
+    const known: BookingProvider[] = [
+      BookingProvider.TRIPADVISOR,
+      BookingProvider.VIATOR,
+      BookingProvider.GETYOURGUIDE,
+      BookingProvider.AIRBNB,
+      BookingProvider.BOOKING_COM,
+      BookingProvider.WEBSITE,
+      BookingProvider.MANUAL,
+    ];
+    if (known.includes(value as BookingProvider))
+      return value as BookingProvider;
     if (value === 'TRIP') return BookingProvider.TRIPADVISOR;
     return undefined;
   }

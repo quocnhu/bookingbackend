@@ -14,7 +14,9 @@ export declare class GetYourGuideParser implements TemplateParser {
     private matchPax;
     private matchPhone;
     private matchDate;
+    private naiveLocalIso;
     private monthIndex;
     private detectTourType;
     private normalizeDate;
+    private toIso;
 }

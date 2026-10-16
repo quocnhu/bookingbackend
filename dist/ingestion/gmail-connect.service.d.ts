@@ -7,6 +7,7 @@ export declare class GmailConnectService {
     private readonly watch;
     constructor(prisma: PrismaService, auth: GmailAuthService, watch: GmailWatchService);
     buildConnectUrl(accountId?: string): string;
+    hasAnyAccount(): Promise<boolean>;
     handleCallback(code: string, state?: string): Promise<{
         reconnected: boolean;
         email: string;

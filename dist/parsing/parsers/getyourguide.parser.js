@@ -10,6 +10,7 @@ exports.GetYourGuideParser = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const cheerio_1 = require("cheerio");
+const extra_util_1 = require("../extra.util");
 const asString = (value) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 const collapse = (value) => value.replace(/\s+/g, ' ').trim();
 let GetYourGuideParser = class GetYourGuideParser {
@@ -24,6 +25,7 @@ let GetYourGuideParser = class GetYourGuideParser {
             /\bsold by\s*[:#]?\s*getyourguide/i.test(text) ||
             /\bbooking channel\s*[:#]?\s*getyourguide/i.test(text) ||
             /\bGYG[-_ ]?\d{4,9}\b/i.test(text) ||
+            /\bGET[-_ ]?\d{4,9}\b/i.test(text) ||
             (hasBooking &&
                 (asString(payload.source).toLowerCase().includes('getyourguide') ||
                     asString(payload.channel).toUpperCase() === 'GETYOURGUIDE')));
@@ -106,6 +108,7 @@ let GetYourGuideParser = class GetYourGuideParser {
             pickUpAddress: this.subAddress(rows.get('pickUp')),
             guidedLanguages: rows.get('guidedLanguages') || null,
             extras: rows.get('extras') || null,
+            externalTicketRefs: rows.get('externalTicketRefs') || null,
             notes: rows.get('notes') || null,
             createdAt: rows.get('created') || null,
         };
@@ -113,7 +116,7 @@ let GetYourGuideParser = class GetYourGuideParser {
     setRow(rows, label, value) {
         const normalized = label
             .toLowerCase()
-            .replace(/\./g, ' ')
+            .replace(/[-.]/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
         const keys = [
@@ -130,6 +133,8 @@ let GetYourGuideParser = class GetYourGuideParser {
             ['pick up', 'pickUp'],
             ['pickup', 'pickUp'],
             ['booking languages', 'bookingLanguages'],
+            ['external ticket reference', 'externalTicketRefs'],
+            ['external ticket ref', 'externalTicketRefs'],
             ['customer', 'customer'],
             ['date', 'date'],
             ['rate', 'rate'],
@@ -174,6 +179,7 @@ let GetYourGuideParser = class GetYourGuideParser {
             pickUpAddress: b.pickUpAddress ?? null,
             guidedLanguages: b.guidedLanguages ?? null,
             extras: b.extras ?? null,
+            externalTicketRefs: b.externalTicketRefs ?? null,
             notes: b.notes ?? null,
             createdAt: b.createdAt ?? null,
         };
@@ -248,6 +254,7 @@ let GetYourGuideParser = class GetYourGuideParser {
             paxDetail: asString(rich.pax) || undefined,
             hotelName: pickUp.hotel || undefined,
             address: pickUp.address || asString(rich.pickUpAddress) || undefined,
+            extra: (0, extra_util_1.buildExtra)(rich),
         };
     }
     splitPickUp(raw) {
@@ -302,22 +309,26 @@ let GetYourGuideParser = class GetYourGuideParser {
                 const year = yy < 100 ? 2000 + yy : yy;
                 const date = new Date(year, month, Number(viator[1]), Number(viator[4]), Number(viator[5]));
                 if (!Number.isNaN(date.getTime()))
-                    return date.toISOString();
+                    return this.naiveLocalIso(date);
             }
         }
         const m = /\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\s*(?:at\s*)?(\d{1,2}):(\d{2})?/.exec(text);
         if (m) {
             const date = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), Number(m[4] ?? 0), Number(m[5] ?? 0));
             if (!Number.isNaN(date.getTime()))
-                return date.toISOString();
+                return this.naiveLocalIso(date);
         }
         const plain = /([A-Z][a-z]{2,9}\.?\s+\d{1,2},?\s+2026)/.exec(text)?.[1];
         if (plain) {
             const date = new Date(plain);
             if (!Number.isNaN(date.getTime()))
-                return date.toISOString();
+                return this.naiveLocalIso(date);
         }
         return undefined;
+    }
+    naiveLocalIso(d) {
+        const p = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00`;
     }
     monthIndex(name) {
         const months = [
@@ -338,10 +349,15 @@ let GetYourGuideParser = class GetYourGuideParser {
     normalizeDate(raw) {
         if (!raw)
             return undefined;
-        const iso = this.matchDate(raw);
-        if (iso)
-            return new Date(iso + '+07:00').toISOString();
-        const d = new Date(raw + '+07:00');
+        const value = raw.trim();
+        const naive = this.matchDate(value);
+        if (naive)
+            return this.toIso(`${naive}+07:00`);
+        const zoned = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+        return this.toIso(zoned ? value : `${value}+07:00`);
+    }
+    toIso(candidate) {
+        const d = new Date(candidate);
         return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
     }
 };

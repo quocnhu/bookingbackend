@@ -26,6 +26,9 @@ let GmailConnectService = class GmailConnectService {
     buildConnectUrl(accountId) {
         return this.auth.buildConnectUrl(accountId ? { connect: 'gmail', accountId } : { connect: 'gmail' });
     }
+    async hasAnyAccount() {
+        return (await this.prisma.gmailAccount.count()) > 0;
+    }
     async handleCallback(code, state) {
         if (!code)
             throw new common_1.BadRequestException('Missing authorization code');
@@ -80,6 +83,13 @@ let GmailConnectService = class GmailConnectService {
                 email: account.email,
                 watchExpiration: account.watchExpiration,
             };
+        }
+        const conflicting = await this.prisma.gmailAccount.findFirst({
+            where: { email: { not: email } },
+        });
+        if (conflicting) {
+            throw new common_1.BadRequestException(`Only one mailbox can be tracked (${conflicting.email}). ` +
+                'Remove or reconnect it before connecting a new mailbox.');
         }
         const account = await this.prisma.gmailAccount.upsert({
             where: { email },

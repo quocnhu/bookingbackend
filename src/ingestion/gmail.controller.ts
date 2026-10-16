@@ -71,7 +71,17 @@ export class GmailController {
   /** Start the OAuth flow to connect/reconnect a mailbox. */
   @Permissions('gmail.manage')
   @Get('connect')
-  connect(@Res() res: Response, @Query('accountId') accountId?: string) {
+  async connect(@Res() res: Response, @Query('accountId') accountId?: string) {
+    // Only one mailbox may be tracked: block starting a second connect flow.
+    if (!accountId && (await this.connectService.hasAnyAccount())) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const message = encodeURIComponent(
+        'Only one mailbox can be tracked — reconnect or remove the existing mailbox first',
+      );
+      return res.redirect(
+        `${frontendUrl}/users?mailbox=error&message=${message}`,
+      );
+    }
     return res.redirect(this.connectService.buildConnectUrl(accountId));
   }
 

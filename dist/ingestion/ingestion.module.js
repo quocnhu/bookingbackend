@@ -16,6 +16,8 @@ const redis_provider_1 = require("./redis.provider");
 const gmail_auth_provider_1 = require("./gmail-auth.provider");
 const gmail_watch_service_1 = require("./gmail-watch.service");
 const gmail_pubsub_service_1 = require("./gmail-pubsub.service");
+const gmail_subscriber_service_1 = require("./gmail-subscriber.service");
+const gmail_poll_service_1 = require("./gmail-poll.service");
 const gmail_connect_service_1 = require("./gmail-connect.service");
 const google_oidc_service_1 = require("./google-oidc.service");
 const gmail_controller_1 = require("./gmail.controller");
@@ -36,6 +38,8 @@ exports.IngestionModule = IngestionModule = __decorate([
             gmail_auth_provider_1.GmailAuthService,
             gmail_watch_service_1.GmailWatchService,
             gmail_pubsub_service_1.GmailPubSubService,
+            gmail_subscriber_service_1.GmailSubscriberService,
+            gmail_poll_service_1.GmailPollService,
             gmail_connect_service_1.GmailConnectService,
             google_oidc_service_1.GoogleOidcService,
         ],

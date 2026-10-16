@@ -40,21 +40,6 @@ let PermissionsService = class PermissionsService {
             throw new common_1.NotFoundException('Permission not found');
         return permission;
     }
-    async create(dto) {
-        const existing = await this.prisma.permission.findUnique({ where: { code: dto.code } });
-        if (existing)
-            throw new common_1.ConflictException('Permission code already exists');
-        return this.prisma.permission.create({ data: dto });
-    }
-    async update(id, dto) {
-        await this.findOne(id);
-        return this.prisma.permission.update({ where: { id }, data: dto });
-    }
-    async remove(id) {
-        await this.findOne(id);
-        await this.prisma.permission.delete({ where: { id } });
-        return { message: 'Permission deleted' };
-    }
 };
 exports.PermissionsService = PermissionsService;
 exports.PermissionsService = PermissionsService = __decorate([

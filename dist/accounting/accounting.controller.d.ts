@@ -262,7 +262,7 @@ export declare class AccountingController {
                 name: string;
                 isCompany: boolean;
             } | null;
-            tourDate: Date | null;
+            tourDate: Date;
             amount: number;
             basis: "ROUTE_PRICE";
             priceMissing: boolean;
@@ -291,7 +291,7 @@ export declare class AccountingController {
                 name: string;
                 isCompany: boolean;
             } | null;
-            tourDate: Date | null;
+            tourDate: Date;
             verifiedAt: Date | null;
             amount: number;
             basis: "NET_SETTLEMENT";
@@ -355,7 +355,7 @@ export declare class AccountingController {
                 name: string;
                 isCompany: boolean;
             } | null;
-            tourDate: Date | null;
+            tourDate: Date;
             amount: number;
             basis: "ROUTE_PRICE";
             priceMissing: boolean;
@@ -384,7 +384,7 @@ export declare class AccountingController {
                 name: string;
                 isCompany: boolean;
             } | null;
-            tourDate: Date | null;
+            tourDate: Date;
             verifiedAt: Date | null;
             amount: number;
             basis: "NET_SETTLEMENT";
@@ -449,7 +449,7 @@ export declare class AccountingController {
                 name: string;
                 isCompany: boolean;
             } | null;
-            tourDate: Date | null;
+            tourDate: Date;
             amount: number;
             basis: "ROUTE_PRICE";
             priceMissing: boolean;
@@ -478,7 +478,7 @@ export declare class AccountingController {
                 name: string;
                 isCompany: boolean;
             } | null;
-            tourDate: Date | null;
+            tourDate: Date;
             verifiedAt: Date | null;
             amount: number;
             basis: "NET_SETTLEMENT";
@@ -544,7 +544,7 @@ export declare class AccountingController {
                 name: string;
                 isCompany: boolean;
             } | null;
-            tourDate: Date | null;
+            tourDate: Date;
             amount: number;
             basis: "ROUTE_PRICE";
             priceMissing: boolean;
@@ -573,7 +573,7 @@ export declare class AccountingController {
                 name: string;
                 isCompany: boolean;
             } | null;
-            tourDate: Date | null;
+            tourDate: Date;
             verifiedAt: Date | null;
             amount: number;
             basis: "NET_SETTLEMENT";

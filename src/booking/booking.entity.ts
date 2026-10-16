@@ -6,6 +6,8 @@ export type BookingEntity = Booking;
 export const SOURCES = {
   AIRBNB: 'airbnb',
   BOOKING_COM: 'booking-com',
+  GETYOURGUIDE: 'getyourguide',
+  VIATOR: 'viator',
   TRIPADVISOR: 'tripadvisor',
   WEBSITE: 'website',
   MANUAL: 'manual',

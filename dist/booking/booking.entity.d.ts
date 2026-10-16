@@ -3,6 +3,8 @@ export type BookingEntity = Booking;
 export declare const SOURCES: {
     readonly AIRBNB: "airbnb";
     readonly BOOKING_COM: "booking-com";
+    readonly GETYOURGUIDE: "getyourguide";
+    readonly VIATOR: "viator";
     readonly TRIPADVISOR: "tripadvisor";
     readonly WEBSITE: "website";
     readonly MANUAL: "manual";
