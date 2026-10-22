@@ -44,8 +44,8 @@ let BookingController = class BookingController {
     updateBatch(dto, actor) {
         return this.bookingService.updateBatch(dto.items, actor);
     }
-    update(id, dto) {
-        return this.bookingService.update(id, dto);
+    update(id, dto, actor) {
+        return this.bookingService.update(id, dto, actor);
     }
     remove(id) {
         return this.bookingService.remove(id);
@@ -100,8 +100,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('booking.update'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, booking_dto_1.UpdateBookingDto]),
+    __metadata("design:paramtypes", [String, booking_dto_1.UpdateBookingDto, Object]),
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "update", null);
 __decorate([

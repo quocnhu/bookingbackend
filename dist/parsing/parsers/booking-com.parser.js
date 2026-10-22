@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BookingComParser = void 0;
 const common_1 = require("@nestjs/common");
+const action_util_1 = require("../action.util");
 const TEN_DIGIT_REF = /\b(\d{10})\b/;
 const DATE_PAIR_RE = /(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{4})/gi;
 const asString = (value) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
@@ -30,7 +31,7 @@ let BookingComParser = class BookingComParser {
         if (!dates.startingDate)
             return null;
         return {
-            action: this.isCancellation(body) ? 'CANCEL' : 'CREATE',
+            action: (0, action_util_1.detectAction)(asString(payload.subject), body),
             bookingRef: ref,
             source: 'booking-com',
             customerName: this.matchGuest(body),
@@ -44,9 +45,6 @@ let BookingComParser = class BookingComParser {
     matchRef(body) {
         const m = /\b(?:reservation|booking|reference|pin|confirmation)\s*[#:]?\s*(\d{10})\b/i.exec(body) ?? TEN_DIGIT_REF.exec(body);
         return m ? m[1] : null;
-    }
-    isCancellation(body) {
-        return /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(body);
     }
     matchGuest(body) {
         const m = /\b(?:guest|lead guest name|traveller name|name)\s*[:-]\s*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)/.exec(body) ?? /Hi\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?),/.exec(body);

@@ -25,7 +25,7 @@ let RawDataController = class RawDataController {
         this.prisma = prisma;
         this.service = service;
     }
-    async list(status, templateTag, page = '1', limit = '20') {
+    async list(status, templateTag, action, outcome, page = '1', limit = '20') {
         const pageNum = Math.max(1, Number(page) || 1);
         const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
         const validStatuses = Object.values(raw_data_entity_1.RAW_DATA_STATUS);
@@ -34,19 +34,43 @@ let RawDataController = class RawDataController {
             where.status = status;
         if (templateTag)
             where.templateTag = templateTag;
-        const [total, items] = await Promise.all([
+        if (action && Object.values(raw_data_entity_1.RAW_DATA_ACTION).includes(action)) {
+            where.action = action;
+        }
+        if (outcome && Object.values(raw_data_entity_1.RAW_DATA_OUTCOME).includes(outcome)) {
+            where.outcome = outcome;
+        }
+        const [total, rows] = await Promise.all([
             this.prisma.rawData.count({ where }),
             this.prisma.rawData.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
                 skip: (pageNum - 1) * limitNum,
                 take: limitNum,
+                include: {
+                    booking: { select: { id: true, bookingRef: true } },
+                    linkedBooking: { select: { id: true, bookingRef: true } },
+                },
             }),
         ]);
+        const items = rows.map((row) => {
+            const linked = row.linkedBooking ?? row.booking;
+            return {
+                ...row,
+                bookingId: linked?.id ?? null,
+                bookingRef: linked?.bookingRef ?? null,
+                isAmendment: row.action === 'MODIFY',
+                isCancellation: row.action === 'CANCEL',
+            };
+        });
         return { total, page: pageNum, limit: limitNum, items };
     }
-    summary() {
-        return this.service.summary();
+    async summary() {
+        const [statuses, actions] = await Promise.all([
+            this.service.summary(),
+            this.service.actionSummary(),
+        ]);
+        return { ...statuses, ...actions };
     }
 };
 exports.RawDataController = RawDataController;
@@ -55,10 +79,12 @@ __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)('status')),
     __param(1, (0, common_1.Query)('templateTag')),
-    __param(2, (0, common_1.Query)('page')),
-    __param(3, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('action')),
+    __param(3, (0, common_1.Query)('outcome')),
+    __param(4, (0, common_1.Query)('page')),
+    __param(5, (0, common_1.Query)('limit')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Object, Object]),
+    __metadata("design:paramtypes", [String, String, String, String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], RawDataController.prototype, "list", null);
 __decorate([
@@ -66,7 +92,7 @@ __decorate([
     (0, common_1.Get)('summary'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], RawDataController.prototype, "summary", null);
 exports.RawDataController = RawDataController = __decorate([
     (0, common_1.Controller)('raw-data'),

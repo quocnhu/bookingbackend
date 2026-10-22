@@ -5,6 +5,11 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { RawDataService } from '@/raw-data/raw-data.service';
 import { ParsingQueue } from '@/parsing/parsing.queue';
 import {
+  matchTemplateRule,
+  parseTemplateRules,
+  resolveTemplateTag,
+} from '@/parsing/template.util';
+import {
   DEDUP_TTL_SECONDS,
   REDIS_CLIENT,
   dedupKey,
@@ -12,10 +17,19 @@ import {
 } from '@/common/redis/redis.constants';
 import { GmailAuthService } from './gmail-auth.provider';
 import type { GmailPushPayload } from './dto/gmail-push-payload.dto';
+import {
+  BOOKING_SYNC_HEADER,
+  BOOKING_SYNC_HEADER_VALUE,
+  BOOKING_SYNC_SUBJECT_PREFIX,
+} from '@/booking/booking-forward.constants';
 
 interface ParsedMail {
   messageId: string;
   threadId?: string;
+  /** RFC 5322 Message-ID header — the confirmation is threaded onto it. */
+  rfcMessageId?: string;
+  /** True when this is our own "pushed to Booking table" notice. */
+  isBookingSync?: boolean;
   emailAddress: string;
   subject: string;
   from: string;
@@ -103,6 +117,22 @@ export class GmailPubSubService {
       try {
         const mail = await this.fetchMessage(gmail, messageId, emailAddress);
 
+        // Loop guard: the "pushed to Booking table" confirmation is sent to this
+        // very mailbox. It is a system notice, never a booking mail.
+        if (
+          mail.isBookingSync ||
+          mail.subject
+            .trimStart()
+            .toLowerCase()
+            .startsWith(BOOKING_SYNC_SUBJECT_PREFIX.toLowerCase())
+        ) {
+          ignored++;
+          this.logger.log(
+            `Ignored system notice "${mail.subject}" — booking-sync loop guard`,
+          );
+          continue;
+        }
+
         // Only ingest mail from senders in MAIL_ALLOWED_SENDERS — everything else is IGNORED.
         if (!this.isAllowedSender(mail.from)) {
           ignored++;
@@ -123,7 +153,7 @@ export class GmailPubSubService {
           bodyPreview: mail.body?.slice(0, 500),
         });
 
-        const templateTag = this.tagTemplate(mail);
+        const templateTag = this.resolveTag(mail);
 
         // >>> TEMPLATE TAG — console.log to see which parser will run <<<
         console.log('[ingestion] template tag:', {
@@ -165,7 +195,12 @@ export class GmailPubSubService {
       });
     }
 
-    return { handled, duplicates, ignored, nextHistoryId: nextHistoryId ?? null };
+    return {
+      handled,
+      duplicates,
+      ignored,
+      nextHistoryId: nextHistoryId ?? null,
+    };
   }
 
   /** Test the connection using the stored refresh token (used by the frontend "Test" button). */
@@ -201,6 +236,9 @@ export class GmailPubSubService {
     return {
       messageId,
       threadId: msg.data.threadId ?? undefined,
+      rfcMessageId: header('message-id') || undefined,
+      isBookingSync:
+        header(BOOKING_SYNC_HEADER).trim() === BOOKING_SYNC_HEADER_VALUE,
       emailAddress,
       subject: header('subject'),
       from: header('from'),
@@ -258,7 +296,7 @@ export class GmailPubSubService {
   private isAllowedSender(fromRaw: string): boolean {
     const tokens = this.allowedSenders;
     if (tokens.size === 0) return true;
-    const emailMatch = fromRaw.match(/<([^<>@]+\@[^<>]+)>/i);
+    const emailMatch = fromRaw.match(/<([^<>@]+@[^<>]+)>/i);
     const email = (emailMatch ? emailMatch[1] : fromRaw).toLowerCase().trim();
     for (const token of tokens) {
       if (
@@ -274,30 +312,25 @@ export class GmailPubSubService {
 
   /**
    * Assign templateTag from the From/Subject headers (step 7) — cheap matching only, no extraction.
-   * console.log is called here to make it easy to see which template was selected.
+   *
+   * The env rules (MAIL_TEMPLATE_PREFIX_RULES) win over the built-in defaults,
+   * so the operator can route a new sender/subject to its own template without
+   * a code change. console.log is called here to make it easy to see which
+   * template was selected.
    */
-  private tagTemplate(mail: ParsedMail): string {
-    const from = mail.from.toLowerCase();
-    const subject = mail.subject.toLowerCase();
-    let tag = 'unknown';
+  private resolveTag(mail: ParsedMail): string {
+    const rules = parseTemplateRules(
+      this.config.get<string>('MAIL_TEMPLATE_PREFIX_RULES'),
+    );
+    const headers = { subject: mail.subject, from: mail.from };
+    const rule = matchTemplateRule(rules, headers);
 
-    if (from.includes('nquocnhu95book@gmail.com')) tag = 'viator';
-    else if (from.includes('nquocnhu95tourguide@gmail.com')) tag = 'website';
-    else if (from.includes('airbnb.com')) tag = 'airbnb';
-    else if (from.includes('booking.com') || from.includes('@booking.com'))
-      tag = 'booking-com';
-    else if (from.includes('getyourguide.com') || subject.includes('getyourguide'))
-      tag = 'getyourguide';
-    else if (
-      from.includes('viator.com') ||
-      from.includes('tripadvisor.com') ||
-      subject.includes('viator') ||
-      subject.includes('tripadvisor')
-    )
-      tag = 'viator';
-    else if (/booking|reservation|confirmation|trip to/i.test(subject))
-      tag = 'website';
+    if (rule) {
+      this.logger.log(
+        `Template rule matched "${rule}" for "${mail.subject}" (from ${mail.from})`,
+      );
+    }
 
-    return tag;
+    return resolveTemplateTag(headers, rules);
   }
 }

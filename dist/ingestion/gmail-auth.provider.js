@@ -9,7 +9,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GmailAuthService = void 0;
 const common_1 = require("@nestjs/common");
 const googleapis_1 = require("googleapis");
-const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const GMAIL_SCOPES = [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send',
+];
 let GmailAuthService = class GmailAuthService {
     getOAuthClient(options) {
         const client = new googleapis_1.google.auth.OAuth2({

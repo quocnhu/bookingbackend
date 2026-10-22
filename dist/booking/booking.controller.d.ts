@@ -32,6 +32,7 @@ export declare class BookingController {
             regulations: string | null;
             insurancePolicy: string | null;
             mapQuery: string | null;
+            slug: string | null;
         } | null;
         rawData: {
             payload: import("@prisma/client/runtime/library").JsonValue;
@@ -68,6 +69,7 @@ export declare class BookingController {
         paxSequence: number;
         movedFromBusId: string | null;
         createdWho: string | null;
+        emailDate: Date | null;
     }>;
     create(dto: CreateBookingDto, actor: AuthenticatedUser): Promise<{
         id: string;
@@ -101,6 +103,7 @@ export declare class BookingController {
         paxSequence: number;
         movedFromBusId: string | null;
         createdWho: string | null;
+        emailDate: Date | null;
     }>;
     updateBatch(dto: BatchUpdateBookingsDto, actor: AuthenticatedUser): Promise<{
         id: string;
@@ -134,8 +137,9 @@ export declare class BookingController {
         paxSequence: number;
         movedFromBusId: string | null;
         createdWho: string | null;
+        emailDate: Date | null;
     }[]>;
-    update(id: string, dto: UpdateBookingDto): Promise<{
+    update(id: string, dto: UpdateBookingDto, actor: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -167,6 +171,7 @@ export declare class BookingController {
         paxSequence: number;
         movedFromBusId: string | null;
         createdWho: string | null;
+        emailDate: Date | null;
     }>;
     remove(id: string): Promise<{
         message: string;

@@ -288,6 +288,11 @@ model Tour {
   type         TourType
   thumbnailUrl String? // e.g. cover image shown on cards
 
+  // URL slug — the public address of the tour page
+  // (/tour/ha-long-bay-full-day-cruise). Keyword-rich for search engines and
+  // stable across a rename (the slug is only regenerated when it is empty).
+  slug String? @unique
+
   adultPrice   Decimal? @default(0)
   childPrice   Decimal? @default(0)
   infantPrice  Decimal? @default(0)
@@ -462,7 +467,12 @@ model Booking {
   // Internal note for this booking (dietary needs, pickup point, collect/refund instructions...)
   notes     String?  @db.Text
   rawDataId String?  @unique
-  rawData   RawData? @relation(fields: [rawDataId], references: [id])
+  rawData   RawData? @relation("BookingOrigin", fields: [rawDataId], references: [id])
+
+  // Every email about this booking: the origin, the amendments, the
+  // cancellations (RawData.linkedBookingId). Which of them changed the
+  // booking is decided by RawData.action / RawData.outcome.
+  emails RawData[] @relation("BookingEmails")
 
   assignmentId String?
   assignment   Assignment? @relation(fields: [assignmentId], references: [id])
@@ -475,6 +485,10 @@ model Booking {
   movedFromBus   Assignment? @relation("MovedFromBus", fields: [movedFromBusId], references: [id], onDelete: SetNull)
 
   createdWho String? // Who created the booking: user name or "Pub-Sub System"
+
+  // Date of the source email that last wrote this booking (ordering guard:
+  // an older email must never overwrite newer state). Null = unknown/manual.
+  emailDate DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -736,7 +750,25 @@ model RawData {
   templateTag String? // 'airbnb' | 'booking-com' | 'getyourguide' | 'viator' | 'website' | 'unknown' — tag from the ingest step (header match)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  booking     Booking?
+
+  // What the EMAIL is: CREATE (a new booking / a re-sent confirmation) |
+  // MODIFY (an amendment — same reference, changed details) | CANCEL.
+  // Separate from `status`, which stays the processing lifecycle
+  // (pending → parsed | unparsed | parse_failed) and guards the replay.
+  action String?
+
+  // What the SYSTEM did with it: CREATED | UPDATED | CANCELLED |
+  // UNCHANGED (a known booking, nothing to change) | SKIPPED (ignored).
+  outcome String?
+
+  // The booking this email is about — the origin email, the amendment or the
+  // cancellation all point at it.
+  linkedBookingId String?
+  linkedBooking   Booking? @relation("BookingEmails", fields: [linkedBookingId], references: [id])
+
+  // Set when this email ORIGINATED the booking (the inverse of
+  // Booking.rawData). An amendment never touches it.
+  booking Booking? @relation("BookingOrigin")
 
   @@index([payloadHash])
 }

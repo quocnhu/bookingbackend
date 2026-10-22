@@ -26,6 +26,7 @@ export declare class CreateBookingDto {
 }
 export declare class UpdateBookingDto {
     status?: BookingStatus;
+    overrideCancelWindow?: boolean;
     tourId?: string;
     address?: string;
     latitude?: number;

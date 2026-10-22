@@ -3,6 +3,8 @@ import { BookingProvider, TourType } from '@prisma/client';
 import { load } from 'cheerio';
 import { BookingNormalizerService } from '../booking-normalizer.service';
 import { buildExtra } from '../extra.util';
+import { detectAction, emailBodyText } from '../action.util';
+import { isRoutedToTag } from '../template.util';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
 /** Safely coerce any value to a string (avoids '[object Object]'). */
@@ -70,7 +72,7 @@ export class WebsiteParser implements TemplateParser {
     }
 
     return (
-      from.includes('nquocnhu95tourguide@gmail.com') ||
+      isRoutedToTag({ from, subject }, 'website') ||
       subject.includes('new booking') ||
       /wptravelengine|wp travel engine/i.test(text) ||
       text.includes('Billing Details') ||
@@ -244,9 +246,7 @@ export class WebsiteParser implements TemplateParser {
   ): BookingFields {
     const subject = asString(payload.subject);
     return {
-      action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
-        ? 'CANCEL'
-        : 'CREATE',
+      action: detectAction(subject, emailBodyText(payload)),
       bookingRef: rich.bookingRef!,
       source: 'website',
       channel: BookingProvider.WEBSITE,

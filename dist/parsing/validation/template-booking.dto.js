@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TemplateBookingDto = exports.PARSED_SOURCES = exports.PARSED_ACTIONS = void 0;
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
-exports.PARSED_ACTIONS = ['CREATE', 'CANCEL'];
+exports.PARSED_ACTIONS = ['CREATE', 'MODIFY', 'CANCEL'];
 exports.PARSED_SOURCES = [
     'airbnb',
     'booking-com',

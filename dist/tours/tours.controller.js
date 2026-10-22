@@ -29,6 +29,9 @@ let ToursController = class ToursController {
     findAll(query) {
         return this.toursService.findAll(query);
     }
+    findBySlug(slug) {
+        return this.toursService.findBySlug(slug);
+    }
     findOne(id) {
         return this.toursService.findOne(id);
     }
@@ -63,6 +66,14 @@ __decorate([
     __metadata("design:paramtypes", [tour_dto_1.QueryTourDto]),
     __metadata("design:returntype", void 0)
 ], ToursController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('slug/:slug'),
+    (0, public_decorator_1.Public)(),
+    __param(0, (0, common_1.Param)('slug')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], ToursController.prototype, "findBySlug", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, public_decorator_1.Public)(),

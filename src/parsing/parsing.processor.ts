@@ -4,9 +4,13 @@ import { Job } from 'bullmq';
 import { RawDataRepository } from '@/raw-data/raw-data.repository';
 import { RawDataService } from '@/raw-data/raw-data.service';
 import { BookingService } from '@/booking/booking.service';
+import { BookingForwardService } from '@/booking/booking-forward.service';
 import { ParserRegistry } from './parsers/parser-registry';
 import { PARSE_QUEUE, ParseJobData } from './parsing.queue';
 import { validateBookingFields } from './validation/booking-fields.schema';
+
+/** Outcomes that actually wrote the Booking table → send the confirmation mail. */
+const FORWARD_OUTCOMES = new Set(['CREATED', 'UPDATED', 'CANCELLED']);
 
 /**
  * BullMQ worker for Stage 2 (per .md steps 11-18):
@@ -23,6 +27,7 @@ export class ParsingProcessor extends WorkerHost {
     private readonly rawDataService: RawDataService,
     private readonly registry: ParserRegistry,
     private readonly bookingService: BookingService,
+    private readonly bookingForward: BookingForwardService,
   ) {
     super();
   }
@@ -68,15 +73,65 @@ export class ParsingProcessor extends WorkerHost {
       await this.rawDataService.updatePayload(rawDataId, payload);
     }
 
-    const booking = await this.bookingService.upsert(
+    const { booking, outcome } = await this.bookingService.upsert(
       validation.data!,
       rawDataId,
+      undefined,
+      undefined,
+      this.resolveEmailDate(payload),
     );
 
-    await this.rawDataService.markParsed(rawDataId, booking.id);
-    this.logger.log(
-      `Parsed rawData ${rawDataId} (${parser.templateTag}) -> booking ${booking.bookingRef}`,
+    // Record WHAT the email was (new booking / amendment / cancellation) and
+    // what the system did with it — the raw-mail list is filtered on these.
+    await this.rawDataService.markParsed(
+      rawDataId,
+      booking.id,
+      validation.data!.action,
+      outcome,
     );
+    this.logger.log(
+      `Parsed rawData ${rawDataId} (${parser.templateTag}) -> booking ${booking.bookingRef} [${validation.data!.action}/${outcome}]`,
+    );
+
+    // Confirmation mail: "this mail with booking ref X was pushed to the Booking
+    // table successfully" — so the operator never has to double-check manually.
+    // Never blocks the job: forward() reports failures instead of throwing.
+    if (FORWARD_OUTCOMES.has(outcome)) {
+      await this.bookingForward.forward({
+        bookingRef: booking.bookingRef,
+        source: validation.data!.source,
+        action: validation.data!.action,
+        outcome,
+        mailbox: this.str(payload.emailAddress) ?? '',
+        messageId: this.str(payload.messageId),
+        threadId: this.str(payload.threadId),
+        rfcMessageId: this.str(payload.rfcMessageId),
+        subject: this.str(payload.subject),
+        from: this.str(payload.from),
+        date: this.str(payload.date),
+        body: this.str(payload.body),
+      });
+    }
+
     return { status: 'parsed', bookingId: booking.id };
+  }
+
+  private str(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim() ? value : undefined;
+  }
+
+  /**
+   * When was the source email sent? Gmail `internalDate` (ms epoch) first,
+   * then the raw `Date` header. Undefined = unknown (guard does not apply).
+   */
+  private resolveEmailDate(payload: Record<string, unknown>): Date | undefined {
+    const ms = Number(payload.internalDate);
+    if (Number.isFinite(ms) && ms > 0) return new Date(ms);
+    const raw = typeof payload.date === 'string' ? payload.date : undefined;
+    if (raw) {
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+    return undefined;
   }
 }

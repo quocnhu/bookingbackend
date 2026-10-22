@@ -74,13 +74,13 @@ export declare class AccountingService {
             createdAt: Date;
             updatedAt: Date;
             assignmentId: string | null;
-            bookingId: string | null;
-            note: string | null;
-            createdById: string;
-            createdByName: string | null;
             amount: Prisma.Decimal;
+            note: string | null;
+            createdByName: string | null;
             categoryId: string | null;
+            createdById: string;
             reversesId: string | null;
+            bookingId: string | null;
         })[];
         categories: {
             id: string;
@@ -104,13 +104,13 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: Prisma.Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     listSettlements(actor: AuthenticatedUser, assignmentId: string): Promise<({
         booking: {
@@ -131,13 +131,13 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: Prisma.Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     })[]>;
     createSettlement(actor: AuthenticatedUser, assignmentId: string, dto: CreateSettlementDto): Promise<{
         category: {
@@ -154,13 +154,13 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: Prisma.Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     private createSettlementCore;
     updateSettlement(actor: AuthenticatedUser, id: string, dto: {
@@ -172,39 +172,39 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: Prisma.Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     deleteTourMoney(actor: AuthenticatedUser, assignmentId: string, settlementId: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: Prisma.Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     deleteSettlement(actor: AuthenticatedUser, id: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: Prisma.Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     private sumRows;
     private computeNet;
@@ -735,6 +735,8 @@ export declare class AccountingService {
         id: string;
         createdAt: Date;
         note: string | null;
+        createdByName: string | null;
+        createdById: string;
         personId: string;
         payeeType: import("@prisma/client").$Enums.PayeeType;
         payeeName: string | null;
@@ -744,8 +746,6 @@ export declare class AccountingService {
         personReturnsToCompany: Prisma.Decimal;
         companyReturnsToPerson: Prisma.Decimal;
         totalNet: Prisma.Decimal;
-        createdById: string;
-        createdByName: string | null;
         voidedAt: Date | null;
         voidedById: string | null;
         voidedByName: string | null;

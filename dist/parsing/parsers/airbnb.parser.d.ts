@@ -5,7 +5,6 @@ export declare class AirbnbParser implements TemplateParser {
     extract(payload: Record<string, unknown>): BookingFields | null;
     private matchRef;
     private cleanRef;
-    private isCancellation;
     private matchGuest;
     private matchStartDate;
     private matchEndDate;

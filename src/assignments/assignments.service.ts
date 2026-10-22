@@ -1287,39 +1287,26 @@ export class AssignmentsService {
    * Uses the most common startingDate among bookings, or the earliest if tied.
    * Recalculates endDate = startDate + durationDays - 1.
    */
+  /**
+   * Move the trip to the date its passengers actually travel on.
+   *
+   * The date logic lives in the board service (one place, so the pipeline and
+   * this endpoint can never drift apart) — this method only keeps the
+   * endpoint's "there is nothing to sync" errors.
+   */
   async syncDatesFromBookings(assignmentId: string) {
-    const assignment = await this.findOne(assignmentId);
     const bookings = await this.prisma.booking.findMany({
       where: { assignmentId },
-      select: { startingDate: true, tour: { select: { durationDays: true } } },
+      select: { startingDate: true },
     });
     if (bookings.length === 0) {
       throw new BadRequestException('Assignment has no bookings to sync dates from');
     }
-    const dates = bookings
-      .map((b) => b.startingDate?.toISOString().split('T')[0])
-      .filter((d): d is string => !!d);
-    if (dates.length === 0) {
+    const hasDate = bookings.some((b) => b.startingDate);
+    if (!hasDate) {
       throw new BadRequestException('No bookings with valid startingDate');
     }
-    const counts = dates.reduce((acc, d) => {
-      acc[d] = (acc[d] ?? 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    const maxCount = Math.max(...Object.values(counts));
-    const mostCommon = Object.entries(counts)
-      .filter(([, c]) => c === maxCount)
-      .map(([d]) => d)
-      .sort()[0];
-    const startDate = new Date(mostCommon);
-    const durationDays = assignment.durationDays ?? bookings[0]?.tour?.durationDays ?? 1;
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + durationDays - 1);
-    await this.prisma.assignment.update({
-      where: { id: assignmentId },
-      data: { startDate, endDate, durationDays },
-    });
-    await this.refreshSummary(assignmentId);
+    await this.board.syncDatesFromBookings(assignmentId);
     return this.findOne(assignmentId);
   }
 

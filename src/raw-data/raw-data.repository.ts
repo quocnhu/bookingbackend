@@ -56,15 +56,53 @@ export class RawDataRepository {
     });
   }
 
-  /** Link rawData → booking after a successful parse (so it can be replayed). */
-  markParsed(id: string, bookingId: string) {
+  /**
+   * Link the raw email to the booking it produced, and record WHAT it was.
+   *
+   * `action`  — what the email is: CREATE | MODIFY | CANCEL
+   * `outcome` — what the system did: CREATED | UPDATED | CANCELLED |
+   *             UNCHANGED | SKIPPED
+   *
+   * Two links are written:
+   *  - `linkedBooking` — always: the booking this email is about;
+   *  - `booking` (the origin) — only when the email CREATED the booking, so
+   *    a later amendment never steals the origin link.
+   */
+  markParsed(
+    id: string,
+    bookingId: string,
+    action?: string | null,
+    outcome?: string | null,
+  ) {
     return this.prisma.rawData.update({
       where: { id },
-      data: { status: 'parsed', booking: { connect: { id: bookingId } } },
+      data: {
+        status: 'parsed',
+        action: action ?? undefined,
+        outcome: outcome ?? undefined,
+        linkedBooking: { connect: { id: bookingId } },
+        ...(outcome === 'CREATED'
+          ? { booking: { connect: { id: bookingId } } }
+          : {}),
+      },
     });
   }
 
   countByStatus(status: string) {
     return this.prisma.rawData.count({ where: { status } });
+  }
+
+  /** Count the rows per distinct value of a column (action / outcome). */
+  async countByField(field: 'action' | 'outcome') {
+    const rows = await this.prisma.rawData.groupBy({
+      by: [field],
+      _count: { _all: true },
+    });
+    const counts: Record<string, number> = {};
+    for (const row of rows) {
+      const value = row[field] as string | null;
+      if (value) counts[value] = row._count._all;
+    }
+    return counts;
   }
 }

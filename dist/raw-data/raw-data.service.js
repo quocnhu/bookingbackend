@@ -43,8 +43,8 @@ let RawDataService = RawDataService_1 = class RawDataService {
     async markParseFailed(id, reason) {
         await this.appendReason(id, reason);
     }
-    async markParsed(id, bookingId) {
-        await this.repository.markParsed(id, bookingId);
+    async markParsed(id, bookingId, action, outcome) {
+        await this.repository.markParsed(id, bookingId, action, outcome);
     }
     async updatePayload(id, payload) {
         await this.repository.updatePayload(id, payload);
@@ -72,6 +72,13 @@ let RawDataService = RawDataService_1 = class RawDataService {
         for (const s of statuses)
             counts[s] = await this.repository.countByStatus(s);
         return counts;
+    }
+    async actionSummary() {
+        const [actions, outcomes] = await Promise.all([
+            this.repository.countByField('action'),
+            this.repository.countByField('outcome'),
+        ]);
+        return { actions, outcomes };
     }
 };
 exports.RawDataService = RawDataService;

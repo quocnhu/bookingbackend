@@ -10,7 +10,7 @@ exports.BookingNormalizerService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const extra_util_1 = require("./extra.util");
-const CANCEL_KEYWORDS = /\b(cancel|cancellation|cancelled|canceled|refund)\b/i;
+const action_util_1 = require("./action.util");
 const TOUR_TYPES = [client_1.TourType.PRIVATE_TOUR, client_1.TourType.GROUP_TOUR];
 const PAYMENT_STATUSES = [
     client_1.PaymentStatus.PENDING,
@@ -30,7 +30,8 @@ let BookingNormalizerService = class BookingNormalizerService {
     normalize(payload, source = 'website') {
         const parsed = (payload?.booking ?? payload?.parsedBooking ?? {});
         const subject = typeof payload?.subject === 'string' ? payload.subject : '';
-        const action = CANCEL_KEYWORDS.test(subject) ? 'CANCEL' : 'CREATE';
+        const body = typeof payload?.body === 'string' ? payload.body : '';
+        const action = (0, action_util_1.detectAction)(subject, body);
         const bookingRef = this.pickString(parsed.bookingRef) ??
             this.pickString(parsed.confirmationCode) ??
             this.pickString(payload.bookingRef) ??

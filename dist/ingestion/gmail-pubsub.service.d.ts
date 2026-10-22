@@ -36,5 +36,5 @@ export declare class GmailPubSubService {
     private extractHtmlBody;
     private get allowedSenders();
     private isAllowedSender;
-    private tagTemplate;
+    private resolveTag;
 }

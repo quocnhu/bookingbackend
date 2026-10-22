@@ -37,6 +37,17 @@ export declare class AssignmentBoardService {
     private attachBooking;
     private canFit;
     private refreshSummary;
+    syncDatesFromBookings(assignmentId: string): Promise<{
+        skipped: boolean;
+        synced?: undefined;
+        startDate?: undefined;
+        endDate?: undefined;
+    } | {
+        synced: boolean;
+        startDate: Date;
+        endDate: Date;
+        skipped?: undefined;
+    }>;
     private resequence;
     geoSort(assignmentId: string): Promise<void>;
 }

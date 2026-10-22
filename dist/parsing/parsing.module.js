@@ -17,6 +17,7 @@ const parser_registry_1 = require("./parsers/parser-registry");
 const airbnb_parser_1 = require("./parsers/airbnb.parser");
 const booking_com_parser_1 = require("./parsers/booking-com.parser");
 const getyourguide_parser_1 = require("./parsers/getyourguide.parser");
+const advanced_viator_parser_1 = require("./parsers/advanced-viator.parser");
 const viator_parser_1 = require("./parsers/viator.parser");
 const website_parser_1 = require("./parsers/website.parser");
 let ParsingModule = class ParsingModule {
@@ -32,6 +33,7 @@ exports.ParsingModule = ParsingModule = __decorate([
             airbnb_parser_1.AirbnbParser,
             booking_com_parser_1.BookingComParser,
             getyourguide_parser_1.GetYourGuideParser,
+            advanced_viator_parser_1.AdvancedViatorParser,
             viator_parser_1.ViatorParser,
             website_parser_1.WebsiteParser,
         ],

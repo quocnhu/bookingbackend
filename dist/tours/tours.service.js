@@ -22,6 +22,7 @@ const audit_service_1 = require("../audit/audit.service");
 const storage_1 = require("../storage");
 const sharp_1 = __importDefault(require("sharp"));
 const file_validation_util_1 = require("../common/utils/file-validation.util");
+const slug_util_1 = require("./slug.util");
 let ToursService = class ToursService {
     prisma;
     auditService;
@@ -62,6 +63,23 @@ let ToursService = class ToursService {
             throw new common_1.NotFoundException('Tour not found');
         return { ...tour, gallery: await this.listGallery(id) };
     }
+    async findBySlug(slug) {
+        const tour = await this.prisma.tour.findFirst({
+            where: { OR: [{ slug }, { id: slug }] },
+            include: {
+                itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
+                typePrices: true,
+                prices: { include: { provider: true } },
+            },
+        });
+        if (!tour)
+            throw new common_1.NotFoundException('Tour not found');
+        return {
+            ...tour,
+            slug: tour.slug ?? slug,
+            gallery: await this.listGallery(tour.id),
+        };
+    }
     async create(dto) {
         const existing = await this.prisma.tour.findUnique({
             where: { name: dto.name },
@@ -82,6 +100,7 @@ let ToursService = class ToursService {
             data: {
                 ...rest,
                 code,
+                slug: await this.nextSlug(dto.name),
                 typePrices: typePrices && typePrices.length > 0
                     ? {
                         create: typePrices.map((tp) => ({
@@ -126,7 +145,14 @@ let ToursService = class ToursService {
         }
         const { typePrices, ...rest } = dto;
         await this.prisma.$transaction([
-            this.prisma.tour.update({ where: { id }, data: rest }),
+            this.prisma.tour.update({
+                where: { id },
+                data: {
+                    ...rest,
+                    slug: before.slug ??
+                        (await this.nextSlug(dto.name ?? before.name, id)),
+                },
+            }),
             ...(typePrices && typePrices.length > 0
                 ? typePrices.map((tp) => this.prisma.tourTypePrice.upsert({
                     where: { tourId_type: { tourId: id, type: tp.type } },
@@ -156,6 +182,13 @@ let ToursService = class ToursService {
             afterData: tour,
         });
         return tour;
+    }
+    async nextSlug(name, excludeId) {
+        const taken = await this.prisma.tour.findMany({
+            where: excludeId ? { id: { not: excludeId } } : undefined,
+            select: { slug: true },
+        });
+        return (0, slug_util_1.uniqueTourSlug)(name, taken.map((t) => t.slug).filter((s) => !!s));
     }
     async updateItinerary(id, dto, changedBy) {
         const before = await this.findOne(id);

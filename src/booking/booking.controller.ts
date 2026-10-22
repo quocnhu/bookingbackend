@@ -79,8 +79,12 @@ export class BookingController {
 
   @Put(':id')
   @Permissions('booking.update')
-  update(@Param('id') id: string, @Body() dto: UpdateBookingDto) {
-    return this.bookingService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateBookingDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.bookingService.update(id, dto, actor);
   }
 
   @Delete(':id')

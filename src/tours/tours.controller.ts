@@ -35,6 +35,19 @@ export class ToursController {
     return this.toursService.findAll(query);
   }
 
+  /**
+   * The public tour page address: /tour/ha-long-bay-full-day-cruise
+   *
+   * Resolves a tour by its slug (the URL) and falls back to the internal id,
+   * so the old /tour/<uuid> links keep working. The response carries the
+   * canonical slug — the website redirects the uuid to it.
+   */
+  @Get('slug/:slug')
+  @Public()
+  findBySlug(@Param('slug') slug: string) {
+    return this.toursService.findBySlug(slug);
+  }
+
   @Get(':id')
   @Public()
   findOne(@Param('id') id: string) {

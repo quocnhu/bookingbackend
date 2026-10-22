@@ -17,8 +17,14 @@ import {
   TourType,
 } from '@prisma/client';
 
-export type ParsedAction = 'CREATE' | 'CANCEL';
-export const PARSED_ACTIONS: ParsedAction[] = ['CREATE', 'CANCEL'];
+/**
+ * What the email means for the booking it references:
+ *  - CREATE — a new booking (or a re-sent confirmation of a known one)
+ *  - MODIFY — an amendment: the SAME reference with different details
+ *  - CANCEL — the booking was cancelled
+ */
+export type ParsedAction = 'CREATE' | 'MODIFY' | 'CANCEL';
+export const PARSED_ACTIONS: ParsedAction[] = ['CREATE', 'MODIFY', 'CANCEL'];
 
 /** Every template parser must resolve to one of these sources. */
 export const PARSED_SOURCES = [

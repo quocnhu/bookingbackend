@@ -32,6 +32,19 @@ import {
 } from './dto/booking.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
 import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
+import {
+  CANCEL_WINDOW_HOURS,
+  cancelDeadline,
+} from '@/common/constants/cancellation';
+import {
+  buildEmailUpdateData,
+  EmailFields,
+  hasBookingChanges,
+} from './email-merge.util';
+import {
+  RAW_DATA_OUTCOME,
+  RawDataOutcome,
+} from '@/raw-data/raw-data.entity';
 
 export type WriteResult =
   | { status: 'SKIPPED'; reason: string; booking?: undefined }
@@ -82,14 +95,31 @@ export class BookingService {
   ) {}
 
   // ─── Pipeline upsert (Stage 2) ──────────────────────────────────────────
-async upsert(
+  /**
+   * Apply one parsed email to the Booking table.
+   *
+   * The booking is keyed on (source, confirmationCode): re-processing the same
+   * reference updates the existing row instead of creating a second one.
+   *
+   * Three kinds of email reach this method:
+   *  - CREATE — a new booking, or a re-sent confirmation of a known one
+   *  - MODIFY — an amendment: the SAME reference with different details
+   *  - CANCEL — the booking was cancelled
+   *
+   * `created` tells the caller whether the row was INSERTED (true) or UPDATED
+   * (false), so the rawData row can be linked as the ORIGIN of the booking or
+   * as an AMENDMENT of it.
+   */
+  async upsert(
     data: CleanBookingData,
     rawDataId?: string,
     actorId?: string,
     createdWho?: string,
-  ): Promise<Booking> {
+    emailDate?: Date,
+  ): Promise<{ booking: Booking; created: boolean; outcome: RawDataOutcome }> {
     const bookingRef = data.bookingRef;
     const existing = await this.findExisting(data.source, bookingRef);
+    const isAmendment = data.action === 'MODIFY';
 
     // Auto-populate tourName from tourId if not provided
     let tourName = data.tourName;
@@ -120,89 +150,147 @@ async upsert(
       }
     }
 
-    const bookingData: {
-      bookingRef: string;
-      confirmationCode?: string;
-      source?: string;
-      channel: BookingProvider;
-      status: BookingStatus;
-      tourId?: string;
-      tourName?: string;
-      tourType?: TourType;
-      address?: string;
-      latitude?: number;
-      longitude?: number;
-      startingDate?: Date;
-      customerName?: string;
-      hotelName: string;
-      phone: string;
-      mail?: string;
-      totalPax?: number;
-      paxDetail?: string;
-      payment?: PaymentStatus;
-      isNoShow?: boolean;
-      noShowReason?: string;
-      extra?: Prisma.InputJsonValue;
-      rawDataId?: string;
-      createdWho?: string;
-    } = {
+    // The parsed values, WITHOUT defaults — an amendment email must only
+    // write the fields it actually carried, otherwise a mail that mentions
+    // only the new date silently blanks the hotel, the phone and the pax
+    // count (see buildEmailUpdateData).
+    const parsed: EmailFields = {
       bookingRef,
-      confirmationCode: data.bookingRef,
       source: data.source,
       channel:
         data.channel ??
         this.normalizer.channelForSource(data.source) ??
         BookingProvider.WEBSITE,
-      status:
-        data.action === 'CANCEL'
-          ? BookingStatus.CANCELED
-          : (data.status ?? BookingStatus.PENDING),
       tourId,
       tourName,
       tourType,
       address: data.address,
       latitude: data.latitude,
       longitude: data.longitude,
-      startingDate: data.startingDate
-        ? new Date(data.startingDate)
-        : undefined,
+      startingDate: data.startingDate ? new Date(data.startingDate) : undefined,
       customerName: data.customerName,
-      hotelName: data.hotelName ?? '',
-      phone: data.phone ?? '',
+      hotelName: data.hotelName,
+      phone: data.phone,
       mail: data.mail,
-      totalPax: data.totalPax ?? 0,
+      totalPax: data.totalPax,
       paxDetail: data.paxDetail,
       payment: data.payment,
       isNoShow: data.isNoShow,
       noShowReason: data.noShowReason,
       extra: data.extra as unknown as Prisma.InputJsonValue | undefined,
-      rawDataId: existing?.rawDataId ?? rawDataId,
+      emailDate: emailDate ?? existing?.emailDate ?? undefined,
     };
 
     const _createdWho = createdWho ?? (actorId ? undefined : 'Pub-Sub System');
 
     if (existing) {
+      // Ordering guard: an older email must never overwrite newer state —
+      // e.g. a stale booking confirmation cannot undo a later cancellation.
+      if (
+        emailDate &&
+        existing.emailDate &&
+        emailDate.getTime() < existing.emailDate.getTime()
+      ) {
+        this.logger.log(
+          `Skipped stale email for ${bookingRef}: email ${emailDate.toISOString()} older than applied ${existing.emailDate.toISOString()}`,
+        );
+        return {
+          booking: existing,
+          created: false,
+          outcome: RAW_DATA_OUTCOME.SKIPPED,
+        };
+      }
+
+      // State machine — CANCELED is TERMINAL for this confirmation code
+      // (standard booking lifecycle: active → CANCELED, no casual reopening).
+      // Only a strictly NEWER booking email (rebooking with the same ref)
+      // may reactivate it; an email with a missing/older date never can.
+      if (
+        existing.status === BookingStatus.CANCELED &&
+        data.action !== 'CANCEL' &&
+        !(
+          emailDate &&
+          existing.emailDate &&
+          emailDate.getTime() > existing.emailDate.getTime()
+        )
+      ) {
+        this.logger.log(
+          `Ignored reactivation of canceled booking ${bookingRef}: no newer email date to justify leaving terminal state`,
+        );
+        return {
+          booking: existing,
+          created: false,
+          outcome: RAW_DATA_OUTCOME.SKIPPED,
+        };
+      }
+
+      const updateData = this.buildEmailUpdateData(parsed, existing, data.action);
+      const changed = hasBookingChanges(
+        updateData,
+        existing as unknown as Record<string, unknown>,
+      );
       const booking = await this.prisma.booking.update({
         where: { id: existing.id },
-        data: { ...bookingData, rawDataId: existing.rawDataId ?? rawDataId },
+        data: updateData,
       });
       await this.auditService.log({
         entityType: 'Booking',
         entityId: booking.id,
-        action: 'UPSERT_EMAIL',
-        beforeData: {
-          source: existing.source,
-          bookingRef: existing.bookingRef,
-        },
+        action: isAmendment ? 'AMEND_EMAIL' : 'UPSERT_EMAIL',
+        // The full before-image, so the audit trail shows WHAT the amendment
+        // changed (the old code only stored {source, bookingRef}).
+        beforeData: existing,
         afterData: booking,
         changedBy: actorId ?? null,
       });
+      if (isAmendment) {
+        this.logger.log(
+          `Applied amendment to booking ${bookingRef} (${data.source})`,
+        );
+      }
+
+      // An amendment can move the passenger to another day — the trip it sits
+      // on must follow, otherwise the bus keeps the old date.
+      if (
+        booking.assignmentId &&
+        this.dateChanged(existing.startingDate, booking.startingDate)
+      ) {
+        await this.board.syncDatesFromBookings(booking.assignmentId);
+      }
+
       await this.postWrite(booking);
-      return booking;
+      return {
+        booking,
+        created: false,
+        outcome: this.outcomeFor(data.action, changed),
+      };
+    }
+
+    if (isAmendment) {
+      // An amendment for a booking we never saw: the email carries the full
+      // details, so the booking is created from it and the row becomes the
+      // origin of that booking.
+      this.logger.warn(
+        `Amendment email for unknown booking ${bookingRef} (${data.source}) — created from the amendment`,
+      );
     }
 
     const booking = await this.prisma.booking.create({
-      data: { ...bookingData, createdWho: _createdWho },
+      data: {
+        ...parsed,
+        confirmationCode: data.bookingRef,
+        status:
+          data.action === 'CANCEL'
+            ? BookingStatus.CANCELED
+            : (data.status ?? BookingStatus.PENDING),
+        // A brand-new booking always carries a usable hotel / phone / pax
+        // count — the dashboard and the bus sheet depend on them.
+        hotelName: parsed.hotelName ?? '',
+        phone: parsed.phone ?? '',
+        totalPax: parsed.totalPax ?? 0,
+        rawDataId,
+        createdWho: _createdWho,
+      },
     });
     await this.auditService.log({
       entityType: 'Booking',
@@ -213,7 +301,47 @@ async upsert(
     });
     this.logger.log(`Upserted booking ${booking.bookingRef} (${data.source})`);
     await this.postWrite(booking);
-    return booking;
+    return {
+      booking,
+      created: true,
+      outcome: RAW_DATA_OUTCOME.CREATED,
+    };
+  }
+
+  /**
+   * What the system did with an email that reached an existing booking.
+   *
+   *  - CANCEL → the booking was cancelled
+   *  - changed → the booking was updated (an amendment, or a corrected
+   *    confirmation)
+   *  - nothing changed → a re-sent confirmation of a booking we already have
+   */
+  private outcomeFor(
+    action: 'CREATE' | 'MODIFY' | 'CANCEL',
+    changed: boolean,
+  ): RawDataOutcome {
+    if (action === 'CANCEL') return RAW_DATA_OUTCOME.CANCELLED;
+    return changed
+      ? RAW_DATA_OUTCOME.UPDATED
+      : RAW_DATA_OUTCOME.UNCHANGED;
+  }
+
+  /**
+   * Field-level merge for an email-driven update — see `buildEmailUpdateData`
+   * (extracted so it can be unit-tested without a database).
+   */
+  private buildEmailUpdateData(
+    parsed: EmailFields,
+    existing: Booking,
+    action: 'CREATE' | 'MODIFY' | 'CANCEL',
+  ): Prisma.BookingUncheckedUpdateInput {
+    return buildEmailUpdateData(parsed, existing, action);
+  }
+
+  /** True when the departure date moved (both dates known and different). */
+  private dateChanged(a?: Date | null, b?: Date | null): boolean {
+    if (!a || !b) return false;
+    return a.getTime() !== b.getTime();
   }
 
   /**
@@ -275,7 +403,7 @@ startingDate: data.startingDate
       isNoShow: data.isNoShow,
       noShowReason: data.noShowReason,
     };
-    const booking = await this.upsert(
+    const { booking } = await this.upsert(
       clean,
       undefined,
       actorId,
@@ -486,7 +614,7 @@ startingDate: data.startingDate
     }
   }
 
-  async update(id: string, dto: UpdateBookingDto) {
+  async update(id: string, dto: UpdateBookingDto, actor?: AuthenticatedUser) {
     const before = await this.findOne(id);
 
     // Check if booking is locked due to tour report submission
@@ -503,7 +631,21 @@ startingDate: data.startingDate
       }
     }
 
-    const data: any = { ...dto };
+    // The override flag is a command, not a booking field.
+    const { overrideCancelWindow, ...dtoFields } = dto;
+
+    // A booking can only be cancelled while the tour is still more than
+    // CANCEL_WINDOW_HOURS away. Inside the window the operator is already
+    // committed, so the cancellation needs an explicit admin override.
+    if (
+      dto.status === BookingStatus.CANCELED &&
+      before.status !== BookingStatus.CANCELED
+    ) {
+      this.assertCancelAllowed(before, overrideCancelWindow, actor);
+    }
+
+    const data: any = { ...dtoFields };
+
     if (dto.startingDate) data.startingDate = new Date(dto.startingDate);
     // Never persist orphan ASSIGNED: a hand-flipped ASSIGNED without a bus
     // used to hide the row from both tables. Coerce to PENDING and let the
@@ -523,6 +665,39 @@ startingDate: data.startingDate
     });
     await this.postWrite(booking);
     return booking;
+  }
+
+  /**
+   * Guard the cancellation window.
+   *
+   * The tour may only be cancelled while it departs more than
+   * CANCEL_WINDOW_HOURS from now — inside the window the vehicle, the guide
+   * and the tickets are already committed. An administrator may still cancel
+   * (supplier cancellation, no-show, goodwill), but the override is recorded
+   * in the audit trail.
+   */
+  private assertCancelAllowed(
+    booking: Booking,
+    override: boolean | undefined,
+    actor?: AuthenticatedUser,
+  ) {
+    const deadline = cancelDeadline(booking.startingDate);
+    // Unknown departure date → the window cannot be evaluated → allow.
+    if (!deadline) return;
+    // Still inside the window → nothing to override.
+    if (Date.now() <= deadline.getTime()) return;
+
+    // The window is closed.
+    if (!override) {
+      throw new BadRequestException(
+        `Cancellation window closed — ${booking.bookingRef} departs on ${booking.startingDate!.toISOString()} and can only be cancelled more than ${CANCEL_WINDOW_HOURS}h before departure (deadline ${deadline.toISOString()}).`,
+      );
+    }
+    if (actor?.role !== RoleType.ADMIN) {
+      throw new ForbiddenException(
+        'Only an administrator can cancel a booking inside the cancellation window',
+      );
+    }
   }
 
   /**

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BookingProvider, TourType } from '@prisma/client';
 import { load } from 'cheerio';
 import { buildExtra } from '../extra.util';
+import { detectAction, emailBodyText } from '../action.util';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
 /** Safely coerce any value to a string (avoids '[object Object]'). */
@@ -61,7 +62,7 @@ export class GetYourGuideParser implements TemplateParser {
       const rich = this.parseTable(text);
       if (rich) {
         payload.booking = rich;
-        return this.toFields(rich, subject);
+        return this.toFields(rich, subject, emailBodyText(payload));
       }
     }
 
@@ -70,7 +71,7 @@ export class GetYourGuideParser implements TemplateParser {
       const rich = this.fromJson(payload);
       if (rich) {
         payload.booking = rich;
-        return this.toFields(rich, subject);
+        return this.toFields(rich, subject, emailBodyText(payload));
       }
     }
 
@@ -78,7 +79,7 @@ export class GetYourGuideParser implements TemplateParser {
     const rich = this.parsePlain(text, payload);
     if (rich) {
       payload.booking = rich;
-      return this.toFields(rich, subject);
+      return this.toFields(rich, subject, emailBodyText(payload));
     }
 
     return null;
@@ -302,12 +303,11 @@ export class GetYourGuideParser implements TemplateParser {
   private toFields(
     rich: Record<string, unknown>,
     subject: string,
+    body: string,
   ): BookingFields {
     const pickUp = this.splitPickUp(asString(rich.pickUp));
     return {
-      action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
-        ? 'CANCEL'
-        : 'CREATE',
+      action: detectAction(subject, body),
       bookingRef: asString(rich.bookingRef),
       source: 'getyourguide',
       channel: BookingProvider.GETYOURGUIDE,

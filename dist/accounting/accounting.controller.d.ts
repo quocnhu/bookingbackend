@@ -41,13 +41,13 @@ export declare class AccountingController {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: import("@prisma/client/runtime/library").Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     })[]>;
     createSettlement(assignmentId: string, dto: CreateSettlementDto, actor: AuthenticatedUser): Promise<{
         category: {
@@ -64,39 +64,39 @@ export declare class AccountingController {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: import("@prisma/client/runtime/library").Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     updateSettlement(id: string, dto: UpdateSettlementDto, actor: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: import("@prisma/client/runtime/library").Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     deleteSettlement(id: string, actor: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: import("@prisma/client/runtime/library").Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     verificationQueue(actor: AuthenticatedUser): Promise<{
         assignmentId: string;
@@ -621,6 +621,8 @@ export declare class AccountingController {
         id: string;
         createdAt: Date;
         note: string | null;
+        createdByName: string | null;
+        createdById: string;
         personId: string;
         payeeType: import("@prisma/client").$Enums.PayeeType;
         payeeName: string | null;
@@ -630,8 +632,6 @@ export declare class AccountingController {
         personReturnsToCompany: import("@prisma/client/runtime/library").Decimal;
         companyReturnsToPerson: import("@prisma/client/runtime/library").Decimal;
         totalNet: import("@prisma/client/runtime/library").Decimal;
-        createdById: string;
-        createdByName: string | null;
         voidedAt: Date | null;
         voidedById: string | null;
         voidedByName: string | null;

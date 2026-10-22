@@ -153,6 +153,14 @@ export class UpdateBookingDto {
   @IsEnum(BookingStatus)
   status?: BookingStatus;
 
+  /**
+   * Cancel a booking even though the 24h cancellation window has closed.
+   * Administrator only — the override is recorded in the audit trail.
+   */
+  @IsOptional()
+  @IsBoolean()
+  overrideCancelWindow?: boolean;
+
   @IsOptional()
   @IsString()
   tourId?: string;

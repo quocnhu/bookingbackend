@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { detectAction } from '../action.util';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
 const TEN_DIGIT_REF = /\b(\d{10})\b/;
@@ -38,7 +39,7 @@ export class BookingComParser implements TemplateParser {
     if (!dates.startingDate) return null;
 
     return {
-      action: this.isCancellation(body) ? 'CANCEL' : 'CREATE',
+      action: detectAction(asString(payload.subject), body),
       bookingRef: ref,
       source: 'booking-com',
       customerName: this.matchGuest(body),
@@ -56,10 +57,6 @@ export class BookingComParser implements TemplateParser {
         body,
       ) ?? TEN_DIGIT_REF.exec(body);
     return m ? m[1] : null;
-  }
-
-  private isCancellation(body: string): boolean {
-    return /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(body);
   }
 
   private matchGuest(body: string): string | undefined {

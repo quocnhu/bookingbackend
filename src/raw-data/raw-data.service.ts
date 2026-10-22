@@ -46,8 +46,20 @@ export class RawDataService {
     await this.appendReason(id, reason);
   }
 
-  async markParsed(id: string, bookingId: string) {
-    await this.repository.markParsed(id, bookingId);
+  /**
+   * Link the raw email to the booking it produced, and record what it was.
+   *
+   * `action`  — what the email is: CREATE | MODIFY | CANCEL
+   * `outcome` — what the system did: CREATED | UPDATED | CANCELLED |
+   *             UNCHANGED | SKIPPED
+   */
+  async markParsed(
+    id: string,
+    bookingId: string,
+    action?: string | null,
+    outcome?: string | null,
+  ) {
+    await this.repository.markParsed(id, bookingId, action, outcome);
   }
 
   /** Persist the payload after the parser enriches it (payload.booking). */
@@ -79,5 +91,17 @@ export class RawDataService {
     for (const s of statuses)
       counts[s] = await this.repository.countByStatus(s);
     return counts;
+  }
+
+  /**
+   * How many emails of each kind were processed: new booking / amendment /
+   * cancellation — and what the system did with them.
+   */
+  async actionSummary() {
+    const [actions, outcomes] = await Promise.all([
+      this.repository.countByField('action'),
+      this.repository.countByField('outcome'),
+    ]);
+    return { actions, outcomes };
   }
 }

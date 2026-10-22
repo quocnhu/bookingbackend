@@ -4,6 +4,15 @@ import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.
 export declare class CompanyProfileController {
     private readonly companyProfileService;
     constructor(companyProfileService: CompanyProfileService);
+    publicProfile(): Promise<{
+        name: string;
+        address: string | null;
+        phone: string | null;
+        email: string | null;
+        website: string | null;
+        latitude: number | null;
+        longitude: number | null;
+    } | null>;
     get(): Promise<{
         id: string;
         createdAt: Date;

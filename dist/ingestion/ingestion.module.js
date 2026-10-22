@@ -12,8 +12,8 @@ const schedule_1 = require("@nestjs/schedule");
 const raw_data_module_1 = require("../raw-data/raw-data.module");
 const queues_module_1 = require("../queues/queues.module");
 const parsing_module_1 = require("../parsing/parsing.module");
+const google_module_1 = require("../google/google.module");
 const redis_provider_1 = require("./redis.provider");
-const gmail_auth_provider_1 = require("./gmail-auth.provider");
 const gmail_watch_service_1 = require("./gmail-watch.service");
 const gmail_pubsub_service_1 = require("./gmail-pubsub.service");
 const gmail_subscriber_service_1 = require("./gmail-subscriber.service");
@@ -30,12 +30,12 @@ exports.IngestionModule = IngestionModule = __decorate([
             raw_data_module_1.RawDataModule,
             queues_module_1.QueuesModule,
             parsing_module_1.ParsingModule,
+            google_module_1.GoogleModule,
             schedule_1.ScheduleModule.forRoot(),
         ],
         controllers: [gmail_controller_1.GmailController],
         providers: [
             redis_provider_1.redisProvider,
-            gmail_auth_provider_1.GmailAuthService,
             gmail_watch_service_1.GmailWatchService,
             gmail_pubsub_service_1.GmailPubSubService,
             gmail_subscriber_service_1.GmailSubscriberService,
@@ -43,7 +43,7 @@ exports.IngestionModule = IngestionModule = __decorate([
             gmail_connect_service_1.GmailConnectService,
             google_oidc_service_1.GoogleOidcService,
         ],
-        exports: [gmail_auth_provider_1.GmailAuthService, gmail_watch_service_1.GmailWatchService, gmail_pubsub_service_1.GmailPubSubService],
+        exports: [google_module_1.GoogleModule, gmail_watch_service_1.GmailWatchService, gmail_pubsub_service_1.GmailPubSubService],
     })
 ], IngestionModule);
 //# sourceMappingURL=ingestion.module.js.map

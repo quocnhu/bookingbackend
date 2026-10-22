@@ -12,6 +12,8 @@ const client_1 = require("@prisma/client");
 const cheerio_1 = require("cheerio");
 const extra_util_1 = require("../extra.util");
 const channel_util_1 = require("../channel.util");
+const template_util_1 = require("../template.util");
+const action_util_1 = require("../action.util");
 const asString = (value) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 let ViatorParser = class ViatorParser {
     templateTag = 'viator';
@@ -22,7 +24,8 @@ let ViatorParser = class ViatorParser {
         const body = asString(payload.body);
         const hasParsedBooking = Boolean(payload.booking ?? payload.parsedBooking);
         return (from.includes('tripadvisor.com') ||
-            from.includes('nquocnhu95book@gmail.com') ||
+            from.includes('bokun.io') ||
+            (0, template_util_1.isRoutedToTag)({ from, subject }, 'viator') ||
             subject.includes('tripadvisor') ||
             subject.includes('viator') ||
             /\bBooking Ref\.?/i.test(html) ||
@@ -169,9 +172,7 @@ let ViatorParser = class ViatorParser {
         const bookingLanguages = this.extractBookingLanguages(notes);
         const guidedLanguages = rows.get('guidedLanguages') || undefined;
         const fields = {
-            action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
-                ? 'CANCEL'
-                : 'CREATE',
+            action: (0, action_util_1.detectAction)(subject, (0, action_util_1.emailBodyText)(payload)),
             bookingRef,
             source: 'viator',
             channel: (0, channel_util_1.resolveBookingChannel)(rows.get('bookingChannel'), rows.get('soldBy')) ??
@@ -257,9 +258,7 @@ let ViatorParser = class ViatorParser {
         const pickUp = this.splitPickUp(asString(b.pickUp));
         const subject = asString(payload.subject);
         return {
-            action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
-                ? 'CANCEL'
-                : 'CREATE',
+            action: (0, action_util_1.detectAction)(subject, (0, action_util_1.emailBodyText)(payload)),
             bookingRef,
             source: 'viator',
             channel: (0, channel_util_1.resolveBookingChannel)(b.bookingChannel, b.soldBy) ??

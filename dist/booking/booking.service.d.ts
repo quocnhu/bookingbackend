@@ -7,6 +7,7 @@ import { AssignmentQueue } from "../queues/assignment.queue";
 import { CreateBookingDto, BookingPatchDto, QueryBookingDto, UpdateBookingDto } from './dto/booking.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import { RawDataOutcome } from "../raw-data/raw-data.entity";
 export type WriteResult = {
     status: 'SKIPPED';
     reason: string;
@@ -23,7 +24,14 @@ export declare class BookingService {
     private readonly assignmentQueue;
     private readonly logger;
     constructor(prisma: PrismaService, auditService: AuditService, normalizer: BookingNormalizerService, board: AssignmentBoardService, assignmentQueue: AssignmentQueue);
-    upsert(data: CleanBookingData, rawDataId?: string, actorId?: string, createdWho?: string): Promise<Booking>;
+    upsert(data: CleanBookingData, rawDataId?: string, actorId?: string, createdWho?: string, emailDate?: Date): Promise<{
+        booking: Booking;
+        created: boolean;
+        outcome: RawDataOutcome;
+    }>;
+    private outcomeFor;
+    private buildEmailUpdateData;
+    private dateChanged;
     private postWrite;
     createManual(data: Record<string, any>, actorId?: string): Promise<Booking>;
     private findExisting;
@@ -57,6 +65,7 @@ export declare class BookingService {
             regulations: string | null;
             insurancePolicy: string | null;
             mapQuery: string | null;
+            slug: string | null;
         } | null;
         rawData: {
             payload: Prisma.JsonValue;
@@ -93,6 +102,7 @@ export declare class BookingService {
         paxSequence: number;
         movedFromBusId: string | null;
         createdWho: string | null;
+        emailDate: Date | null;
     }>;
     create(dto: CreateBookingDto, actor?: AuthenticatedUser): Promise<{
         id: string;
@@ -126,10 +136,11 @@ export declare class BookingService {
         paxSequence: number;
         movedFromBusId: string | null;
         createdWho: string | null;
+        emailDate: Date | null;
     }>;
     private looksGenerated;
     private assertEmailForChannel;
-    update(id: string, dto: UpdateBookingDto): Promise<{
+    update(id: string, dto: UpdateBookingDto, actor?: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -161,7 +172,9 @@ export declare class BookingService {
         paxSequence: number;
         movedFromBusId: string | null;
         createdWho: string | null;
+        emailDate: Date | null;
     }>;
+    private assertCancelAllowed;
     private assertCanPatchBookings;
     updateBatch(items: BookingPatchDto[], actor: AuthenticatedUser): Promise<{
         id: string;
@@ -195,6 +208,7 @@ export declare class BookingService {
         paxSequence: number;
         movedFromBusId: string | null;
         createdWho: string | null;
+        emailDate: Date | null;
     }[]>;
     remove(id: string): Promise<{
         message: string;

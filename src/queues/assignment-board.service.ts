@@ -222,6 +222,55 @@ export class AssignmentBoardService {
     });
   }
 
+  /**
+   * Move the trip to the date its passengers actually travel on.
+   *
+   * The trip date follows the MAJORITY of its bookings: one amended
+   * passenger must not drag the whole bus to another day, but a bus whose
+   * passengers all moved must follow them.
+   *
+   * Used after an amendment email changed a passenger's departure date.
+   */
+  async syncDatesFromBookings(assignmentId: string) {
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { durationDays: true },
+    });
+    if (!assignment) return { skipped: true };
+
+    const bookings = await this.prisma.booking.findMany({
+      where: { assignmentId },
+      select: { startingDate: true, tour: { select: { durationDays: true } } },
+    });
+    const dates = bookings
+      .map((b) => b.startingDate?.toISOString().split('T')[0])
+      .filter((d): d is string => !!d);
+    if (dates.length === 0) return { skipped: true };
+
+    const counts = dates.reduce((acc, d) => {
+      acc[d] = (acc[d] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const maxCount = Math.max(...Object.values(counts));
+    const mostCommon = Object.entries(counts)
+      .filter(([, c]) => c === maxCount)
+      .map(([d]) => d)
+      .sort()[0];
+
+    const startDate = new Date(mostCommon);
+    const durationDays =
+      assignment.durationDays ?? bookings[0]?.tour?.durationDays ?? 1;
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + durationDays - 1);
+
+    await this.prisma.assignment.update({
+      where: { id: assignmentId },
+      data: { startDate, endDate, durationDays },
+    });
+    await this.refreshSummary(assignmentId);
+    return { synced: true, startDate, endDate };
+  }
+
   /** Renumber paxSequence 1..n following the trip's current order. */
   private async resequence(assignmentId: string) {
     const bookings = await this.prisma.booking.findMany({

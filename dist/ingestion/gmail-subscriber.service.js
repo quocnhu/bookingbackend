@@ -15,19 +15,27 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const pubsub_1 = require("@google-cloud/pubsub");
 const gmail_pubsub_service_1 = require("./gmail-pubsub.service");
-let GmailSubscriberService = GmailSubscriberService_1 = class GmailSubscriberService {
+let GmailSubscriberService = class GmailSubscriberService {
+    static { GmailSubscriberService_1 = this; }
     config;
     gmailPubSub;
     logger = new common_1.Logger(GmailSubscriberService_1.name);
+    pubsub;
     subscription;
+    reconnectTimer;
+    attempts = 0;
+    connecting = false;
+    destroyed = false;
+    failureLogged = false;
+    lastWarningAt = 0;
+    static WARNING_INTERVAL_MS = 5 * 60_000;
     constructor(config, gmailPubSub) {
         this.config = config;
         this.gmailPubSub = gmailPubSub;
     }
     onModuleInit() {
-        const enabled = this.isEnabled();
-        if (!enabled) {
-            this.logger.log('Streaming pull disabled (GOOGLE_PUBSUB_PULL_ENABLED != true) — using push webhook');
+        if (!this.isEnabled()) {
+            this.logger.log('Streaming pull disabled (GOOGLE_PUBSUB_PULL_ENABLED != true)');
             return;
         }
         const subName = this.config.get('GOOGLE_PUBSUB_SUBSCRIPTION');
@@ -35,41 +43,170 @@ let GmailSubscriberService = GmailSubscriberService_1 = class GmailSubscriberSer
             this.logger.warn('GOOGLE_PUBSUB_PULL_ENABLED=true but GOOGLE_PUBSUB_SUBSCRIPTION is not set — skipping');
             return;
         }
+        const projectId = this.config.get('GOOGLE_CLOUD_PROJECT') ??
+            this.parseProjectId(subName);
+        const keyFilename = this.config.get('GOOGLE_APPLICATION_CREDENTIALS');
         try {
-            const projectId = this.config.get('GOOGLE_CLOUD_PROJECT') ??
-                this.parseProjectId(subName);
-            const keyFilename = this.config.get('GOOGLE_APPLICATION_CREDENTIALS');
-            const pubsub = new pubsub_1.PubSub({
+            this.pubsub = new pubsub_1.PubSub({
                 ...(projectId ? { projectId } : {}),
                 ...(keyFilename ? { keyFilename } : {}),
             });
-            this.subscription = pubsub.subscription(subName, {
+        }
+        catch (err) {
+            this.logger.error(`Streaming pull: invalid Pub/Sub credentials (${err.message})`);
+            return;
+        }
+        void this.connect();
+    }
+    async connect() {
+        if (this.connecting || this.destroyed || !this.pubsub)
+            return;
+        this.connecting = true;
+        this.attempts++;
+        const subName = this.config.get('GOOGLE_PUBSUB_SUBSCRIPTION');
+        try {
+            const ready = await this.ensureSubscription(subName);
+            if (!ready) {
+                this.scheduleReconnect();
+                return;
+            }
+            this.openStream(subName);
+        }
+        catch (err) {
+            this.reportFailure(err, subName);
+            this.scheduleReconnect();
+        }
+        finally {
+            this.connecting = false;
+        }
+    }
+    async ensureSubscription(subName) {
+        const pubsub = this.pubsub;
+        const sub = pubsub.subscription(subName);
+        try {
+            const [exists] = await sub.exists();
+            if (exists) {
+                this.failureLogged = false;
+                return true;
+            }
+        }
+        catch (err) {
+            const code = err.code;
+            if (code !== 7)
+                throw err;
+            this.logger.warn(`Streaming pull: cannot check whether "${this.shortName(subName)}" exists (PERMISSION_DENIED) — trying to open the stream`);
+            return true;
+        }
+        if (!this.autoCreate())
+            return false;
+        const topicName = this.config.get('GOOGLE_PUBSUB_TOPIC') ??
+            `projects/${this.projectId(subName)}/topics/gmail-notifications`;
+        try {
+            const [created] = await this.pubsub.topic(topicName).createSubscription(this.shortName(subName), { ackDeadlineSeconds: 60 });
+            this.logger.log(`Streaming pull: created subscription ${created.name}`);
+            this.failureLogged = false;
+            return true;
+        }
+        catch (err) {
+            const code = err.code;
+            if (code === 6) {
+                return true;
+            }
+            throw err;
+        }
+    }
+    openStream(subName) {
+        if (this.destroyed || this.subscription)
+            return;
+        try {
+            this.subscription = this.pubsub.subscription(subName, {
                 flowControl: { maxMessages: 10 },
             });
             this.subscription.on('message', (message) => {
                 void this.handleMessage(message);
             });
             this.subscription.on('error', (err) => {
+                const code = err.code;
                 this.logger.error(`Pub/Sub subscription error: ${err.message}`);
+                if (code === 5 || code === 7) {
+                    void this.closeStream();
+                    this.scheduleReconnect();
+                }
             });
-            this.logger.log(`Streaming pull started on ${subName}`);
+            this.attempts = 0;
+            this.failureLogged = false;
+            this.logger.log(`Streaming pull started on ${this.shortName(subName)} (project ${this.projectId(subName)})`);
         }
         catch (err) {
-            this.logger.error(`Failed to start streaming pull: ${err.message}`);
+            this.reportFailure(err, subName);
+            this.scheduleReconnect();
         }
+    }
+    async closeStream() {
+        const sub = this.subscription;
+        this.subscription = undefined;
+        if (!sub)
+            return;
+        try {
+            await sub.close();
+        }
+        catch {
+        }
+    }
+    scheduleReconnect() {
+        if (this.destroyed || this.reconnectTimer)
+            return;
+        const delay = this.reconnectMs();
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = undefined;
+            void this.connect();
+        }, delay);
+        this.reconnectTimer.unref?.();
+    }
+    reportFailure(err, subName) {
+        const code = err.code;
+        const name = this.shortName(subName);
+        const project = this.projectId(subName);
+        if (this.failureLogged) {
+            const now = Date.now();
+            if (now - this.lastWarningAt <
+                GmailSubscriberService_1.WARNING_INTERVAL_MS) {
+                return;
+            }
+            this.lastWarningAt = now;
+            this.logger.warn(`Streaming pull still not connected (attempt ${this.attempts}): ${err.message}`);
+            return;
+        }
+        this.failureLogged = true;
+        this.lastWarningAt = Date.now();
+        if (code === 5) {
+            this.logger.error(`Streaming pull: subscription "${name}" does not exist in project "${project}". ` +
+                `Create it (GCP Console → Pub/Sub → Subscriptions, Pull, ack deadline 60s) or set ` +
+                `GOOGLE_PUBSUB_AUTO_CREATE_SUBSCRIPTION=true and grant the service account ` +
+                `roles/pubsub.editor. It will connect automatically within ${Math.round(this.reconnectMs() / 1000)}s after it exists — no restart needed.`);
+            return;
+        }
+        if (code === 7) {
+            this.logger.error(`Streaming pull: PERMISSION_DENIED on "${name}" (project "${project}"). ` +
+                `The service account needs pubsub.subscriptions.consume on the subscription ` +
+                `(roles/pubsub.subscriber) and pubsub.subscriptions.create on the project ` +
+                `(roles/pubsub.editor / roles/pubsub.admin) to auto-create it. Retrying in ` +
+                `${Math.round(this.reconnectMs() / 1000)}s.`);
+            return;
+        }
+        this.logger.error(`Streaming pull failed: ${err.message}`);
     }
     async handleMessage(message) {
         try {
             const decoded = JSON.parse(message.data.toString('utf-8'));
-            const payload = {
-                emailAddress: decoded.emailAddress,
-                historyId: Number(decoded.historyId),
-            };
-            if (!payload.emailAddress || !payload.historyId) {
+            const emailAddress = decoded.emailAddress;
+            const historyId = Number(decoded.historyId);
+            if (!emailAddress || !historyId) {
                 this.logger.warn('Invalid Pub/Sub payload (missing emailAddress/historyId) — acking');
                 message.ack();
                 return;
             }
+            const payload = { emailAddress, historyId };
             const result = await this.gmailPubSub.handlePush(payload);
             this.logger.log(`Pulled notification for ${payload.emailAddress}: ${JSON.stringify(result)}`);
             message.ack();
@@ -80,23 +217,38 @@ let GmailSubscriberService = GmailSubscriberService_1 = class GmailSubscriberSer
         }
     }
     async onModuleDestroy() {
-        if (!this.subscription)
-            return;
-        try {
-            await this.subscription.close();
-            this.logger.log('Streaming pull stopped');
+        this.destroyed = true;
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = undefined;
         }
-        catch (err) {
-            this.logger.warn(`Failed to close subscription: ${err.message}`);
-        }
+        await this.closeStream();
+        this.logger.log('Streaming pull stopped');
     }
     isEnabled() {
         const raw = this.config.get('GOOGLE_PUBSUB_PULL_ENABLED');
         return (raw ?? 'false').toLowerCase() === 'true';
     }
+    autoCreate() {
+        const raw = this.config.get('GOOGLE_PUBSUB_AUTO_CREATE_SUBSCRIPTION');
+        return (raw ?? 'false').toLowerCase() === 'true';
+    }
+    reconnectMs() {
+        const n = Number(this.config.get('GOOGLE_PUBSUB_RECONNECT_MS'));
+        return Number.isFinite(n) && n >= 5000 ? n : 60_000;
+    }
     parseProjectId(subName) {
         const match = subName.match(/projects\/([^/]+)/);
         return match?.[1];
+    }
+    projectId(subName) {
+        return (this.config.get('GOOGLE_CLOUD_PROJECT') ??
+            this.parseProjectId(subName) ??
+            '');
+    }
+    shortName(subName) {
+        const match = /subscriptions\/([^/]+)$/.exec(subName);
+        return match ? match[1] : subName;
     }
 };
 exports.GmailSubscriberService = GmailSubscriberService;

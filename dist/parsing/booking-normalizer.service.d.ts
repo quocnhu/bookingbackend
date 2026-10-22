@@ -3,7 +3,7 @@ import type { BookingFields } from './validation/booking-fields.schema';
 export interface CleanBookingData extends Omit<BookingFields, 'startingDate'> {
     startingDate?: string | undefined;
 }
-export type NormalizeAction = 'CREATE' | 'CANCEL' | 'SKIP';
+export type NormalizeAction = 'CREATE' | 'MODIFY' | 'CANCEL' | 'SKIP';
 export interface NormalizeResult {
     clean: boolean;
     reason?: string;

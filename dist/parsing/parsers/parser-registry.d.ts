@@ -2,11 +2,12 @@ import type { TemplateParser } from './parser.interface';
 import { AirbnbParser } from './airbnb.parser';
 import { BookingComParser } from './booking-com.parser';
 import { GetYourGuideParser } from './getyourguide.parser';
+import { AdvancedViatorParser } from './advanced-viator.parser';
 import { ViatorParser } from './viator.parser';
 import { WebsiteParser } from './website.parser';
 export declare class ParserRegistry {
     private readonly parsers;
-    constructor(airbnb: AirbnbParser, bookingCom: BookingComParser, getYourGuide: GetYourGuideParser, viator: ViatorParser, website: WebsiteParser);
+    constructor(airbnb: AirbnbParser, bookingCom: BookingComParser, getYourGuide: GetYourGuideParser, advancedViator: AdvancedViatorParser, viator: ViatorParser, website: WebsiteParser);
     get(tag?: string | null): TemplateParser | undefined;
     resolve(payload: Record<string, unknown>, tag?: string | null): TemplateParser | undefined;
     tags(): string[];

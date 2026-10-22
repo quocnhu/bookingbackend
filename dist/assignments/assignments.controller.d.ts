@@ -229,6 +229,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -371,6 +372,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -513,6 +515,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -655,6 +658,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -797,6 +801,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -939,6 +944,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1081,6 +1087,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1223,6 +1230,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1365,6 +1373,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1552,6 +1561,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1631,13 +1641,13 @@ export declare class AssignmentsController {
             createdAt: Date;
             updatedAt: Date;
             assignmentId: string | null;
-            bookingId: string | null;
-            note: string | null;
-            createdById: string;
-            createdByName: string | null;
             amount: import("@prisma/client/runtime/library").Decimal;
+            note: string | null;
+            createdByName: string | null;
             categoryId: string | null;
+            createdById: string;
             reversesId: string | null;
+            bookingId: string | null;
         })[];
         categories: {
             id: string;
@@ -1661,26 +1671,26 @@ export declare class AssignmentsController {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: import("@prisma/client/runtime/library").Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     deleteTourMoney(id: string, settlementId: string, actor: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        bookingId: string | null;
-        note: string | null;
-        createdById: string;
-        createdByName: string | null;
         amount: import("@prisma/client/runtime/library").Decimal;
+        note: string | null;
+        createdByName: string | null;
         categoryId: string | null;
+        createdById: string;
         reversesId: string | null;
+        bookingId: string | null;
     }>;
     finalize(id: string, dto: FinalizeAssignmentDto, actor: AuthenticatedUser): Promise<{
         vehicle: {
@@ -1772,6 +1782,7 @@ export declare class AssignmentsController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;

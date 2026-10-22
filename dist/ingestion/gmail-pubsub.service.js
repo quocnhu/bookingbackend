@@ -23,8 +23,10 @@ const ioredis_1 = __importDefault(require("ioredis"));
 const prisma_service_1 = require("../prisma/prisma.service");
 const raw_data_service_1 = require("../raw-data/raw-data.service");
 const parsing_queue_1 = require("../parsing/parsing.queue");
+const template_util_1 = require("../parsing/template.util");
 const redis_constants_1 = require("../common/redis/redis.constants");
 const gmail_auth_provider_1 = require("./gmail-auth.provider");
+const booking_forward_constants_1 = require("../booking/booking-forward.constants");
 let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
     prisma;
     auth;
@@ -75,6 +77,15 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
             }
             try {
                 const mail = await this.fetchMessage(gmail, messageId, emailAddress);
+                if (mail.isBookingSync ||
+                    mail.subject
+                        .trimStart()
+                        .toLowerCase()
+                        .startsWith(booking_forward_constants_1.BOOKING_SYNC_SUBJECT_PREFIX.toLowerCase())) {
+                    ignored++;
+                    this.logger.log(`Ignored system notice "${mail.subject}" — booking-sync loop guard`);
+                    continue;
+                }
                 if (!this.isAllowedSender(mail.from)) {
                     ignored++;
                     this.logger.log(`Ignored mail "${mail.subject}" from "${mail.from}" — sender not in MAIL_ALLOWED_SENDERS`);
@@ -89,7 +100,7 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
                     snippet: mail.snippet?.slice(0, 300),
                     bodyPreview: mail.body?.slice(0, 500),
                 });
-                const templateTag = this.tagTemplate(mail);
+                const templateTag = this.resolveTag(mail);
                 console.log('[ingestion] template tag:', {
                     emailAddress,
                     messageId,
@@ -120,7 +131,12 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
                 data: { lastHistoryId: String(nextHistoryId) },
             });
         }
-        return { handled, duplicates, ignored, nextHistoryId: nextHistoryId ?? null };
+        return {
+            handled,
+            duplicates,
+            ignored,
+            nextHistoryId: nextHistoryId ?? null,
+        };
     }
     async testConnection(accountId) {
         const account = await this.prisma.gmailAccount.findUnique({
@@ -148,6 +164,8 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
         return {
             messageId,
             threadId: msg.data.threadId ?? undefined,
+            rfcMessageId: header('message-id') || undefined,
+            isBookingSync: header(booking_forward_constants_1.BOOKING_SYNC_HEADER).trim() === booking_forward_constants_1.BOOKING_SYNC_HEADER_VALUE,
             emailAddress,
             subject: header('subject'),
             from: header('from'),
@@ -197,7 +215,7 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
         const tokens = this.allowedSenders;
         if (tokens.size === 0)
             return true;
-        const emailMatch = fromRaw.match(/<([^<>@]+\@[^<>]+)>/i);
+        const emailMatch = fromRaw.match(/<([^<>@]+@[^<>]+)>/i);
         const email = (emailMatch ? emailMatch[1] : fromRaw).toLowerCase().trim();
         for (const token of tokens) {
             if (email === token ||
@@ -208,28 +226,14 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
         }
         return false;
     }
-    tagTemplate(mail) {
-        const from = mail.from.toLowerCase();
-        const subject = mail.subject.toLowerCase();
-        let tag = 'unknown';
-        if (from.includes('nquocnhu95book@gmail.com'))
-            tag = 'viator';
-        else if (from.includes('nquocnhu95tourguide@gmail.com'))
-            tag = 'website';
-        else if (from.includes('airbnb.com'))
-            tag = 'airbnb';
-        else if (from.includes('booking.com') || from.includes('@booking.com'))
-            tag = 'booking-com';
-        else if (from.includes('getyourguide.com') || subject.includes('getyourguide'))
-            tag = 'getyourguide';
-        else if (from.includes('viator.com') ||
-            from.includes('tripadvisor.com') ||
-            subject.includes('viator') ||
-            subject.includes('tripadvisor'))
-            tag = 'viator';
-        else if (/booking|reservation|confirmation|trip to/i.test(subject))
-            tag = 'website';
-        return tag;
+    resolveTag(mail) {
+        const rules = (0, template_util_1.parseTemplateRules)(this.config.get('MAIL_TEMPLATE_PREFIX_RULES'));
+        const headers = { subject: mail.subject, from: mail.from };
+        const rule = (0, template_util_1.matchTemplateRule)(rules, headers);
+        if (rule) {
+            this.logger.log(`Template rule matched "${rule}" for "${mail.subject}" (from ${mail.from})`);
+        }
+        return (0, template_util_1.resolveTemplateTag)(headers, rules);
     }
 };
 exports.GmailPubSubService = GmailPubSubService;

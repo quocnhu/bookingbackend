@@ -3,8 +3,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { RawDataModule } from '@/raw-data/raw-data.module';
 import { QueuesModule } from '@/queues/queues.module';
 import { ParsingModule } from '@/parsing/parsing.module';
+import { GoogleModule } from '@/google/google.module';
 import { redisProvider } from './redis.provider';
-import { GmailAuthService } from './gmail-auth.provider';
 import { GmailWatchService } from './gmail-watch.service';
 import { GmailPubSubService } from './gmail-pubsub.service';
 import { GmailSubscriberService } from './gmail-subscriber.service';
@@ -18,12 +18,12 @@ import { GmailController } from './gmail.controller';
     RawDataModule,
     QueuesModule,
     ParsingModule,
+    GoogleModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [GmailController],
   providers: [
     redisProvider,
-    GmailAuthService,
     GmailWatchService,
     GmailPubSubService,
     GmailSubscriberService,
@@ -31,6 +31,6 @@ import { GmailController } from './gmail.controller';
     GmailConnectService,
     GoogleOidcService,
   ],
-  exports: [GmailAuthService, GmailWatchService, GmailPubSubService],
+  exports: [GoogleModule, GmailWatchService, GmailPubSubService],
 })
 export class IngestionModule {}

@@ -1,0 +1,31 @@
+import { BookingProvider, BookingStatus, PaymentStatus, Prisma, TourType } from '@prisma/client';
+export type EmailFields = {
+    bookingRef: string;
+    source?: string;
+    channel: BookingProvider;
+    tourId?: string;
+    tourName?: string;
+    tourType?: TourType;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    startingDate?: Date;
+    customerName?: string;
+    hotelName?: string;
+    phone?: string;
+    mail?: string;
+    totalPax?: number;
+    paxDetail?: string;
+    payment?: PaymentStatus;
+    isNoShow?: boolean;
+    noShowReason?: string;
+    extra?: Prisma.InputJsonValue;
+    emailDate?: Date;
+};
+export type ExistingBooking = {
+    status: BookingStatus;
+    mail?: string | null;
+    extra?: Prisma.JsonValue | null;
+};
+export declare function buildEmailUpdateData(parsed: EmailFields, existing: ExistingBooking, action: 'CREATE' | 'MODIFY' | 'CANCEL'): Prisma.BookingUncheckedUpdateInput;
+export declare function hasBookingChanges(data: Prisma.BookingUncheckedUpdateInput, existing: Record<string, unknown>): boolean;

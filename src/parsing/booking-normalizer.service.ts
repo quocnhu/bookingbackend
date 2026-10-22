@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { BookingProvider, PaymentStatus, TourType } from '@prisma/client';
 import { buildExtra } from './extra.util';
+import { detectAction } from './action.util';
 import type { BookingFields } from './validation/booking-fields.schema';
 
-const CANCEL_KEYWORDS = /\b(cancel|cancellation|cancelled|canceled|refund)\b/i;
 const TOUR_TYPES: TourType[] = [TourType.PRIVATE_TOUR, TourType.GROUP_TOUR];
 const PAYMENT_STATUSES: PaymentStatus[] = [
   PaymentStatus.PENDING,
@@ -15,7 +15,7 @@ const PAYMENT_STATUSES: PaymentStatus[] = [
 export interface CleanBookingData extends Omit<BookingFields, 'startingDate'> {
   startingDate?: string | undefined;
 }
-export type NormalizeAction = 'CREATE' | 'CANCEL' | 'SKIP';
+export type NormalizeAction = 'CREATE' | 'MODIFY' | 'CANCEL' | 'SKIP';
 
 export interface NormalizeResult {
   clean: boolean;
@@ -50,8 +50,9 @@ export class BookingNormalizerService {
       unknown
     >;
     const subject = typeof payload?.subject === 'string' ? payload.subject : '';
+    const body = typeof payload?.body === 'string' ? payload.body : '';
 
-    const action = CANCEL_KEYWORDS.test(subject) ? 'CANCEL' : 'CREATE';
+    const action = detectAction(subject, body);
 
     const bookingRef =
       this.pickString(parsed.bookingRef) ??

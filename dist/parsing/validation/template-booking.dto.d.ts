@@ -1,5 +1,5 @@
 import { BookingProvider, BookingStatus, PaymentStatus, TourType } from '@prisma/client';
-export type ParsedAction = 'CREATE' | 'CANCEL';
+export type ParsedAction = 'CREATE' | 'MODIFY' | 'CANCEL';
 export declare const PARSED_ACTIONS: ParsedAction[];
 export declare const PARSED_SOURCES: readonly ["airbnb", "booking-com", "getyourguide", "viator", "website", "manual"];
 export declare class TemplateBookingDto {

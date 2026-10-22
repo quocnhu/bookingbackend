@@ -19,6 +19,9 @@ const audit_service_1 = require("../audit/audit.service");
 const booking_normalizer_service_1 = require("../parsing/booking-normalizer.service");
 const assignment_board_service_1 = require("../queues/assignment-board.service");
 const assignment_queue_1 = require("../queues/assignment.queue");
+const cancellation_1 = require("../common/constants/cancellation");
+const email_merge_util_1 = require("./email-merge.util");
+const raw_data_entity_1 = require("../raw-data/raw-data.entity");
 const TOUR_MATCH_MIN_SCORE = 0.5;
 function normalizeTourName(name) {
     return name
@@ -54,9 +57,10 @@ let BookingService = BookingService_1 = class BookingService {
         this.board = board;
         this.assignmentQueue = assignmentQueue;
     }
-    async upsert(data, rawDataId, actorId, createdWho) {
+    async upsert(data, rawDataId, actorId, createdWho, emailDate) {
         const bookingRef = data.bookingRef;
         const existing = await this.findExisting(data.source, bookingRef);
+        const isAmendment = data.action === 'MODIFY';
         let tourName = data.tourName;
         let tourType = data.tourType;
         let tourId = data.tourId;
@@ -78,59 +82,99 @@ let BookingService = BookingService_1 = class BookingService {
                 this.logger.log(`Linked booking ${bookingRef} to tour "${matched.name}" (name match)`);
             }
         }
-        const bookingData = {
+        const parsed = {
             bookingRef,
-            confirmationCode: data.bookingRef,
             source: data.source,
             channel: data.channel ??
                 this.normalizer.channelForSource(data.source) ??
                 client_1.BookingProvider.WEBSITE,
-            status: data.action === 'CANCEL'
-                ? client_1.BookingStatus.CANCELED
-                : (data.status ?? client_1.BookingStatus.PENDING),
             tourId,
             tourName,
             tourType,
             address: data.address,
             latitude: data.latitude,
             longitude: data.longitude,
-            startingDate: data.startingDate
-                ? new Date(data.startingDate)
-                : undefined,
+            startingDate: data.startingDate ? new Date(data.startingDate) : undefined,
             customerName: data.customerName,
-            hotelName: data.hotelName ?? '',
-            phone: data.phone ?? '',
+            hotelName: data.hotelName,
+            phone: data.phone,
             mail: data.mail,
-            totalPax: data.totalPax ?? 0,
+            totalPax: data.totalPax,
             paxDetail: data.paxDetail,
             payment: data.payment,
             isNoShow: data.isNoShow,
             noShowReason: data.noShowReason,
             extra: data.extra,
-            rawDataId: existing?.rawDataId ?? rawDataId,
+            emailDate: emailDate ?? existing?.emailDate ?? undefined,
         };
         const _createdWho = createdWho ?? (actorId ? undefined : 'Pub-Sub System');
         if (existing) {
+            if (emailDate &&
+                existing.emailDate &&
+                emailDate.getTime() < existing.emailDate.getTime()) {
+                this.logger.log(`Skipped stale email for ${bookingRef}: email ${emailDate.toISOString()} older than applied ${existing.emailDate.toISOString()}`);
+                return {
+                    booking: existing,
+                    created: false,
+                    outcome: raw_data_entity_1.RAW_DATA_OUTCOME.SKIPPED,
+                };
+            }
+            if (existing.status === client_1.BookingStatus.CANCELED &&
+                data.action !== 'CANCEL' &&
+                !(emailDate &&
+                    existing.emailDate &&
+                    emailDate.getTime() > existing.emailDate.getTime())) {
+                this.logger.log(`Ignored reactivation of canceled booking ${bookingRef}: no newer email date to justify leaving terminal state`);
+                return {
+                    booking: existing,
+                    created: false,
+                    outcome: raw_data_entity_1.RAW_DATA_OUTCOME.SKIPPED,
+                };
+            }
+            const updateData = this.buildEmailUpdateData(parsed, existing, data.action);
+            const changed = (0, email_merge_util_1.hasBookingChanges)(updateData, existing);
             const booking = await this.prisma.booking.update({
                 where: { id: existing.id },
-                data: { ...bookingData, rawDataId: existing.rawDataId ?? rawDataId },
+                data: updateData,
             });
             await this.auditService.log({
                 entityType: 'Booking',
                 entityId: booking.id,
-                action: 'UPSERT_EMAIL',
-                beforeData: {
-                    source: existing.source,
-                    bookingRef: existing.bookingRef,
-                },
+                action: isAmendment ? 'AMEND_EMAIL' : 'UPSERT_EMAIL',
+                beforeData: existing,
                 afterData: booking,
                 changedBy: actorId ?? null,
             });
+            if (isAmendment) {
+                this.logger.log(`Applied amendment to booking ${bookingRef} (${data.source})`);
+            }
+            if (booking.assignmentId &&
+                this.dateChanged(existing.startingDate, booking.startingDate)) {
+                await this.board.syncDatesFromBookings(booking.assignmentId);
+            }
             await this.postWrite(booking);
-            return booking;
+            return {
+                booking,
+                created: false,
+                outcome: this.outcomeFor(data.action, changed),
+            };
+        }
+        if (isAmendment) {
+            this.logger.warn(`Amendment email for unknown booking ${bookingRef} (${data.source}) — created from the amendment`);
         }
         const booking = await this.prisma.booking.create({
-            data: { ...bookingData, createdWho: _createdWho },
+            data: {
+                ...parsed,
+                confirmationCode: data.bookingRef,
+                status: data.action === 'CANCEL'
+                    ? client_1.BookingStatus.CANCELED
+                    : (data.status ?? client_1.BookingStatus.PENDING),
+                hotelName: parsed.hotelName ?? '',
+                phone: parsed.phone ?? '',
+                totalPax: parsed.totalPax ?? 0,
+                rawDataId,
+                createdWho: _createdWho,
+            },
         });
         await this.auditService.log({
             entityType: 'Booking',
@@ -141,7 +185,26 @@ let BookingService = BookingService_1 = class BookingService {
         });
         this.logger.log(`Upserted booking ${booking.bookingRef} (${data.source})`);
         await this.postWrite(booking);
-        return booking;
+        return {
+            booking,
+            created: true,
+            outcome: raw_data_entity_1.RAW_DATA_OUTCOME.CREATED,
+        };
+    }
+    outcomeFor(action, changed) {
+        if (action === 'CANCEL')
+            return raw_data_entity_1.RAW_DATA_OUTCOME.CANCELLED;
+        return changed
+            ? raw_data_entity_1.RAW_DATA_OUTCOME.UPDATED
+            : raw_data_entity_1.RAW_DATA_OUTCOME.UNCHANGED;
+    }
+    buildEmailUpdateData(parsed, existing, action) {
+        return (0, email_merge_util_1.buildEmailUpdateData)(parsed, existing, action);
+    }
+    dateChanged(a, b) {
+        if (!a || !b)
+            return false;
+        return a.getTime() !== b.getTime();
     }
     async postWrite(booking) {
         if (booking.status === client_1.BookingStatus.CANCELED) {
@@ -185,7 +248,7 @@ let BookingService = BookingService_1 = class BookingService {
             isNoShow: data.isNoShow,
             noShowReason: data.noShowReason,
         };
-        const booking = await this.upsert(clean, undefined, actorId, data.createdWho ?? 'Manual Entry');
+        const { booking } = await this.upsert(clean, undefined, actorId, data.createdWho ?? 'Manual Entry');
         return booking;
     }
     async findExisting(source, bookingRef) {
@@ -330,7 +393,7 @@ let BookingService = BookingService_1 = class BookingService {
             throw new common_1.BadRequestException('Email is required');
         }
     }
-    async update(id, dto) {
+    async update(id, dto, actor) {
         const before = await this.findOne(id);
         if (before.assignmentId) {
             const assignment = await this.prisma.assignment.findUnique({
@@ -342,7 +405,12 @@ let BookingService = BookingService_1 = class BookingService {
                 throw new common_1.BadRequestException('This booking is locked because the tour report has been submitted for verification. Only accounting can unlock by rejecting the report.');
             }
         }
-        const data = { ...dto };
+        const { overrideCancelWindow, ...dtoFields } = dto;
+        if (dto.status === client_1.BookingStatus.CANCELED &&
+            before.status !== client_1.BookingStatus.CANCELED) {
+            this.assertCancelAllowed(before, overrideCancelWindow, actor);
+        }
+        const data = { ...dtoFields };
         if (dto.startingDate)
             data.startingDate = new Date(dto.startingDate);
         if (data.status === client_1.BookingStatus.ASSIGNED && !before.assignmentId) {
@@ -358,6 +426,19 @@ let BookingService = BookingService_1 = class BookingService {
         });
         await this.postWrite(booking);
         return booking;
+    }
+    assertCancelAllowed(booking, override, actor) {
+        const deadline = (0, cancellation_1.cancelDeadline)(booking.startingDate);
+        if (!deadline)
+            return;
+        if (Date.now() <= deadline.getTime())
+            return;
+        if (!override) {
+            throw new common_1.BadRequestException(`Cancellation window closed — ${booking.bookingRef} departs on ${booking.startingDate.toISOString()} and can only be cancelled more than ${cancellation_1.CANCEL_WINDOW_HOURS}h before departure (deadline ${deadline.toISOString()}).`);
+        }
+        if (actor?.role !== client_1.RoleType.ADMIN) {
+            throw new common_1.ForbiddenException('Only an administrator can cancel a booking inside the cancellation window');
+        }
     }
     async assertCanPatchBookings(bookingIds, actor) {
         if (actor.permissions?.includes('booking.update'))

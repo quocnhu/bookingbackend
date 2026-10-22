@@ -14,15 +14,17 @@ const common_1 = require("@nestjs/common");
 const airbnb_parser_1 = require("./airbnb.parser");
 const booking_com_parser_1 = require("./booking-com.parser");
 const getyourguide_parser_1 = require("./getyourguide.parser");
+const advanced_viator_parser_1 = require("./advanced-viator.parser");
 const viator_parser_1 = require("./viator.parser");
 const website_parser_1 = require("./website.parser");
 let ParserRegistry = class ParserRegistry {
     parsers = new Map();
-    constructor(airbnb, bookingCom, getYourGuide, viator, website) {
+    constructor(airbnb, bookingCom, getYourGuide, advancedViator, viator, website) {
         for (const parser of [
             airbnb,
             bookingCom,
             getYourGuide,
+            advancedViator,
             viator,
             website,
         ]) {
@@ -56,6 +58,7 @@ exports.ParserRegistry = ParserRegistry = __decorate([
     __metadata("design:paramtypes", [airbnb_parser_1.AirbnbParser,
         booking_com_parser_1.BookingComParser,
         getyourguide_parser_1.GetYourGuideParser,
+        advanced_viator_parser_1.AdvancedViatorParser,
         viator_parser_1.ViatorParser,
         website_parser_1.WebsiteParser])
 ], ParserRegistry);

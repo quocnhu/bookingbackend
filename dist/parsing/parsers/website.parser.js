@@ -15,6 +15,8 @@ const client_1 = require("@prisma/client");
 const cheerio_1 = require("cheerio");
 const booking_normalizer_service_1 = require("../booking-normalizer.service");
 const extra_util_1 = require("../extra.util");
+const action_util_1 = require("../action.util");
+const template_util_1 = require("../template.util");
 const asString = (value) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 const collapse = (value) => value.replace(/\s+/g, ' ').trim();
 let WebsiteParser = class WebsiteParser {
@@ -34,7 +36,7 @@ let WebsiteParser = class WebsiteParser {
             if (source === 'website' || source === '' || source === 'unknown')
                 return true;
         }
-        return (from.includes('nquocnhu95tourguide@gmail.com') ||
+        return ((0, template_util_1.isRoutedToTag)({ from, subject }, 'website') ||
             subject.includes('new booking') ||
             /wptravelengine|wp travel engine/i.test(text) ||
             text.includes('Billing Details') ||
@@ -170,9 +172,7 @@ let WebsiteParser = class WebsiteParser {
     toFields(rich, payload) {
         const subject = asString(payload.subject);
         return {
-            action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
-                ? 'CANCEL'
-                : 'CREATE',
+            action: (0, action_util_1.detectAction)(subject, (0, action_util_1.emailBodyText)(payload)),
             bookingRef: rich.bookingRef,
             source: 'website',
             channel: client_1.BookingProvider.WEBSITE,

@@ -3,6 +3,7 @@ import { Job } from 'bullmq';
 import { RawDataRepository } from "../raw-data/raw-data.repository";
 import { RawDataService } from "../raw-data/raw-data.service";
 import { BookingService } from "../booking/booking.service";
+import { BookingForwardService } from "../booking/booking-forward.service";
 import { ParserRegistry } from './parsers/parser-registry';
 import { ParseJobData } from './parsing.queue';
 export declare class ParsingProcessor extends WorkerHost {
@@ -10,8 +11,9 @@ export declare class ParsingProcessor extends WorkerHost {
     private readonly rawDataService;
     private readonly registry;
     private readonly bookingService;
+    private readonly bookingForward;
     private readonly logger;
-    constructor(rawDataRepo: RawDataRepository, rawDataService: RawDataService, registry: ParserRegistry, bookingService: BookingService);
+    constructor(rawDataRepo: RawDataRepository, rawDataService: RawDataService, registry: ParserRegistry, bookingService: BookingService, bookingForward: BookingForwardService);
     process(job: Job<ParseJobData>): Promise<{
         skipped: boolean;
         reason: string;
@@ -37,4 +39,6 @@ export declare class ParsingProcessor extends WorkerHost {
         reason?: undefined;
         rawDataId?: undefined;
     }>;
+    private str;
+    private resolveEmailDate;
 }

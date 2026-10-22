@@ -3,6 +3,8 @@ import { BookingProvider, TourType } from '@prisma/client';
 import { load } from 'cheerio';
 import { buildExtra } from '../extra.util';
 import { resolveBookingChannel } from '../channel.util';
+import { isRoutedToTag } from '../template.util';
+import { detectAction, emailBodyText } from '../action.util';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
 /** Safely coerce any value to a string (avoids '[object Object]'). */
@@ -37,7 +39,10 @@ export class ViatorParser implements TemplateParser {
 
     return (
       from.includes('tripadvisor.com') ||
-      from.includes('nquocnhu95book@gmail.com') ||
+      // Real Bókun mail, and any sender MAIL_TEMPLATE_PREFIX_RULES routes here
+      // (e.g. a test forwarder) — no address is hard-coded.
+      from.includes('bokun.io') ||
+      isRoutedToTag({ from, subject }, 'viator') ||
       subject.includes('tripadvisor') ||
       subject.includes('viator') ||
       /\bBooking Ref\.?/i.test(html) ||
@@ -207,9 +212,7 @@ export class ViatorParser implements TemplateParser {
     const guidedLanguages = rows.get('guidedLanguages') || undefined;
 
     const fields: BookingFields = {
-      action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
-        ? 'CANCEL'
-        : 'CREATE',
+      action: detectAction(subject, emailBodyText(payload)),
       bookingRef,
       source: 'viator',
       channel:
@@ -316,9 +319,7 @@ export class ViatorParser implements TemplateParser {
     const subject = asString(payload.subject);
 
     return {
-      action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
-        ? 'CANCEL'
-        : 'CREATE',
+      action: detectAction(subject, emailBodyText(payload)),
       bookingRef,
       source: 'viator',
       channel:

@@ -18,10 +18,25 @@ const company_profile_service_1 = require("./company-profile.service");
 const update_company_profile_dto_1 = require("./dto/update-company-profile.dto");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const public_decorator_1 = require("../common/decorators/public.decorator");
 let CompanyProfileController = class CompanyProfileController {
     companyProfileService;
     constructor(companyProfileService) {
         this.companyProfileService = companyProfileService;
+    }
+    async publicProfile() {
+        const profile = await this.companyProfileService.getProfile();
+        if (!profile)
+            return null;
+        return {
+            name: profile.name,
+            address: profile.address,
+            phone: profile.phone,
+            email: profile.email,
+            website: profile.website,
+            latitude: profile.rootLatitude,
+            longitude: profile.rootLongitude,
+        };
     }
     get() {
         return this.companyProfileService.getProfile();
@@ -31,6 +46,13 @@ let CompanyProfileController = class CompanyProfileController {
     }
 };
 exports.CompanyProfileController = CompanyProfileController;
+__decorate([
+    (0, public_decorator_1.Public)(),
+    (0, common_1.Get)('public'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], CompanyProfileController.prototype, "publicProfile", null);
 __decorate([
     (0, common_1.Get)(),
     __metadata("design:type", Function),

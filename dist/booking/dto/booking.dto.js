@@ -170,6 +170,7 @@ __decorate([
 ], CreateBookingDto.prototype, "noShowReason", void 0);
 class UpdateBookingDto {
     status;
+    overrideCancelWindow;
     tourId;
     address;
     latitude;
@@ -193,6 +194,11 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.BookingStatus),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateBookingDto.prototype, "overrideCancelWindow", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

@@ -3,6 +3,7 @@ import type { TemplateParser } from './parser.interface';
 import { AirbnbParser } from './airbnb.parser';
 import { BookingComParser } from './booking-com.parser';
 import { GetYourGuideParser } from './getyourguide.parser';
+import { AdvancedViatorParser } from './advanced-viator.parser';
 import { ViatorParser } from './viator.parser';
 import { WebsiteParser } from './website.parser';
 
@@ -18,6 +19,7 @@ export class ParserRegistry {
     airbnb: AirbnbParser,
     bookingCom: BookingComParser,
     getYourGuide: GetYourGuideParser,
+    advancedViator: AdvancedViatorParser,
     viator: ViatorParser,
     website: WebsiteParser,
   ) {
@@ -25,6 +27,9 @@ export class ParserRegistry {
       airbnb,
       bookingCom,
       getYourGuide,
+      // Before viator: the conversation mails also match the regular Viator
+      // template ("Booking Ref."), but they are a different template.
+      advancedViator,
       viator,
       website,
     ]) {

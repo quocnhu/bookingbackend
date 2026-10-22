@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { detectAction } from '../action.util';
 import type { BookingFields, TemplateParser } from './parser.interface';
 
 const DATE_RE =
@@ -39,7 +40,7 @@ export class AirbnbParser implements TemplateParser {
     if (!start && !end) return null;
 
     return {
-      action: this.isCancellation(body) ? 'CANCEL' : 'CREATE',
+      action: detectAction(asString(payload.subject), body),
       bookingRef: ref,
       source: 'airbnb',
       customerName: this.matchGuest(body),
@@ -63,12 +64,6 @@ export class AirbnbParser implements TemplateParser {
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '')
       .slice(0, 20);
-  }
-
-  private isCancellation(body: string): boolean {
-    return /\b(cancel(?:led|lation)?|refund(?:ed)?|you won'?t be going)\b/i.test(
-      body,
-    );
   }
 
   private matchGuest(body: string): string | undefined {

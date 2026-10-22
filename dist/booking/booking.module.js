@@ -11,18 +11,25 @@ const common_1 = require("@nestjs/common");
 const booking_controller_1 = require("./booking.controller");
 const booking_service_1 = require("./booking.service");
 const booking_manual_processor_1 = require("./booking-manual.processor");
+const booking_forward_service_1 = require("./booking-forward.service");
 const booking_normalizer_service_1 = require("../parsing/booking-normalizer.service");
 const audit_module_1 = require("../audit/audit.module");
 const queues_module_1 = require("../queues/queues.module");
+const google_module_1 = require("../google/google.module");
 let BookingModule = class BookingModule {
 };
 exports.BookingModule = BookingModule;
 exports.BookingModule = BookingModule = __decorate([
     (0, common_1.Module)({
-        imports: [audit_module_1.AuditModule, queues_module_1.QueuesModule],
+        imports: [audit_module_1.AuditModule, queues_module_1.QueuesModule, google_module_1.GoogleModule],
         controllers: [booking_controller_1.BookingController],
-        providers: [booking_service_1.BookingService, booking_manual_processor_1.BookingManualProcessor, booking_normalizer_service_1.BookingNormalizerService],
-        exports: [booking_service_1.BookingService, booking_normalizer_service_1.BookingNormalizerService],
+        providers: [
+            booking_service_1.BookingService,
+            booking_manual_processor_1.BookingManualProcessor,
+            booking_normalizer_service_1.BookingNormalizerService,
+            booking_forward_service_1.BookingForwardService,
+        ],
+        exports: [booking_service_1.BookingService, booking_normalizer_service_1.BookingNormalizerService, booking_forward_service_1.BookingForwardService],
     })
 ], BookingModule);
 //# sourceMappingURL=booking.module.js.map

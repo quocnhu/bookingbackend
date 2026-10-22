@@ -77,6 +77,7 @@ export declare class DashboardController {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         recentRawData: {
             id: string;

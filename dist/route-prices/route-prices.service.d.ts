@@ -66,6 +66,7 @@ export declare class RoutePricesService {
             regulations: string | null;
             insurancePolicy: string | null;
             mapQuery: string | null;
+            slug: string | null;
         };
         vehicle: {
             id: string;
@@ -112,6 +113,7 @@ export declare class RoutePricesService {
             regulations: string | null;
             insurancePolicy: string | null;
             mapQuery: string | null;
+            slug: string | null;
         };
         vehicle: {
             id: string;
@@ -158,6 +160,7 @@ export declare class RoutePricesService {
             regulations: string | null;
             insurancePolicy: string | null;
             mapQuery: string | null;
+            slug: string | null;
         };
         vehicle: {
             id: string;

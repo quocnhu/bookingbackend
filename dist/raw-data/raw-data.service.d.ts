@@ -13,9 +13,13 @@ export declare class RawDataService {
     }>;
     markUnparsed(id: string): Promise<void>;
     markParseFailed(id: string, reason: string): Promise<void>;
-    markParsed(id: string, bookingId: string): Promise<void>;
+    markParsed(id: string, bookingId: string, action?: string | null, outcome?: string | null): Promise<void>;
     updatePayload(id: string, payload: Record<string, unknown>): Promise<void>;
     private appendReason;
     private hashPayload;
     summary(): Promise<Record<string, number>>;
+    actionSummary(): Promise<{
+        actions: Record<string, number>;
+        outcomes: Record<string, number>;
+    }>;
 }

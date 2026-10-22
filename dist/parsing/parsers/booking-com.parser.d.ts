@@ -4,7 +4,6 @@ export declare class BookingComParser implements TemplateParser {
     canParse(payload: Record<string, unknown>): boolean;
     extract(payload: Record<string, unknown>): BookingFields | null;
     private matchRef;
-    private isCancellation;
     private matchGuest;
     private matchDates;
     private matchPax;

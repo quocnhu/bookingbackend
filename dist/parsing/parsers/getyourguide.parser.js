@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const cheerio_1 = require("cheerio");
 const extra_util_1 = require("../extra.util");
+const action_util_1 = require("../action.util");
 const asString = (value) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 const collapse = (value) => value.replace(/\s+/g, ' ').trim();
 let GetYourGuideParser = class GetYourGuideParser {
@@ -39,20 +40,20 @@ let GetYourGuideParser = class GetYourGuideParser {
             const rich = this.parseTable(text);
             if (rich) {
                 payload.booking = rich;
-                return this.toFields(rich, subject);
+                return this.toFields(rich, subject, (0, action_util_1.emailBodyText)(payload));
             }
         }
         if (payload.booking ?? payload.parsedBooking) {
             const rich = this.fromJson(payload);
             if (rich) {
                 payload.booking = rich;
-                return this.toFields(rich, subject);
+                return this.toFields(rich, subject, (0, action_util_1.emailBodyText)(payload));
             }
         }
         const rich = this.parsePlain(text, payload);
         if (rich) {
             payload.booking = rich;
-            return this.toFields(rich, subject);
+            return this.toFields(rich, subject, (0, action_util_1.emailBodyText)(payload));
         }
         return null;
     }
@@ -231,12 +232,10 @@ let GetYourGuideParser = class GetYourGuideParser {
             createdAt: null,
         };
     }
-    toFields(rich, subject) {
+    toFields(rich, subject, body) {
         const pickUp = this.splitPickUp(asString(rich.pickUp));
         return {
-            action: /\b(cancel(?:led|lation)?|refund(?:ed)?)\b/i.test(subject)
-                ? 'CANCEL'
-                : 'CREATE',
+            action: (0, action_util_1.detectAction)(subject, body),
             bookingRef: asString(rich.bookingRef),
             source: 'getyourguide',
             channel: client_1.BookingProvider.GETYOURGUIDE,

@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { google, Auth } from 'googleapis';
 
-const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const GMAIL_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  // Needed by BookingForwardService to send the "pushed to Booking table"
+  // confirmation. Mailboxes connected before this scope was added must be
+  // reconnected once (Connect mailbox) to mint a refresh token that can send.
+  'https://www.googleapis.com/auth/gmail.send',
+];
 
 /**
  * Creates/coordinates the OAuth2 client for Gmail.

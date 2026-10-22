@@ -19,6 +19,7 @@ import {
 import { PaginatedResult } from '@/common/dto/pagination.dto';
 import sharp from 'sharp';
 import { validateFile, sanitizeFileName, ALLOWED_IMAGE_TYPES, MAX_FILE_SIZE } from '@/common/utils/file-validation.util';
+import { uniqueTourSlug } from './slug.util';
 
 @Injectable()
 export class ToursService {
@@ -60,6 +61,29 @@ export class ToursService {
     return { ...tour, gallery: await this.listGallery(id) };
   }
 
+  /**
+   * The tour behind a public URL: /tour/ha-long-bay-full-day-cruise
+   *
+   * Falls back to the internal id, so the old /tour/<uuid> links still resolve
+   * (the website then redirects them to the canonical slug).
+   */
+  async findBySlug(slug: string) {
+    const tour = await this.prisma.tour.findFirst({
+      where: { OR: [{ slug }, { id: slug }] },
+      include: {
+        itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
+        typePrices: true,
+        prices: { include: { provider: true } },
+      },
+    });
+    if (!tour) throw new NotFoundException('Tour not found');
+    return {
+      ...tour,
+      slug: tour.slug ?? slug,
+      gallery: await this.listGallery(tour.id),
+    };
+  }
+
   async create(dto: CreateTourDto) {
     const existing = await this.prisma.tour.findUnique({
       where: { name: dto.name },
@@ -77,6 +101,8 @@ export class ToursService {
       data: {
         ...rest,
         code,
+        // The public URL of the tour page — keyword-rich and stable.
+        slug: await this.nextSlug(dto.name),
         typePrices:
           typePrices && typePrices.length > 0
             ? {
@@ -127,7 +153,17 @@ export class ToursService {
     }
     const { typePrices, ...rest } = dto;
     await this.prisma.$transaction([
-      this.prisma.tour.update({ where: { id }, data: rest }),
+      this.prisma.tour.update({
+        where: { id },
+        data: {
+          ...rest,
+          // The slug stays stable across a rename — the indexed links keep
+          // working. It is only filled in when it is still missing.
+          slug:
+            before.slug ??
+            (await this.nextSlug(dto.name ?? before.name, id)),
+        },
+      }),
       ...(typePrices && typePrices.length > 0
         ? typePrices.map((tp) =>
             this.prisma.tourTypePrice.upsert({
@@ -159,6 +195,20 @@ export class ToursService {
       afterData: tour,
     });
     return tour;
+  }
+
+  /**
+   * A slug that is not taken yet — the tour name, lowercased and dash-separated.
+   */
+  private async nextSlug(name: string, excludeId?: string): Promise<string> {
+    const taken = await this.prisma.tour.findMany({
+      where: excludeId ? { id: { not: excludeId } } : undefined,
+      select: { slug: true },
+    });
+    return uniqueTourSlug(
+      name,
+      taken.map((t) => t.slug).filter((s): s is string => !!s),
+    );
   }
 
   async updateItinerary(

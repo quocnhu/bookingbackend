@@ -16,21 +16,25 @@ const bullmq_1 = require("@nestjs/bullmq");
 const raw_data_repository_1 = require("../raw-data/raw-data.repository");
 const raw_data_service_1 = require("../raw-data/raw-data.service");
 const booking_service_1 = require("../booking/booking.service");
+const booking_forward_service_1 = require("../booking/booking-forward.service");
 const parser_registry_1 = require("./parsers/parser-registry");
 const parsing_queue_1 = require("./parsing.queue");
 const booking_fields_schema_1 = require("./validation/booking-fields.schema");
+const FORWARD_OUTCOMES = new Set(['CREATED', 'UPDATED', 'CANCELLED']);
 let ParsingProcessor = ParsingProcessor_1 = class ParsingProcessor extends bullmq_1.WorkerHost {
     rawDataRepo;
     rawDataService;
     registry;
     bookingService;
+    bookingForward;
     logger = new common_1.Logger(ParsingProcessor_1.name);
-    constructor(rawDataRepo, rawDataService, registry, bookingService) {
+    constructor(rawDataRepo, rawDataService, registry, bookingService, bookingForward) {
         super();
         this.rawDataRepo = rawDataRepo;
         this.rawDataService = rawDataService;
         this.registry = registry;
         this.bookingService = bookingService;
+        this.bookingForward = bookingForward;
     }
     async process(job) {
         const { rawDataId } = job.data;
@@ -61,10 +65,41 @@ let ParsingProcessor = ParsingProcessor_1 = class ParsingProcessor extends bullm
         if (payload.booking !== undefined) {
             await this.rawDataService.updatePayload(rawDataId, payload);
         }
-        const booking = await this.bookingService.upsert(validation.data, rawDataId);
-        await this.rawDataService.markParsed(rawDataId, booking.id);
-        this.logger.log(`Parsed rawData ${rawDataId} (${parser.templateTag}) -> booking ${booking.bookingRef}`);
+        const { booking, outcome } = await this.bookingService.upsert(validation.data, rawDataId, undefined, undefined, this.resolveEmailDate(payload));
+        await this.rawDataService.markParsed(rawDataId, booking.id, validation.data.action, outcome);
+        this.logger.log(`Parsed rawData ${rawDataId} (${parser.templateTag}) -> booking ${booking.bookingRef} [${validation.data.action}/${outcome}]`);
+        if (FORWARD_OUTCOMES.has(outcome)) {
+            await this.bookingForward.forward({
+                bookingRef: booking.bookingRef,
+                source: validation.data.source,
+                action: validation.data.action,
+                outcome,
+                mailbox: this.str(payload.emailAddress) ?? '',
+                messageId: this.str(payload.messageId),
+                threadId: this.str(payload.threadId),
+                rfcMessageId: this.str(payload.rfcMessageId),
+                subject: this.str(payload.subject),
+                from: this.str(payload.from),
+                date: this.str(payload.date),
+                body: this.str(payload.body),
+            });
+        }
         return { status: 'parsed', bookingId: booking.id };
+    }
+    str(value) {
+        return typeof value === 'string' && value.trim() ? value : undefined;
+    }
+    resolveEmailDate(payload) {
+        const ms = Number(payload.internalDate);
+        if (Number.isFinite(ms) && ms > 0)
+            return new Date(ms);
+        const raw = typeof payload.date === 'string' ? payload.date : undefined;
+        if (raw) {
+            const d = new Date(raw);
+            if (!Number.isNaN(d.getTime()))
+                return d;
+        }
+        return undefined;
     }
 };
 exports.ParsingProcessor = ParsingProcessor;
@@ -74,6 +109,7 @@ exports.ParsingProcessor = ParsingProcessor = ParsingProcessor_1 = __decorate([
     __metadata("design:paramtypes", [raw_data_repository_1.RawDataRepository,
         raw_data_service_1.RawDataService,
         parser_registry_1.ParserRegistry,
-        booking_service_1.BookingService])
+        booking_service_1.BookingService,
+        booking_forward_service_1.BookingForwardService])
 ], ParsingProcessor);
 //# sourceMappingURL=parsing.processor.js.map

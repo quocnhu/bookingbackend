@@ -47,14 +47,35 @@ let RawDataRepository = class RawDataRepository {
             data: { payload },
         });
     }
-    markParsed(id, bookingId) {
+    markParsed(id, bookingId, action, outcome) {
         return this.prisma.rawData.update({
             where: { id },
-            data: { status: 'parsed', booking: { connect: { id: bookingId } } },
+            data: {
+                status: 'parsed',
+                action: action ?? undefined,
+                outcome: outcome ?? undefined,
+                linkedBooking: { connect: { id: bookingId } },
+                ...(outcome === 'CREATED'
+                    ? { booking: { connect: { id: bookingId } } }
+                    : {}),
+            },
         });
     }
     countByStatus(status) {
         return this.prisma.rawData.count({ where: { status } });
+    }
+    async countByField(field) {
+        const rows = await this.prisma.rawData.groupBy({
+            by: [field],
+            _count: { _all: true },
+        });
+        const counts = {};
+        for (const row of rows) {
+            const value = row[field];
+            if (value)
+                counts[value] = row._count._all;
+        }
+        return counts;
     }
 };
 exports.RawDataRepository = RawDataRepository;

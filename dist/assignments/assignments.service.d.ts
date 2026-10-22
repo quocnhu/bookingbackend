@@ -224,6 +224,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -366,6 +367,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -508,6 +510,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -653,6 +656,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -796,6 +800,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -938,6 +943,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1080,6 +1086,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1222,6 +1229,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1366,6 +1374,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1551,6 +1560,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
@@ -1693,6 +1703,7 @@ export declare class AssignmentsService {
             paxSequence: number;
             movedFromBusId: string | null;
             createdWho: string | null;
+            emailDate: Date | null;
         })[];
         driver: {
             id: string;
