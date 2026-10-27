@@ -63,6 +63,9 @@ export declare class EvidenceImageDto {
     name?: string;
     url: string;
     ext?: string;
+    storageKey?: string;
+    size?: number;
+    mimeType?: string;
     uploadedAt?: string;
     uploadedByName?: string;
 }

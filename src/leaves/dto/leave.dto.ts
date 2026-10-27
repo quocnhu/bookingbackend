@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsOptional,
@@ -18,6 +19,10 @@ export class CreateLeaveDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isEmergency?: boolean;
 
   @IsOptional()
   @IsString()

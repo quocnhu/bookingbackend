@@ -3,8 +3,9 @@ import {
   BadRequestException,
   NotFoundException,
   Inject,
+  Logger,
 } from '@nestjs/common';
-import { DriveFolder } from '@prisma/client';
+import { DriveFolder, Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '@/prisma/prisma.service';
 import { STORAGE } from '@/storage';
@@ -14,7 +15,19 @@ import {
   RenameFileDto,
   RenameFolderDto,
 } from './dto/drive.dto';
-import { validateFile, sanitizeFileName, ALLOWED_AVATAR_TYPES, MAX_AVATAR_SIZE } from '@/common/utils/file-validation.util';
+import {
+  validateFile,
+  sanitizeFileName,
+  ALLOWED_AVATAR_TYPES,
+  MAX_AVATAR_SIZE,
+} from '@/common/utils/file-validation.util';
+import {
+  formatDateKey,
+  pendingEvidencePrefix,
+  storagePathSegment,
+  tourFolderName,
+  userStorageDir,
+} from '@/common/utils/storage-key.util';
 
 export const AVATAR_SIZE = 515;
 export const DEFAULT_QUOTA_MB = 3072; // 3 GB for every non-ADMIN user
@@ -33,15 +46,88 @@ export interface DriveFileView {
   url: string;
 }
 
+interface ReportEvidenceImage {
+  name?: string | null;
+  url?: string | null;
+  ext?: string | null;
+  storageKey?: string | null;
+  size?: number | null;
+  mimeType?: string | null;
+  uploadedAt?: string | null;
+  uploadedByName?: string | null;
+  [key: string]: unknown;
+}
+
 @Injectable()
 export class DriveService {
+  private readonly logger = new Logger(DriveService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     @Inject(STORAGE) private readonly storage: FileStorage,
   ) {}
 
+  private formatDateKey(date: Date | string = new Date()): string {
+    return formatDateKey(date);
+  }
+
+  private async ensureChildFolder(
+    userId: string,
+    parentId: string,
+    name: string,
+    kind = 'folder',
+  ) {
+    const existing = await this.prisma.driveFolder.findFirst({
+      where: { userId, parentId, name },
+    });
+    if (existing) return existing;
+    return this.prisma.driveFolder.create({
+      data: { userId, parentId, name, kind },
+    });
+  }
+
   /**
-   * Creates the root "{slug}_{userId}" plus the "avatar" folder if missing (idempotent).
+   * Physical path of a folder mirrors the Drive tree:
+   * drive/<user>/avatar and drive/<user>/tour/<date>_<tour name>.
+   * Works identically for local, S3 and Supabase (the key is the same).
+   */
+  private async folderSegments(
+    userId: string,
+    folder: DriveFolder,
+  ): Promise<string[]> {
+    const segments: string[] = [];
+    const seen = new Set<string>();
+    let current: DriveFolder | null = folder;
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id);
+      segments.unshift(storagePathSegment(current.name));
+      if (!current.parentId) break;
+      current = await this.prisma.driveFolder.findFirst({
+        where: { id: current.parentId, userId },
+      });
+    }
+    return segments;
+  }
+
+  private async folderPrefix(
+    userId: string,
+    folder: DriveFolder,
+  ): Promise<string> {
+    return `drive/${(await this.folderSegments(userId, folder)).join('/')}`;
+  }
+
+  private async storageKeyFor(
+    userId: string,
+    folder: DriveFolder,
+    storedName: string,
+  ): Promise<string> {
+    return `${await this.folderPrefix(userId, folder)}/${storedName}`;
+  }
+
+  /**
+   * Creates the root "{slug}_{userId}" plus the "avatar" and "tour" folders
+   * if missing (idempotent). Every user has the same shape:
+   * `<user>/avatar` and `<user>/tour/<date>_<tour name>`.
    * Called every time a user logs in / registers.
    */
   async ensureUserDrive(userId: string) {
@@ -74,7 +160,148 @@ export class DriveService {
         data: { userId, parentId: root.id, name: 'avatar', kind: 'avatar' },
       });
     }
-    return { root, avatar };
+
+    const tour = await this.ensureChildFolder(userId, root.id, 'tour', 'tour');
+
+    return { root, avatar, tour };
+  }
+
+  async ensureDateFolder(userId: string, parentId?: string, dateKey?: string) {
+    let targetParentId = parentId;
+    if (!targetParentId) {
+      const drive = await this.ensureUserDrive(userId);
+      targetParentId = drive.tour.id;
+    }
+    await this.assertFolderAccess(userId, targetParentId);
+    const key = dateKey ?? this.formatDateKey();
+    return this.ensureChildFolder(userId, targetParentId, key);
+  }
+
+  async getOrCreateTourFolder(
+    userId: string,
+    tourName: string,
+    date?: Date | string,
+  ) {
+    const drive = await this.ensureUserDrive(userId);
+    const name = tourFolderName(tourName || 'tour', date ?? new Date());
+    return this.ensureChildFolder(userId, drive.tour.id, name);
+  }
+
+  /**
+   * Moves pending tour-report evidence into the guide's Drive,
+   * under `<user>/tour/{YYYY-MM-DD}_{tour name}`. Runs after Admin/Accounting
+   * verifies the report; safe to call more than once.
+   */
+  async publishTourReportEvidence(assignmentId: string) {
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        guide: { select: { id: true, email: true, name: true } },
+        tourReport: true,
+      },
+    });
+    if (!assignment?.guideId || !assignment.tourReport) {
+      return { moved: 0 };
+    }
+    const report = assignment.tourReport;
+    if (report.status !== 'VERIFIED') {
+      return { moved: 0 };
+    }
+
+    const images: ReportEvidenceImage[] = Array.isArray(report.evidenceImages)
+      ? (report.evidenceImages as unknown as ReportEvidenceImage[])
+      : [];
+    const dir = userStorageDir(
+      assignment.guideId,
+      assignment.guide?.email,
+      assignment.guide?.name,
+    );
+    const prefix = pendingEvidencePrefix(dir, assignment.id);
+    const pending = images.filter(
+      (img) =>
+        typeof img.storageKey === 'string' && img.storageKey.startsWith(prefix),
+    );
+    if (pending.length === 0) {
+      return { moved: 0 };
+    }
+
+    const folder = await this.getOrCreateTourFolder(
+      assignment.guideId,
+      assignment.tourName || assignment.code || 'tour',
+      assignment.startDate,
+    );
+
+    let moved = 0;
+    const updated: ReportEvidenceImage[] = [];
+    for (let i = 0; i < images.length; i += 1) {
+      const img = images[i];
+      const key = typeof img.storageKey === 'string' ? img.storageKey : '';
+      if (!key.startsWith(prefix)) {
+        updated.push(img);
+        continue;
+      }
+      const safeName = sanitizeFileName(
+        img.name || key.split('/').pop() || 'evidence',
+      );
+      const newKey = await this.storageKeyFor(
+        assignment.guideId,
+        folder,
+        `${Date.now()}-${i}-${safeName}`,
+      );
+      try {
+        await this.storage.rename(key, newKey);
+        await this.prisma.driveFile.create({
+          data: {
+            userId: assignment.guideId,
+            folderId: folder.id,
+            name: safeName,
+            mimeType: img.mimeType ?? null,
+            size: Number(img.size) || 0,
+            storageKey: newKey,
+          },
+        });
+        moved += 1;
+        updated.push({
+          ...img,
+          storageKey: newKey,
+          url: this.storage.url(newKey),
+        });
+      } catch (error) {
+        await this.storage.rename(newKey, key).catch(() => undefined);
+        this.logger.warn(
+          `Could not publish evidence ${key} for assignment ${assignment.id}: ${(error as Error).message}`,
+        );
+        updated.push(img);
+      }
+    }
+
+    if (moved > 0) {
+      await this.prisma.tourReport.update({
+        where: { id: report.id },
+        data: {
+          evidenceImages: updated as unknown as Prisma.InputJsonValue,
+        },
+      });
+    }
+
+    const leftovers = await this.storage.list(prefix);
+    const stillPending = new Set(
+      updated
+        .map((img) =>
+          typeof img.storageKey === 'string' ? img.storageKey : '',
+        )
+        .filter((key) => key.startsWith(prefix)),
+    );
+    for (const entry of leftovers) {
+      if (stillPending.has(entry.key)) continue;
+      await this.storage.remove(entry.key).catch(() => undefined);
+    }
+
+    return { moved };
+  }
+
+  async getOrCreateTourGuideDateFolder(userId: string, date?: Date | string) {
+    return this.ensureDateFolder(userId, undefined, this.formatDateKey(date));
   }
 
   async listContents(userId: string, folderId?: string) {
@@ -119,25 +346,82 @@ export class DriveService {
       dto.parentId ?? (await this.ensureUserDrive(userId)).root.id;
     await this.assertFolderAccess(userId, targetId);
     return this.prisma.driveFolder.create({
-      data: { userId, parentId: targetId, name: dto.name.trim(), kind: 'folder' },
+      data: {
+        userId,
+        parentId: targetId,
+        name: dto.name.trim(),
+        kind: 'folder',
+      },
     });
   }
 
   async renameFolder(userId: string, id: string, dto: RenameFolderDto) {
     const folder = await this.assertFolderAccess(userId, id);
     if (folder.kind !== 'folder') {
-      throw new BadRequestException('Root and avatar folders cannot be renamed');
+      throw new BadRequestException(
+        'Root and avatar folders cannot be renamed',
+      );
     }
-    return this.prisma.driveFolder.update({
+    const updated = await this.prisma.driveFolder.update({
       where: { id },
       data: { name: dto.name.trim() },
     });
+
+    const ids = await this.collectFolderIds(userId, id);
+    const files = await this.prisma.driveFile.findMany({
+      where: { userId, folderId: { in: ids } },
+      include: { folder: true },
+    });
+    for (const file of files) {
+      const baseName = file.storageKey.split('/').pop() || file.name;
+      try {
+        const newKey = await this.storageKeyFor(userId, file.folder, baseName);
+        if (newKey === file.storageKey) continue;
+        await this.storage.rename(file.storageKey, newKey);
+        await this.prisma.driveFile.update({
+          where: { id: file.id },
+          data: { storageKey: newKey },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Could not move file ${file.id} after renaming folder ${id}: ${(error as Error).message}`,
+        );
+      }
+    }
+    return updated;
+  }
+
+  private async collectFolderIds(
+    userId: string,
+    rootId: string,
+  ): Promise<string[]> {
+    const folders = await this.prisma.driveFolder.findMany({
+      where: { userId },
+      select: { id: true, parentId: true },
+    });
+    const children = new Map<string, string[]>();
+    for (const folder of folders) {
+      if (!folder.parentId) continue;
+      const list = children.get(folder.parentId) ?? [];
+      list.push(folder.id);
+      children.set(folder.parentId, list);
+    }
+    const ids: string[] = [];
+    const queue = [rootId];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      ids.push(id);
+      queue.push(...(children.get(id) ?? []));
+    }
+    return ids;
   }
 
   async deleteFolder(userId: string, id: string) {
     const folder = await this.assertFolderAccess(userId, id);
     if (folder.kind !== 'folder') {
-      throw new BadRequestException('Root and avatar folders cannot be deleted');
+      throw new BadRequestException(
+        'Root and avatar folders cannot be deleted',
+      );
     }
     const keys = await this.collectFileKeys(userId, id);
     for (const key of keys) {
@@ -173,12 +457,37 @@ export class DriveService {
     file: Express.Multer.File,
     folderId?: string,
     clientName?: string,
+    options?: {
+      date?: string | Date;
+      useDateFolder?: boolean;
+      tourName?: string;
+    },
   ): Promise<DriveFileView> {
     if (!file?.buffer) {
       throw new BadRequestException('No file uploaded');
     }
-    const targetId =
-      folderId ?? (await this.ensureUserDrive(userId)).root.id;
+    let targetId: string;
+    if (folderId) {
+      targetId = folderId;
+    } else {
+      const drive = await this.ensureUserDrive(userId);
+      if (options?.tourName) {
+        const tourFolder = await this.getOrCreateTourFolder(
+          userId,
+          options.tourName,
+          options.date,
+        );
+        targetId = tourFolder.id;
+      } else if (options?.useDateFolder) {
+        const dateFolder = await this.getOrCreateTourGuideDateFolder(
+          userId,
+          options?.date,
+        );
+        targetId = dateFolder.id;
+      } else {
+        targetId = drive.root.id;
+      }
+    }
     const folder = await this.assertFolderAccess(userId, targetId);
 
     const ext = (file.originalname.split('.').pop() || '').toLowerCase();
@@ -204,7 +513,7 @@ export class DriveService {
       where: { id: userId },
       select: { email: true, name: true, role: true, storageQuotaMb: true },
     });
-    const userDir = `${this.userSlug(user?.email, user?.name, userId)}_${userId}`;
+    const userDir = userStorageDir(userId, user?.email, user?.name);
 
     if (user?.role !== 'ADMIN') {
       if (buffer.length > MAX_UPLOAD_BYTES) {
@@ -229,18 +538,27 @@ export class DriveService {
       }
     }
 
-    const baseName = sanitizeFileName(clientName || file.originalname || `file.${ext || 'bin'}`);
+    const baseName = sanitizeFileName(
+      clientName || file.originalname || `file.${ext || 'bin'}`,
+    );
     const finalName = isAvatar ? `avatar.${finalExt}` : baseName;
     const storedName = isAvatar ? finalName : `${Date.now()}-${finalName}`;
 
-    const storageKey = `drive/${userDir}/${targetId}/${storedName}`;
+    const storageKey = await this.storageKeyFor(userId, folder, storedName);
 
     if (isAvatar) {
-      // folder-based: delete all old avatar images in the folder before writing the new one.
-      // Because the new image always has the same name avatar.{ext}, deleting after saving would delete the new image too.
-      const oldFiles = await this.storage.list(`drive/${userDir}/${targetId}/`);
-      for (const f of oldFiles) {
-        await this.storage.remove(f.key);
+      // Delete all old avatar images in the folder before writing the new one:
+      // the new image always has the same name avatar.{ext}, so deleting after
+      // saving would remove the new file too. Also clean legacy ID-based paths.
+      const prefixes = new Set([
+        `${await this.folderPrefix(userId, folder)}/`,
+        `drive/${userDir}/${targetId}/`,
+      ]);
+      for (const prefix of prefixes) {
+        const oldFiles = await this.storage.list(prefix);
+        for (const f of oldFiles) {
+          await this.storage.remove(f.key);
+        }
       }
       await this.prisma.driveFile.deleteMany({
         where: { userId, folderId: targetId },
@@ -370,9 +688,8 @@ export class DriveService {
       const pipeline = sharp(file.buffer, { failOn: 'none' })
         .rotate()
         .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: 'cover', position: 'centre' });
-      const buffer = await (isPng
-        ? pipeline.png({ quality: 95 })
-        : pipeline.jpeg({ quality: 90 })
+      const buffer = await (
+        isPng ? pipeline.png({ quality: 95 }) : pipeline.jpeg({ quality: 90 })
       ).toBuffer();
       return {
         buffer,

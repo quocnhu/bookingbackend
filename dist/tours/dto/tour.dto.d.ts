@@ -1,11 +1,16 @@
 import { PaginationDto } from "../../common/dto/pagination.dto";
-import { TourType } from '@prisma/client';
+import { DurationUnit, TourType } from '@prisma/client';
 export declare class CreateTourDto {
     name: string;
     code?: string;
     type: TourType;
     thumbnailUrl?: string;
+    departureTimes?: string[];
     durationDays?: number;
+    durationValue?: number;
+    durationUnit?: DurationUnit;
+    freeCancellationHours?: number;
+    cancellationPolicy?: string;
     adultPrice?: number;
     childPrice?: number;
     infantPrice?: number;
@@ -28,7 +33,12 @@ export declare class UpdateTourDto {
     code?: string;
     type?: TourType;
     thumbnailUrl?: string;
+    departureTimes?: string[];
     durationDays?: number;
+    durationValue?: number;
+    durationUnit?: DurationUnit;
+    freeCancellationHours?: number;
+    cancellationPolicy?: string;
     departureLocation?: string;
     transportation?: string;
     overview?: string;

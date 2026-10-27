@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsEnum,
   IsIn,
+  IsMilitaryTime,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -100,6 +101,10 @@ export class TemplateBookingDto {
   /** ISO string or Date — validated with Date.parse() in the schema. */
   @IsOptional()
   startingDate?: string | Date;
+
+  @IsOptional()
+  @IsMilitaryTime()
+  departureTime?: string;
 
   @IsOptional()
   @IsString()

@@ -290,6 +290,9 @@ class EvidenceImageDto {
     name;
     url;
     ext;
+    storageKey;
+    size;
+    mimeType;
     uploadedAt;
     uploadedByName;
 }
@@ -308,6 +311,22 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], EvidenceImageDto.prototype, "ext", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EvidenceImageDto.prototype, "storageKey", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], EvidenceImageDto.prototype, "size", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EvidenceImageDto.prototype, "mimeType", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

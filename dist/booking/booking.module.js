@@ -16,6 +16,7 @@ const booking_normalizer_service_1 = require("../parsing/booking-normalizer.serv
 const audit_module_1 = require("../audit/audit.module");
 const queues_module_1 = require("../queues/queues.module");
 const google_module_1 = require("../google/google.module");
+const redis_provider_1 = require("../ingestion/redis.provider");
 let BookingModule = class BookingModule {
 };
 exports.BookingModule = BookingModule;
@@ -24,6 +25,7 @@ exports.BookingModule = BookingModule = __decorate([
         imports: [audit_module_1.AuditModule, queues_module_1.QueuesModule, google_module_1.GoogleModule],
         controllers: [booking_controller_1.BookingController],
         providers: [
+            redis_provider_1.redisProvider,
             booking_service_1.BookingService,
             booking_manual_processor_1.BookingManualProcessor,
             booking_normalizer_service_1.BookingNormalizerService,

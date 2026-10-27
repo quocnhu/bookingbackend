@@ -20,7 +20,13 @@ const booking_forward_service_1 = require("../booking/booking-forward.service");
 const parser_registry_1 = require("./parsers/parser-registry");
 const parsing_queue_1 = require("./parsing.queue");
 const booking_fields_schema_1 = require("./validation/booking-fields.schema");
-const FORWARD_OUTCOMES = new Set(['CREATED', 'UPDATED', 'CANCELLED']);
+const FORWARD_OUTCOMES = new Set([
+    'CREATED',
+    'UPDATED',
+    'CANCELLED',
+    'SKIPPED',
+    'UNCHANGED',
+]);
 let ParsingProcessor = ParsingProcessor_1 = class ParsingProcessor extends bullmq_1.WorkerHost {
     rawDataRepo;
     rawDataService;
@@ -66,7 +72,17 @@ let ParsingProcessor = ParsingProcessor_1 = class ParsingProcessor extends bullm
             await this.rawDataService.updatePayload(rawDataId, payload);
         }
         const { booking, outcome } = await this.bookingService.upsert(validation.data, rawDataId, undefined, undefined, this.resolveEmailDate(payload));
-        await this.rawDataService.markParsed(rawDataId, booking.id, validation.data.action, outcome);
+        const isDuplicate = outcome === 'UNCHANGED' || outcome === 'SKIPPED';
+        if (isDuplicate) {
+            const earlierDuplicates = await this.rawDataRepo.countDuplicateRowsForBooking(booking.id);
+            if (earlierDuplicates > 0) {
+                await this.rawDataRepo.delete(rawDataId);
+                this.logger.log(`Blocked duplicate mail ${rawDataId} for booking ${booking.bookingRef} — an earlier duplicate was already recorded`);
+                return { status: 'duplicate_blocked', bookingId: booking.id };
+            }
+        }
+        const displayAction = isDuplicate ? 'DUPLICATE' : validation.data.action;
+        await this.rawDataService.markParsed(rawDataId, booking.id, displayAction, outcome);
         this.logger.log(`Parsed rawData ${rawDataId} (${parser.templateTag}) -> booking ${booking.bookingRef} [${validation.data.action}/${outcome}]`);
         if (FORWARD_OUTCOMES.has(outcome)) {
             await this.bookingForward.forward({

@@ -23,6 +23,7 @@ export type EmailFields = {
   latitude?: number;
   longitude?: number;
   startingDate?: Date;
+  departureTime?: string;
   customerName?: string;
   hotelName?: string;
   phone?: string;

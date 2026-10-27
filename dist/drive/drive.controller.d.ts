@@ -33,10 +33,10 @@ export declare class DriveController {
             createdAt: Date;
             name: string;
             userId: string | null;
-            folderId: string;
-            mimeType: string | null;
-            size: number;
             storageKey: string;
+            size: number;
+            mimeType: string | null;
+            folderId: string;
         }[];
         quota: {
             unlimited: boolean;
@@ -53,6 +53,24 @@ export declare class DriveController {
             usedPercent: number;
             maxUploadBytes: number;
         };
+    }>;
+    ensureDate(user: AuthenticatedUser, date?: string): Promise<{
+        id: string;
+        createdAt: Date;
+        name: string;
+        userId: string | null;
+        updatedAt: Date;
+        parentId: string | null;
+        kind: string;
+    }>;
+    ensureDatePost(user: AuthenticatedUser, date?: string): Promise<{
+        id: string;
+        createdAt: Date;
+        name: string;
+        userId: string | null;
+        updatedAt: Date;
+        parentId: string | null;
+        kind: string;
     }>;
     folder(id: string, user: AuthenticatedUser): Promise<{
         current: {
@@ -83,10 +101,10 @@ export declare class DriveController {
             createdAt: Date;
             name: string;
             userId: string | null;
-            folderId: string;
-            mimeType: string | null;
-            size: number;
             storageKey: string;
+            size: number;
+            mimeType: string | null;
+            folderId: string;
         }[];
         quota: {
             unlimited: boolean;
@@ -126,16 +144,16 @@ export declare class DriveController {
         success: boolean;
     }>;
     uploadAvatar(file: Express.Multer.File, targetUserId: string | undefined, user: AuthenticatedUser): Promise<import("./drive.service").DriveFileView>;
-    upload(file: Express.Multer.File, folderId: string, name: string, user: AuthenticatedUser): Promise<import("./drive.service").DriveFileView>;
+    upload(file: Express.Multer.File, folderId: string, name: string, date: string, useDateFolder: string, tourName: string, user: AuthenticatedUser): Promise<import("./drive.service").DriveFileView>;
     renameFile(id: string, dto: RenameFileDto, user: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         name: string;
         userId: string | null;
-        folderId: string;
-        mimeType: string | null;
-        size: number;
         storageKey: string;
+        size: number;
+        mimeType: string | null;
+        folderId: string;
     }>;
     deleteFile(id: string, user: AuthenticatedUser): Promise<{
         success: boolean;

@@ -5,7 +5,25 @@ import type { PrismaService } from '@/prisma/prisma.service';
 
 const MAILBOX = 'tracked@example.com';
 
-function makeService(env: Record<string, string | undefined>) {
+function makeRedis() {
+  const store = new Map<string, string>();
+  return {
+    set: jest.fn((key: string, value: string) => {
+      if (store.has(key)) return Promise.resolve(null);
+      store.set(key, value);
+      return Promise.resolve('OK');
+    }),
+    del: jest.fn((key: string) => {
+      store.delete(key);
+      return Promise.resolve(1);
+    }),
+  };
+}
+
+function makeService(
+  env: Record<string, string | undefined>,
+  redis?: ReturnType<typeof makeRedis>,
+) {
   const config = {
     get: jest.fn((key: string) => env[key]),
   } as unknown as ConfigService;
@@ -15,6 +33,9 @@ function makeService(env: Record<string, string | undefined>) {
       findUnique: jest
         .fn()
         .mockResolvedValue({ refreshToken: 'refresh-token' }),
+    },
+    rawData: {
+      count: jest.fn().mockResolvedValue(1),
     },
   };
 
@@ -31,6 +52,7 @@ function makeService(env: Record<string, string | undefined>) {
     prisma as unknown as PrismaService,
     config,
     auth as unknown as GmailAuthService,
+    redis as never,
   );
 
   return { service, prisma, auth, send };
@@ -215,6 +237,87 @@ describe('BookingForwardService', () => {
       sent: false,
       reason: 'SEND_FAILED',
     });
+  });
+
+  it('sends the duplicate-blocked notice only once per booking ref', async () => {
+    const redis = makeRedis();
+    const { service, send } = makeService(
+      {
+        BOOKING_FORWARD_ENABLED: 'true',
+        BOOKING_FORWARD_TO: MAILBOX,
+      },
+      redis,
+    );
+
+    await expect(
+      service.forward(input({ outcome: 'UNCHANGED' })),
+    ).resolves.toEqual({ sent: true });
+    await expect(
+      service.forward(input({ outcome: 'UNCHANGED', messageId: 'msg-2' })),
+    ).resolves.toEqual({
+      sent: false,
+      reason: 'DUPLICATE_NOTICE_SUPPRESSED',
+    });
+
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses the notice when earlier duplicate rows already exist', async () => {
+    const redis = makeRedis();
+    const { service, prisma, send } = makeService(
+      {
+        BOOKING_FORWARD_ENABLED: 'true',
+        BOOKING_FORWARD_TO: MAILBOX,
+      },
+      redis,
+    );
+    prisma.rawData.count.mockResolvedValueOnce(2);
+
+    await expect(
+      service.forward(input({ outcome: 'UNCHANGED' })),
+    ).resolves.toEqual({
+      sent: false,
+      reason: 'DUPLICATE_NOTICE_SUPPRESSED',
+    });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('still forwards every new/updated/cancelled booking', async () => {
+    const redis = makeRedis();
+    const { service, send } = makeService(
+      {
+        BOOKING_FORWARD_ENABLED: 'true',
+        BOOKING_FORWARD_TO: MAILBOX,
+      },
+      redis,
+    );
+
+    await service.forward(input({ outcome: 'CREATED' }));
+    await service.forward(input({ outcome: 'UPDATED', action: 'MODIFY' }));
+    await service.forward(input({ outcome: 'CANCELLED', action: 'CANCEL' }));
+
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+
+  it('releases the duplicate claim when sending fails', async () => {
+    const redis = makeRedis();
+    const { service, send } = makeService(
+      {
+        BOOKING_FORWARD_ENABLED: 'true',
+        BOOKING_FORWARD_TO: MAILBOX,
+      },
+      redis,
+    );
+    send.mockRejectedValueOnce(new Error('network down'));
+
+    await expect(
+      service.forward(input({ outcome: 'UNCHANGED' })),
+    ).resolves.toEqual({ sent: false, reason: 'SEND_FAILED' });
+    await expect(
+      service.forward(input({ outcome: 'UNCHANGED', messageId: 'msg-2' })),
+    ).resolves.toEqual({ sent: true });
+
+    expect(send).toHaveBeenCalledTimes(2);
   });
 
   it('strips CR/LF from the booking ref to block header injection', async () => {

@@ -11,6 +11,7 @@ exports.RAW_DATA_ACTION = {
     CREATE: 'CREATE',
     MODIFY: 'MODIFY',
     CANCEL: 'CANCEL',
+    DUPLICATE: 'DUPLICATE',
 };
 exports.RAW_DATA_OUTCOME = {
     CREATED: 'CREATED',

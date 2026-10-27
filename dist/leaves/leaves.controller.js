@@ -28,6 +28,9 @@ let LeavesController = class LeavesController {
     findMy(actor) {
         return this.leavesService.findMy(actor);
     }
+    findMySummary(actor) {
+        return this.leavesService.findMySummary(actor);
+    }
     create(dto, actor) {
         return this.leavesService.create(dto, actor);
     }
@@ -54,6 +57,13 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], LeavesController.prototype, "findMy", null);
+__decorate([
+    (0, common_1.Get)('my-summary'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], LeavesController.prototype, "findMySummary", null);
 __decorate([
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),

@@ -88,6 +88,24 @@ export class RawDataRepository {
     });
   }
 
+  /**
+   * How many duplicate rows are already recorded for this booking.
+   * Used to block the second and later duplicate mail before it is linked.
+   */
+  countDuplicateRowsForBooking(bookingId: string) {
+    return this.prisma.rawData.count({
+      where: {
+        linkedBookingId: bookingId,
+        outcome: { in: ['UNCHANGED', 'SKIPPED'] },
+      },
+    });
+  }
+
+  /** Permanently drop a mail that was blocked as a later duplicate. */
+  delete(id: string) {
+    return this.prisma.rawData.delete({ where: { id } });
+  }
+
   countByStatus(status: string) {
     return this.prisma.rawData.count({ where: { status } });
   }
@@ -100,7 +118,7 @@ export class RawDataRepository {
     });
     const counts: Record<string, number> = {};
     for (const row of rows) {
-      const value = row[field] as string | null;
+      const value = row[field];
       if (value) counts[value] = row._count._all;
     }
     return counts;

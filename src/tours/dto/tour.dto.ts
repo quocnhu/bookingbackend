@@ -1,9 +1,11 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsDateString,
   IsEnum,
   IsInt,
+  IsMilitaryTime,
   IsNumber,
   IsOptional,
   IsString,
@@ -12,7 +14,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
-import { TourType } from '@prisma/client';
+import { DurationUnit, TourType } from '@prisma/client';
 
 export class CreateTourDto {
   @IsString()
@@ -30,10 +32,36 @@ export class CreateTourDto {
   thumbnailUrl?: string;
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @IsMilitaryTime({ each: true })
+  departureTimes?: string[];
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   durationDays?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  durationValue?: number;
+
+  @IsOptional()
+  @IsEnum(DurationUnit)
+  durationUnit?: DurationUnit;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  freeCancellationHours?: number;
+
+  @IsOptional()
+  @IsString()
+  cancellationPolicy?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -125,10 +153,36 @@ export class UpdateTourDto {
   thumbnailUrl?: string;
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @IsMilitaryTime({ each: true })
+  departureTimes?: string[];
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   durationDays?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  durationValue?: number;
+
+  @IsOptional()
+  @IsEnum(DurationUnit)
+  durationUnit?: DurationUnit;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  freeCancellationHours?: number;
+
+  @IsOptional()
+  @IsString()
+  cancellationPolicy?: string;
 
   @IsOptional()
   @IsString()

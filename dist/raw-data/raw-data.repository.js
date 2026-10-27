@@ -61,6 +61,17 @@ let RawDataRepository = class RawDataRepository {
             },
         });
     }
+    countDuplicateRowsForBooking(bookingId) {
+        return this.prisma.rawData.count({
+            where: {
+                linkedBookingId: bookingId,
+                outcome: { in: ['UNCHANGED', 'SKIPPED'] },
+            },
+        });
+    }
+    delete(id) {
+        return this.prisma.rawData.delete({ where: { id } });
+    }
     countByStatus(status) {
         return this.prisma.rawData.count({ where: { status } });
     }

@@ -217,6 +217,19 @@ export class EvidenceImageDto {
 
   @IsOptional()
   @IsString()
+  storageKey?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  size?: number;
+
+  @IsOptional()
+  @IsString()
+  mimeType?: string;
+
+  @IsOptional()
+  @IsString()
   uploadedAt?: string;
 
   @IsOptional()

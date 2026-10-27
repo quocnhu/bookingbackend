@@ -178,9 +178,10 @@ export class GmailSubscriberService implements OnModuleInit, OnModuleDestroy {
       this.subscription.on('error', (err: Error) => {
         const code = (err as { code?: number }).code;
         this.logger.error(`Pub/Sub subscription error: ${err.message}`);
-        // NOT_FOUND (5) / PERMISSION_DENIED (7) never recover on their own —
-        // drop the stream and let the retry loop reconnect once it is fixed.
-        if (code === 5 || code === 7) {
+        // NOT_FOUND (5), PERMISSION_DENIED (7) and UNAUTHENTICATED (16) never
+        // recover on their own — drop the stream and let the retry loop
+        // reconnect once the subscription/key is fixed.
+        if (code === 5 || code === 7 || code === 16) {
           void this.closeStream();
           this.scheduleReconnect();
         }
@@ -259,6 +260,17 @@ export class GmailSubscriberService implements OnModuleInit, OnModuleDestroy {
           `(roles/pubsub.subscriber) and pubsub.subscriptions.create on the project ` +
           `(roles/pubsub.editor / roles/pubsub.admin) to auto-create it. Retrying in ` +
           `${Math.round(this.reconnectMs() / 1000)}s.`,
+      );
+      return;
+    }
+
+    if (code === 16) {
+      this.logger.error(
+        `Streaming pull: UNAUTHENTICATED on "${name}" (project "${project}"). ` +
+          `The key in GOOGLE_APPLICATION_CREDENTIALS is invalid, revoked, or belongs ` +
+          `to a deleted service account. Download a fresh JSON key for the service ` +
+          `account that was granted roles/pubsub.subscriber, replace the file and ` +
+          `restart. Retrying in ${Math.round(this.reconnectMs() / 1000)}s.`,
       );
       return;
     }

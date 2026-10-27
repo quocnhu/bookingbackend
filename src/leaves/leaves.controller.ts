@@ -31,6 +31,11 @@ export class LeavesController {
     return this.leavesService.findMy(actor);
   }
 
+  @Get('my-summary')
+  findMySummary(@CurrentUser() actor: AuthenticatedUser) {
+    return this.leavesService.findMySummary(actor);
+  }
+
   @Post()
   create(@Body() dto: CreateLeaveDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.leavesService.create(dto, actor);

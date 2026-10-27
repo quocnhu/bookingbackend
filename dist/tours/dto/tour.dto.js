@@ -19,7 +19,12 @@ class CreateTourDto {
     code;
     type;
     thumbnailUrl;
+    departureTimes;
     durationDays;
+    durationValue;
+    durationUnit;
+    freeCancellationHours;
+    cancellationPolicy;
     adultPrice;
     childPrice;
     infantPrice;
@@ -51,11 +56,42 @@ __decorate([
 ], CreateTourDto.prototype, "thumbnailUrl", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ArrayMaxSize)(12),
+    (0, class_validator_1.IsMilitaryTime)({ each: true }),
+    __metadata("design:type", Array)
+], CreateTourDto.prototype, "departureTimes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], CreateTourDto.prototype, "durationDays", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], CreateTourDto.prototype, "durationValue", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.DurationUnit),
+    __metadata("design:type", String)
+], CreateTourDto.prototype, "durationUnit", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], CreateTourDto.prototype, "freeCancellationHours", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateTourDto.prototype, "cancellationPolicy", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
@@ -152,7 +188,12 @@ class UpdateTourDto {
     code;
     type;
     thumbnailUrl;
+    departureTimes;
     durationDays;
+    durationValue;
+    durationUnit;
+    freeCancellationHours;
+    cancellationPolicy;
     departureLocation;
     transportation;
     overview;
@@ -196,11 +237,42 @@ __decorate([
 ], UpdateTourDto.prototype, "thumbnailUrl", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ArrayMaxSize)(12),
+    (0, class_validator_1.IsMilitaryTime)({ each: true }),
+    __metadata("design:type", Array)
+], UpdateTourDto.prototype, "departureTimes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], UpdateTourDto.prototype, "durationDays", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], UpdateTourDto.prototype, "durationValue", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.DurationUnit),
+    __metadata("design:type", String)
+], UpdateTourDto.prototype, "durationUnit", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], UpdateTourDto.prototype, "freeCancellationHours", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateTourDto.prototype, "cancellationPolicy", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

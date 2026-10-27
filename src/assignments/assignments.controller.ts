@@ -126,8 +126,12 @@ export class AssignmentsController {
 
   @Put(':id')
   @Permissions('assignment.update')
-  update(@Param('id') id: string, @Body() dto: UpdateAssignmentDto) {
-    return this.assignmentsService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateAssignmentDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.update(id, dto, actor);
   }
 
   @Put(':id/status')
@@ -141,8 +145,12 @@ export class AssignmentsController {
 
   @Post(':id/bookings/reorder')
   @Permissions('assignment.update')
-  reorderBookings(@Param('id') id: string, @Body() dto: ReorderBookingsDto) {
-    return this.assignmentsService.reorderBookings(id, dto.bookingIds);
+  reorderBookings(
+    @Param('id') id: string,
+    @Body() dto: ReorderBookingsDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.reorderBookings(id, dto.bookingIds, actor);
   }
 
   @Put(':id/bookings/:bookingId/move')
@@ -151,18 +159,24 @@ export class AssignmentsController {
     @Param('id') id: string,
     @Param('bookingId') bookingId: string,
     @Body() dto: MoveBookingDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.assignmentsService.moveBooking(
       id,
       bookingId,
       dto.toAssignmentId,
+      actor,
     );
   }
 
   @Post(':id/bookings')
   @Permissions('assignment.update')
-  assignBookings(@Param('id') id: string, @Body() dto: AssignBookingsDto) {
-    return this.assignmentsService.assignBookings(id, dto);
+  assignBookings(
+    @Param('id') id: string,
+    @Body() dto: AssignBookingsDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.assignBookings(id, dto, actor);
   }
 
   @Delete(':id/bookings/:bookingId')
@@ -170,14 +184,18 @@ export class AssignmentsController {
   removeBooking(
     @Param('id') id: string,
     @Param('bookingId') bookingId: string,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.assignmentsService.removeBooking(id, bookingId);
+    return this.assignmentsService.removeBooking(id, bookingId, actor);
   }
 
   @Post(':id/sync-dates')
   @Permissions('assignment.update')
-  syncDatesFromBookings(@Param('id') id: string) {
-    return this.assignmentsService.syncDatesFromBookings(id);
+  syncDatesFromBookings(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.syncDatesFromBookings(id, actor);
   }
 
   @Delete(':id')

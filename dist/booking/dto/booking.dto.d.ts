@@ -11,6 +11,7 @@ export declare class CreateBookingDto {
     latitude?: number;
     longitude?: number;
     startingDate?: string | Date;
+    departureTime?: string;
     customerName: string;
     hotelName: string;
     phone: string;
@@ -32,6 +33,7 @@ export declare class UpdateBookingDto {
     latitude?: number;
     longitude?: number;
     startingDate?: string | Date;
+    departureTime?: string;
     customerName?: string;
     hotelName?: string;
     phone?: string;

@@ -94,13 +94,34 @@ export class AdvancedViatorParser implements TemplateParser {
     const bookingRef = this.bookingRef(subject, text, labels);
     if (!bookingRef) return null;
 
-    const product = labels.get('product name') ?? '';
-    const productOption = labels.get('product option') ?? '';
-    const travel = this.travelLine(labels.get('travel date/pax'));
-    const pickUp = this.splitPickUp(labels.get('pickup point'));
+    const product =
+      labels.get('product name') ??
+      labels.get('product') ??
+      this.extractLabel(text, ['product name']) ??
+      '';
+    const productOption =
+      labels.get('product option') ??
+      labels.get('option') ??
+      this.extractLabel(text, ['product option']) ??
+      '';
+    const travelLineStr =
+      labels.get('travel date/pax') ??
+      labels.get('travel date / pax') ??
+      labels.get('travel date') ??
+      this.extractLabel(text, ['travel date/pax', 'travel date / pax']);
+    const travel = this.travelLine(travelLineStr);
+    const pickUp =
+      this.splitPickUp(
+        labels.get('pickup point') ?? this.extractLabel(text, ['pickup point']),
+      );
     const customerMessage = this.customerMessage(text);
 
-    const leadTraveler = labels.get('lead traveler');
+    const leadTraveler =
+      labels.get('lead traveler') ??
+      labels.get('lead traveller') ??
+      labels.get('traveler') ??
+      labels.get('traveller') ??
+      this.extractLabel(text, ['lead traveler', 'lead traveller']);
     const customerName =
       leadTraveler ||
       // The subject salutation is a SHORT form ("Pablo M"). It may only name a
@@ -108,7 +129,12 @@ export class AdvancedViatorParser implements TemplateParser {
       // name already stored on the booking.
       (action === 'CREATE' ? this.fromSalutation(subject) : undefined) ||
       undefined;
-    const phone = labels.get('phone number') || undefined;
+    const phone =
+      labels.get('phone number') ??
+      labels.get('phone') ??
+      labels.get('contact number') ??
+      this.extractLabel(text, ['phone number']) ??
+      undefined;
     const mail = this.customerMail(text, payload);
 
     const startingDate = this.startingDate(travel.date, {
@@ -127,7 +153,7 @@ export class AdvancedViatorParser implements TemplateParser {
       channel:
         resolveBookingChannel(product, productOption, payload.from) ??
         BookingProvider.VIATOR,
-      customerName,
+      customerName: customerName || undefined,
       mail: mail.address,
       phone,
       tourName: product || undefined,
@@ -135,8 +161,8 @@ export class AdvancedViatorParser implements TemplateParser {
       startingDate,
       totalPax,
       paxDetail,
-      hotelName: pickUp.hotel,
-      address: pickUp.address,
+      hotelName: pickUp.hotel || undefined,
+      address: pickUp.address || undefined,
     };
 
     // Everything that has no dedicated Booking column is kept verbatim in
@@ -147,10 +173,10 @@ export class AdvancedViatorParser implements TemplateParser {
       productName: product || null,
       productOption: productOption || null,
       bookingRef,
-      leadTraveler: labels.get('lead traveler') ?? null,
+      leadTraveler: leadTraveler ?? null,
       phoneNumber: phone ?? null,
-      travelDatePax: labels.get('travel date/pax') ?? null,
-      pickupPoint: labels.get('pickup point') ?? null,
+      travelDatePax: travelLineStr ?? null,
+      pickupPoint: pickUp.hotel || pickUp.address ? [pickUp.hotel, pickUp.address].filter(Boolean).join(', ') : (labels.get('pickup point') ?? null),
       customerMessage: customerMessage || null,
       whatsapp: this.whatsapp(customerMessage) ?? null,
       customerEmail: mail.address ?? null,
@@ -196,7 +222,24 @@ export class AdvancedViatorParser implements TemplateParser {
       asString(payload.snippet),
       this.htmlToText(asString(payload.html)),
     ];
-    return parts.filter((p) => p.trim() !== '').join('\n');
+    const combined = parts.filter((p) => p.trim() !== '').join('\n');
+    // Unwrap forwarded messages (Gmail "Fwd:" / "--- Forwarded message ---")
+    return this.unwrapForward(combined);
+  }
+
+  private unwrapForward(text: string): string {
+    // Gmail style
+    const markers = [
+      /[-]{3,}\s*forwarded message\s*[-]{3,}/i,
+      /begin forwarded message:/i,
+    ];
+    for (const m of markers) {
+      const idx = text.search(m);
+      if (idx >= 0) {
+        return text.slice(idx);
+      }
+    }
+    return text;
   }
 
   /** Very small HTML → text (block tags become newlines, entities decoded). */
@@ -227,7 +270,9 @@ export class AdvancedViatorParser implements TemplateParser {
       const line = rawLine.trim();
       if (!line) continue;
 
-      const m = /^([A-Za-z][A-Za-z0-9 /()_-]{0,40}):\s*(.+)$/.exec(line);
+      // Also handle bullet/list style "  - Label: value"
+      const cleaned = line.replace(/^[-*•\u2022]\s+/, '');
+      const m = /^([A-Za-z][A-Za-z0-9 /()'_-]{0,60}):\s*(.+)$/.exec(cleaned);
       if (!m) continue;
 
       const label = m[1].trim().toLowerCase();
@@ -238,6 +283,21 @@ export class AdvancedViatorParser implements TemplateParser {
     }
 
     return out;
+  }
+
+  private extractLabel(text: string, names: string[]): string | undefined {
+    for (const name of names) {
+      const re = new RegExp(
+        String.raw`(?:^|\n)\s*[-*•\u2022]?\s*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\s*:\s*(.+)`,
+        'im',
+      );
+      const m = re.exec(text);
+      if (m) {
+        const v = m[1].trim().replace(/\.$/, '');
+        if (v) return v;
+      }
+    }
+    return undefined;
   }
 
   /** "BR-1457720525" (details block) → "BR-1457720525" (subject fallback). */

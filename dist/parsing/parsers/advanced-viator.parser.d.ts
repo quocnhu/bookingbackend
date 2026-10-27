@@ -7,8 +7,10 @@ export declare class AdvancedViatorParser implements TemplateParser {
     private isMessageCentre;
     private isStateChange;
     private flatten;
+    private unwrapForward;
     private htmlToText;
     private readLabels;
+    private extractLabel;
     private bookingRef;
     private travelLine;
     private sumPax;

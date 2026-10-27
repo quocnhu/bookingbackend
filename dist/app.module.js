@@ -11,7 +11,6 @@ const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 const config_1 = require("@nestjs/config");
 const serve_static_1 = require("@nestjs/serve-static");
-const path_1 = require("path");
 const throttler_1 = require("@nestjs/throttler");
 const schedule_1 = require("@nestjs/schedule");
 const prisma_module_1 = require("./prisma/prisma.module");
@@ -78,7 +77,7 @@ exports.AppModule = AppModule = __decorate([
             transportation_providers_module_1.TransportationProvidersModule,
             accounting_module_1.AccountingModule,
             serve_static_1.ServeStaticModule.forRoot({
-                rootPath: (0, path_1.join)(process.cwd(), 'uploads'),
+                rootPath: (0, storage_1.uploadRootPath)(),
                 serveRoot: '/uploads',
             }),
         ],

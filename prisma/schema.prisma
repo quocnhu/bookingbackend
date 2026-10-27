@@ -27,6 +27,11 @@ enum TourType {
   GROUP_TOUR
 }
 
+enum DurationUnit {
+  HOUR
+  DAY
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -201,13 +206,14 @@ model User {
 }
 
 model UserLeave {
-  id        String      @id @default(uuid())
-  userId    String
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  startDate DateTime
-  endDate   DateTime
-  reason    String?
-  status    LeaveStatus @default(PENDING)
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  isEmergency Boolean     @default(false)
+  status      LeaveStatus @default(PENDING)
 
   reviewedById String?
   reviewedBy   User?     @relation("LeaveReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
@@ -293,11 +299,15 @@ model Tour {
   // stable across a rename (the slug is only regenerated when it is empty).
   slug String? @unique
 
-  adultPrice   Decimal? @default(0)
-  childPrice   Decimal? @default(0)
-  infantPrice  Decimal? @default(0)
-  currency     String   @default("VND")
-  durationDays Int?     @default(1) // Half-day tours = 1; otherwise number of days
+  adultPrice            Decimal?      @default(0)
+  childPrice            Decimal?      @default(0)
+  infantPrice           Decimal?      @default(0)
+  currency              String        @default("VND")
+  durationDays          Int?          @default(1) // Half-day tours = 1; otherwise number of days
+  durationValue         Int? // e.g. 5
+  durationUnit          DurationUnit? // HOUR or DAY; null = fall back to durationDays
+  freeCancellationHours Int? // Free cancellation cutoff before departure; null = not offered
+  cancellationPolicy    String?       @db.Text // Optional display text
 
   // Promotion / discount — separate per tour type
   privateDiscountPercent Int?      @default(0) // % off Private Tour during the promotion window
@@ -307,14 +317,15 @@ model Tour {
 
   // Tour detail page content (layout similar to a "Tour Itinerary" page)
   departureLocation String? // Departure point
+  departureTimes    String[] @default([]) // Daily slots, e.g. ["08:00", "13:30"]
   transportation    String? // Transportation type
-  overview          String? @db.Text // Overview (HTML bullet list)
-  includedServices  String? @db.Text // Included services (HTML list)
-  excludedServices  String? @db.Text // Excluded services (HTML list)
-  childrenPolicy    String? @db.Text // Child pricing (HTML list)
-  regulations       String? @db.Text // Terms & conditions (HTML)
-  highlights        String? @db.Text // Highlights (HTML)
-  insurancePolicy   String? @db.Text // Insurance policy (HTML)
+  overview          String?  @db.Text // Overview (HTML bullet list)
+  includedServices  String?  @db.Text // Included services (HTML list)
+  excludedServices  String?  @db.Text // Excluded services (HTML list)
+  childrenPolicy    String?  @db.Text // Child pricing (HTML list)
+  regulations       String?  @db.Text // Terms & conditions (HTML)
+  highlights        String?  @db.Text // Highlights (HTML)
+  insurancePolicy   String?  @db.Text // Insurance policy (HTML)
   mapQuery          String? // Google Maps embed map centre query
 
   itineraries TourItinerary[]
@@ -440,10 +451,11 @@ model Booking {
   source           String?
   confirmationCode String?
 
-  address      String?
-  latitude     Float?
-  longitude    Float?
-  startingDate DateTime?
+  address       String?
+  latitude      Float?
+  longitude     Float?
+  startingDate  DateTime?
+  departureTime String? // Chosen daily slot, e.g. "08:00"
 
   customerName String?
   hotelName    String

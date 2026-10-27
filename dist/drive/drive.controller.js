@@ -28,6 +28,12 @@ let DriveController = class DriveController {
     root(user) {
         return this.driveService.listContents(user.id);
     }
+    ensureDate(user, date) {
+        return this.driveService.getOrCreateTourGuideDateFolder(user.id, date);
+    }
+    ensureDatePost(user, date) {
+        return this.driveService.getOrCreateTourGuideDateFolder(user.id, date);
+    }
     folder(id, user) {
         return this.driveService.listContents(user.id, id);
     }
@@ -43,8 +49,9 @@ let DriveController = class DriveController {
     uploadAvatar(file, targetUserId, user) {
         return this.driveService.uploadAvatar(user, file, targetUserId);
     }
-    upload(file, folderId, name, user) {
-        return this.driveService.uploadFile(user.id, file, folderId, name);
+    upload(file, folderId, name, date, useDateFolder, tourName, user) {
+        const useDate = useDateFolder === 'true' || useDateFolder === '1' || undefined;
+        return this.driveService.uploadFile(user.id, file, folderId || undefined, name, { date, useDateFolder: !!useDate, tourName: tourName || undefined });
     }
     renameFile(id, dto, user) {
         return this.driveService.renameFile(user.id, id, dto);
@@ -61,6 +68,22 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], DriveController.prototype, "root", null);
+__decorate([
+    (0, common_1.Get)('ensure-date'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('date')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], DriveController.prototype, "ensureDate", null);
+__decorate([
+    (0, common_1.Post)('ensure-date'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)('date')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], DriveController.prototype, "ensureDatePost", null);
 __decorate([
     (0, common_1.Get)('folders/:id'),
     __param(0, (0, common_1.Param)('id')),
@@ -116,9 +139,12 @@ __decorate([
     __param(0, (0, common_1.UploadedFile)()),
     __param(1, (0, common_1.Body)('folderId')),
     __param(2, (0, common_1.Body)('name')),
-    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __param(3, (0, common_1.Body)('date')),
+    __param(4, (0, common_1.Body)('useDateFolder')),
+    __param(5, (0, common_1.Body)('tourName')),
+    __param(6, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String, String, Object]),
+    __metadata("design:paramtypes", [Object, String, String, String, String, String, Object]),
     __metadata("design:returntype", void 0)
 ], DriveController.prototype, "upload", null);
 __decorate([

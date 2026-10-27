@@ -39,8 +39,13 @@ export declare class RoutePricesController {
             id: string;
             name: string;
             code: string;
-            thumbnailUrl: string | null;
             durationDays: number | null;
+            thumbnailUrl: string | null;
+            departureTimes: string[];
+            durationValue: number | null;
+            durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+            freeCancellationHours: number | null;
+            cancellationPolicy: string | null;
             adultPrice: import("@prisma/client/runtime/library").Decimal | null;
             childPrice: import("@prisma/client/runtime/library").Decimal | null;
             infantPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -76,8 +81,8 @@ export declare class RoutePricesController {
     } & {
         id: string;
         providerId: string;
-        tourId: string;
         vehicleId: string;
+        tourId: string;
         price: import("@prisma/client/runtime/library").Decimal;
     }>;
     create(dto: CreateRoutePriceDto, actor: AuthenticatedUser): Promise<{
@@ -86,8 +91,13 @@ export declare class RoutePricesController {
             id: string;
             name: string;
             code: string;
-            thumbnailUrl: string | null;
             durationDays: number | null;
+            thumbnailUrl: string | null;
+            departureTimes: string[];
+            durationValue: number | null;
+            durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+            freeCancellationHours: number | null;
+            cancellationPolicy: string | null;
             adultPrice: import("@prisma/client/runtime/library").Decimal | null;
             childPrice: import("@prisma/client/runtime/library").Decimal | null;
             infantPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -123,8 +133,8 @@ export declare class RoutePricesController {
     } & {
         id: string;
         providerId: string;
-        tourId: string;
         vehicleId: string;
+        tourId: string;
         price: import("@prisma/client/runtime/library").Decimal;
     }>;
     update(id: string, dto: UpdateRoutePriceDto, actor: AuthenticatedUser): Promise<{
@@ -133,8 +143,13 @@ export declare class RoutePricesController {
             id: string;
             name: string;
             code: string;
-            thumbnailUrl: string | null;
             durationDays: number | null;
+            thumbnailUrl: string | null;
+            departureTimes: string[];
+            durationValue: number | null;
+            durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+            freeCancellationHours: number | null;
+            cancellationPolicy: string | null;
             adultPrice: import("@prisma/client/runtime/library").Decimal | null;
             childPrice: import("@prisma/client/runtime/library").Decimal | null;
             infantPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -170,8 +185,8 @@ export declare class RoutePricesController {
     } & {
         id: string;
         providerId: string;
-        tourId: string;
         vehicleId: string;
+        tourId: string;
         price: import("@prisma/client/runtime/library").Decimal;
     }>;
     remove(id: string): Promise<{

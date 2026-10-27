@@ -4,6 +4,7 @@ export declare class CreateLeaveDto {
     startDate: string;
     endDate: string;
     reason?: string;
+    isEmergency?: boolean;
     userId?: string;
 }
 export declare class UpdateLeaveStatusDto {

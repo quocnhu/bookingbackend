@@ -168,6 +168,7 @@ export class BookingService {
       latitude: data.latitude,
       longitude: data.longitude,
       startingDate: data.startingDate ? new Date(data.startingDate) : undefined,
+      departureTime: data.departureTime,
       customerName: data.customerName,
       hotelName: data.hotelName,
       phone: data.phone,
@@ -393,6 +394,7 @@ export class BookingService {
 startingDate: data.startingDate
       ? new Date(data.startingDate + 'T00:00:00.000+07:00').toISOString()
       : undefined,
+      departureTime: data.departureTime,
       customerName: data.customerName,
       hotelName: data.hotelName,
       phone: data.phone,
@@ -623,10 +625,12 @@ startingDate: data.startingDate
         where: { id: before.assignmentId },
         include: { tourReport: true },
       });
-      const locked = assignment?.tourReport?.status === 'SUBMITTED' || assignment?.tourReport?.status === 'VERIFIED';
-      if (locked) {
+      const locked =
+        assignment?.tourReport?.status === 'SUBMITTED' ||
+        assignment?.tourReport?.status === 'VERIFIED';
+      if (locked && actor?.role !== RoleType.ADMIN) {
         throw new BadRequestException(
-          'This booking is locked because the tour report has been submitted for verification. Only accounting can unlock by rejecting the report.',
+          'This booking is locked because the tour report has been submitted for verification. Only an administrator can change it; accounting can unlock it by rejecting the report.',
         );
       }
     }
@@ -760,10 +764,12 @@ startingDate: data.startingDate
       include: { assignment: { include: { tourReport: true } } },
     });
     for (const booking of bookings) {
-      const locked = booking.assignment?.tourReport?.status === 'SUBMITTED' || booking.assignment?.tourReport?.status === 'VERIFIED';
-      if (locked) {
+      const locked =
+        booking.assignment?.tourReport?.status === 'SUBMITTED' ||
+        booking.assignment?.tourReport?.status === 'VERIFIED';
+      if (locked && actor?.role !== RoleType.ADMIN) {
         throw new BadRequestException(
-          `Booking ${booking.bookingRef} is locked because the tour report has been submitted for verification. Only accounting can unlock by rejecting the report.`,
+          `Booking ${booking.bookingRef} is locked because the tour report has been submitted for verification. Only an administrator can change it; accounting can unlock it by rejecting the report.`,
         );
       }
     }
@@ -789,8 +795,22 @@ startingDate: data.startingDate
     return updated;
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, actor?: AuthenticatedUser) {
+    const booking = await this.findOne(id);
+    if (booking.assignmentId) {
+      const assignment = await this.prisma.assignment.findUnique({
+        where: { id: booking.assignmentId },
+        select: { tourReport: { select: { status: true } } },
+      });
+      const locked =
+        assignment?.tourReport?.status === 'SUBMITTED' ||
+        assignment?.tourReport?.status === 'VERIFIED';
+      if (locked && actor?.role !== RoleType.ADMIN) {
+        throw new BadRequestException(
+          'This booking is locked because the tour report has been submitted for verification. Only an administrator can delete it; accounting can unlock it by rejecting the report.',
+        );
+      }
+    }
     await this.prisma.booking.delete({ where: { id } });
     await this.auditService.log({
       entityType: 'Booking',

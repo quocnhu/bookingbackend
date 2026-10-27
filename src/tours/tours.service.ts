@@ -5,6 +5,7 @@ import {
   Inject,
   NotFoundException,
 } from '@nestjs/common';
+import { DurationUnit } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { STORAGE } from '@/storage';
@@ -97,9 +98,12 @@ export class ToursService {
       code = await this.generateTourCode(dto.name, dto.durationDays ?? 1);
     }
     const { typePrices, ...rest } = dto;
+    const durationDays = this.resolveDurationDays(dto);
     const tour = await this.prisma.tour.create({
       data: {
         ...rest,
+        durationDays: durationDays ?? dto.durationDays,
+        departureTimes: this.normalizeDepartureTimes(dto.departureTimes),
         code,
         // The public URL of the tour page — keyword-rich and stable.
         slug: await this.nextSlug(dto.name),
@@ -143,6 +147,27 @@ export class ToursService {
     return code;
   }
 
+  private normalizeDepartureTimes(
+    times?: string[],
+  ): string[] | undefined {
+    if (times === undefined) return undefined;
+    return Array.from(new Set(times.map((t) => t.trim()).filter(Boolean))).sort();
+  }
+
+  private resolveDurationDays(dto: {
+    durationDays?: number;
+    durationValue?: number;
+    durationUnit?: DurationUnit;
+  }): number | undefined {
+    if (dto.durationDays != null) return dto.durationDays;
+    if (dto.durationValue != null && dto.durationUnit) {
+      return dto.durationUnit === 'DAY'
+        ? dto.durationValue
+        : Math.max(1, Math.ceil(dto.durationValue / 24));
+    }
+    return undefined;
+  }
+
   async update(id: string, dto: UpdateTourDto) {
     const before = await this.findOne(id);
     if (dto.code && dto.code !== before.code) {
@@ -152,11 +177,14 @@ export class ToursService {
       if (dup) throw new ConflictException('Tour code already exists');
     }
     const { typePrices, ...rest } = dto;
+    const durationDays = this.resolveDurationDays(dto);
     await this.prisma.$transaction([
       this.prisma.tour.update({
         where: { id },
         data: {
           ...rest,
+          durationDays: durationDays ?? dto.durationDays,
+          departureTimes: this.normalizeDepartureTimes(dto.departureTimes),
           // The slug stays stable across a rename — the indexed links keep
           // working. It is only filled in when it is still missing.
           slug:

@@ -4,7 +4,7 @@ export interface StorageEntry {
     url: string;
 }
 export interface FileStorage {
-    readonly driver: 'local' | 's3';
+    readonly driver: 'local' | 's3' | 'supabase';
     save(key: string, buffer: Buffer, opts?: {
         contentType?: string;
     }): Promise<{

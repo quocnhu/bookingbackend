@@ -15,6 +15,7 @@ export interface BookingFields {
     latitude?: number;
     longitude?: number;
     startingDate?: string;
+    departureTime?: string;
     customerName?: string;
     hotelName?: string;
     phone?: string;

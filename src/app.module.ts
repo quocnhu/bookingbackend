@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
@@ -26,7 +25,7 @@ import { RawDataModule } from './raw-data/raw-data.module';
 import { ParsingModule } from './parsing/parsing.module';
 import { QueuesModule } from './queues/queues.module';
 import { DriveModule } from './drive/drive.module';
-import { StorageModule } from './storage';
+import { StorageModule, uploadRootPath } from './storage';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LeavesModule } from './leaves/leaves.module';
 import { CoordinatesModule } from './coordinates/coordinates.module';
@@ -66,7 +65,7 @@ import { AccountingModule } from './accounting/accounting.module';
     TransportationProvidersModule,
     AccountingModule,
     ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
+      rootPath: uploadRootPath(),
       serveRoot: '/uploads',
     }),
   ],

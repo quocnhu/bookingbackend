@@ -17,6 +17,7 @@ class CreateLeaveDto {
     startDate;
     endDate;
     reason;
+    isEmergency;
     userId;
 }
 exports.CreateLeaveDto = CreateLeaveDto;
@@ -33,6 +34,11 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateLeaveDto.prototype, "reason", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateLeaveDto.prototype, "isEmergency", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

@@ -14,3 +14,13 @@ export const BOOKING_SYNC_SUBJECT_PREFIX = '[Booking Sync]';
  */
 export const BOOKING_SYNC_HEADER = 'X-Booking-Sync';
 export const BOOKING_SYNC_HEADER_VALUE = '1';
+
+/**
+ * Dedup claim for the "duplication blocked" notice. A re-sent booking mail
+ * produces one notice; every later duplicate of the same booking ref is
+ * suppressed so the operator's inbox is not spammed. Kept for 30 days.
+ */
+export const DUPLICATE_NOTICE_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+export const duplicateNoticeKey = (mailbox: string, bookingRef: string) =>
+  `booking-forward:duplicate-notice:${mailbox}:${bookingRef}`;

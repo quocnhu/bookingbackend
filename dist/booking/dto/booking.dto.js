@@ -25,6 +25,7 @@ class CreateBookingDto {
     latitude;
     longitude;
     startingDate;
+    departureTime;
     customerName;
     hotelName;
     phone;
@@ -98,6 +99,11 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", Object)
 ], CreateBookingDto.prototype, "startingDate", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsMilitaryTime)(),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "departureTime", void 0);
 __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
@@ -176,6 +182,7 @@ class UpdateBookingDto {
     latitude;
     longitude;
     startingDate;
+    departureTime;
     customerName;
     hotelName;
     phone;
@@ -230,6 +237,11 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Object)
 ], UpdateBookingDto.prototype, "startingDate", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsMilitaryTime)(),
+    __metadata("design:type", String)
+], UpdateBookingDto.prototype, "departureTime", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

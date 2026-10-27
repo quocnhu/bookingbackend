@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -30,6 +31,22 @@ export class DriveController {
   @Get()
   root(@CurrentUser() user: AuthenticatedUser) {
     return this.driveService.listContents(user.id);
+  }
+
+  @Get('ensure-date')
+  ensureDate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('date') date?: string,
+  ) {
+    return this.driveService.getOrCreateTourGuideDateFolder(user.id, date);
+  }
+
+  @Post('ensure-date')
+  ensureDatePost(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body('date') date?: string,
+  ) {
+    return this.driveService.getOrCreateTourGuideDateFolder(user.id, date);
   }
 
   @Get('folders/:id')
@@ -88,9 +105,20 @@ export class DriveController {
     @UploadedFile() file: Express.Multer.File,
     @Body('folderId') folderId: string,
     @Body('name') name: string,
+    @Body('date') date: string,
+    @Body('useDateFolder') useDateFolder: string,
+    @Body('tourName') tourName: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.driveService.uploadFile(user.id, file, folderId, name);
+    const useDate =
+      useDateFolder === 'true' || useDateFolder === '1' || undefined;
+    return this.driveService.uploadFile(
+      user.id,
+      file,
+      folderId || undefined,
+      name,
+      { date, useDateFolder: !!useDate, tourName: tourName || undefined },
+    );
   }
 
   @Patch('files/:id')

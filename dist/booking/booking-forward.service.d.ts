@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
 import { PrismaService } from "../prisma/prisma.service";
 import { GmailAuthService } from "../ingestion/gmail-auth.provider";
 export interface BookingForwardInput {
@@ -19,8 +20,9 @@ export declare class BookingForwardService {
     private readonly prisma;
     private readonly config;
     private readonly auth;
+    private readonly redis?;
     private readonly logger;
-    constructor(prisma: PrismaService, config: ConfigService, auth: GmailAuthService);
+    constructor(prisma: PrismaService, config: ConfigService, auth: GmailAuthService, redis?: Redis | undefined);
     forward(input: BookingForwardInput): Promise<{
         sent: boolean;
         reason?: string;

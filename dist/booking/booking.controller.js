@@ -47,8 +47,8 @@ let BookingController = class BookingController {
     update(id, dto, actor) {
         return this.bookingService.update(id, dto, actor);
     }
-    remove(id) {
-        return this.bookingService.remove(id);
+    remove(id, actor) {
+        return this.bookingService.remove(id, actor);
     }
 };
 exports.BookingController = BookingController;
@@ -109,8 +109,9 @@ __decorate([
     (0, common_1.Delete)(':id'),
     (0, permissions_decorator_1.Permissions)('booking.delete'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "remove", null);
 exports.BookingController = BookingController = __decorate([

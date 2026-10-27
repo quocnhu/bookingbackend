@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var DriveService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DriveService = exports.MAX_UPLOAD_BYTES = exports.DEFAULT_QUOTA_MB = exports.AVATAR_SIZE = void 0;
 const common_1 = require("@nestjs/common");
@@ -21,16 +22,52 @@ const sharp_1 = __importDefault(require("sharp"));
 const prisma_service_1 = require("../prisma/prisma.service");
 const storage_1 = require("../storage");
 const file_validation_util_1 = require("../common/utils/file-validation.util");
+const storage_key_util_1 = require("../common/utils/storage-key.util");
 exports.AVATAR_SIZE = 515;
 exports.DEFAULT_QUOTA_MB = 3072;
 exports.MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MB = 1024 * 1024;
-let DriveService = class DriveService {
+let DriveService = DriveService_1 = class DriveService {
     prisma;
     storage;
+    logger = new common_1.Logger(DriveService_1.name);
     constructor(prisma, storage) {
         this.prisma = prisma;
         this.storage = storage;
+    }
+    formatDateKey(date = new Date()) {
+        return (0, storage_key_util_1.formatDateKey)(date);
+    }
+    async ensureChildFolder(userId, parentId, name, kind = 'folder') {
+        const existing = await this.prisma.driveFolder.findFirst({
+            where: { userId, parentId, name },
+        });
+        if (existing)
+            return existing;
+        return this.prisma.driveFolder.create({
+            data: { userId, parentId, name, kind },
+        });
+    }
+    async folderSegments(userId, folder) {
+        const segments = [];
+        const seen = new Set();
+        let current = folder;
+        while (current && !seen.has(current.id)) {
+            seen.add(current.id);
+            segments.unshift((0, storage_key_util_1.storagePathSegment)(current.name));
+            if (!current.parentId)
+                break;
+            current = await this.prisma.driveFolder.findFirst({
+                where: { id: current.parentId, userId },
+            });
+        }
+        return segments;
+    }
+    async folderPrefix(userId, folder) {
+        return `drive/${(await this.folderSegments(userId, folder)).join('/')}`;
+    }
+    async storageKeyFor(userId, folder, storedName) {
+        return `${await this.folderPrefix(userId, folder)}/${storedName}`;
     }
     async ensureUserDrive(userId) {
         const user = await this.prisma.user.findUnique({
@@ -61,7 +98,106 @@ let DriveService = class DriveService {
                 data: { userId, parentId: root.id, name: 'avatar', kind: 'avatar' },
             });
         }
-        return { root, avatar };
+        const tour = await this.ensureChildFolder(userId, root.id, 'tour', 'tour');
+        return { root, avatar, tour };
+    }
+    async ensureDateFolder(userId, parentId, dateKey) {
+        let targetParentId = parentId;
+        if (!targetParentId) {
+            const drive = await this.ensureUserDrive(userId);
+            targetParentId = drive.tour.id;
+        }
+        await this.assertFolderAccess(userId, targetParentId);
+        const key = dateKey ?? this.formatDateKey();
+        return this.ensureChildFolder(userId, targetParentId, key);
+    }
+    async getOrCreateTourFolder(userId, tourName, date) {
+        const drive = await this.ensureUserDrive(userId);
+        const name = (0, storage_key_util_1.tourFolderName)(tourName || 'tour', date ?? new Date());
+        return this.ensureChildFolder(userId, drive.tour.id, name);
+    }
+    async publishTourReportEvidence(assignmentId) {
+        const assignment = await this.prisma.assignment.findUnique({
+            where: { id: assignmentId },
+            include: {
+                guide: { select: { id: true, email: true, name: true } },
+                tourReport: true,
+            },
+        });
+        if (!assignment?.guideId || !assignment.tourReport) {
+            return { moved: 0 };
+        }
+        const report = assignment.tourReport;
+        if (report.status !== 'VERIFIED') {
+            return { moved: 0 };
+        }
+        const images = Array.isArray(report.evidenceImages)
+            ? report.evidenceImages
+            : [];
+        const dir = (0, storage_key_util_1.userStorageDir)(assignment.guideId, assignment.guide?.email, assignment.guide?.name);
+        const prefix = (0, storage_key_util_1.pendingEvidencePrefix)(dir, assignment.id);
+        const pending = images.filter((img) => typeof img.storageKey === 'string' && img.storageKey.startsWith(prefix));
+        if (pending.length === 0) {
+            return { moved: 0 };
+        }
+        const folder = await this.getOrCreateTourFolder(assignment.guideId, assignment.tourName || assignment.code || 'tour', assignment.startDate);
+        let moved = 0;
+        const updated = [];
+        for (let i = 0; i < images.length; i += 1) {
+            const img = images[i];
+            const key = typeof img.storageKey === 'string' ? img.storageKey : '';
+            if (!key.startsWith(prefix)) {
+                updated.push(img);
+                continue;
+            }
+            const safeName = (0, file_validation_util_1.sanitizeFileName)(img.name || key.split('/').pop() || 'evidence');
+            const newKey = await this.storageKeyFor(assignment.guideId, folder, `${Date.now()}-${i}-${safeName}`);
+            try {
+                await this.storage.rename(key, newKey);
+                await this.prisma.driveFile.create({
+                    data: {
+                        userId: assignment.guideId,
+                        folderId: folder.id,
+                        name: safeName,
+                        mimeType: img.mimeType ?? null,
+                        size: Number(img.size) || 0,
+                        storageKey: newKey,
+                    },
+                });
+                moved += 1;
+                updated.push({
+                    ...img,
+                    storageKey: newKey,
+                    url: this.storage.url(newKey),
+                });
+            }
+            catch (error) {
+                await this.storage.rename(newKey, key).catch(() => undefined);
+                this.logger.warn(`Could not publish evidence ${key} for assignment ${assignment.id}: ${error.message}`);
+                updated.push(img);
+            }
+        }
+        if (moved > 0) {
+            await this.prisma.tourReport.update({
+                where: { id: report.id },
+                data: {
+                    evidenceImages: updated,
+                },
+            });
+        }
+        const leftovers = await this.storage.list(prefix);
+        const stillPending = new Set(updated
+            .map((img) => typeof img.storageKey === 'string' ? img.storageKey : '')
+            .filter((key) => key.startsWith(prefix)));
+        for (const entry of leftovers) {
+            if (stillPending.has(entry.key))
+                continue;
+            await this.storage.remove(entry.key).catch(() => undefined);
+        }
+        return { moved };
+    }
+    async getOrCreateTourGuideDateFolder(userId, date) {
+        return this.ensureDateFolder(userId, undefined, this.formatDateKey(date));
     }
     async listContents(userId, folderId) {
         let current = null;
@@ -101,7 +237,12 @@ let DriveService = class DriveService {
         const targetId = dto.parentId ?? (await this.ensureUserDrive(userId)).root.id;
         await this.assertFolderAccess(userId, targetId);
         return this.prisma.driveFolder.create({
-            data: { userId, parentId: targetId, name: dto.name.trim(), kind: 'folder' },
+            data: {
+                userId,
+                parentId: targetId,
+                name: dto.name.trim(),
+                kind: 'folder',
+            },
         });
     }
     async renameFolder(userId, id, dto) {
@@ -109,10 +250,54 @@ let DriveService = class DriveService {
         if (folder.kind !== 'folder') {
             throw new common_1.BadRequestException('Root and avatar folders cannot be renamed');
         }
-        return this.prisma.driveFolder.update({
+        const updated = await this.prisma.driveFolder.update({
             where: { id },
             data: { name: dto.name.trim() },
         });
+        const ids = await this.collectFolderIds(userId, id);
+        const files = await this.prisma.driveFile.findMany({
+            where: { userId, folderId: { in: ids } },
+            include: { folder: true },
+        });
+        for (const file of files) {
+            const baseName = file.storageKey.split('/').pop() || file.name;
+            try {
+                const newKey = await this.storageKeyFor(userId, file.folder, baseName);
+                if (newKey === file.storageKey)
+                    continue;
+                await this.storage.rename(file.storageKey, newKey);
+                await this.prisma.driveFile.update({
+                    where: { id: file.id },
+                    data: { storageKey: newKey },
+                });
+            }
+            catch (error) {
+                this.logger.warn(`Could not move file ${file.id} after renaming folder ${id}: ${error.message}`);
+            }
+        }
+        return updated;
+    }
+    async collectFolderIds(userId, rootId) {
+        const folders = await this.prisma.driveFolder.findMany({
+            where: { userId },
+            select: { id: true, parentId: true },
+        });
+        const children = new Map();
+        for (const folder of folders) {
+            if (!folder.parentId)
+                continue;
+            const list = children.get(folder.parentId) ?? [];
+            list.push(folder.id);
+            children.set(folder.parentId, list);
+        }
+        const ids = [];
+        const queue = [rootId];
+        while (queue.length > 0) {
+            const id = queue.shift();
+            ids.push(id);
+            queue.push(...(children.get(id) ?? []));
+        }
+        return ids;
     }
     async deleteFolder(userId, id) {
         const folder = await this.assertFolderAccess(userId, id);
@@ -137,11 +322,28 @@ let DriveService = class DriveService {
         const { avatar } = await this.ensureUserDrive(uid);
         return this.uploadFile(uid, file, avatar.id);
     }
-    async uploadFile(userId, file, folderId, clientName) {
+    async uploadFile(userId, file, folderId, clientName, options) {
         if (!file?.buffer) {
             throw new common_1.BadRequestException('No file uploaded');
         }
-        const targetId = folderId ?? (await this.ensureUserDrive(userId)).root.id;
+        let targetId;
+        if (folderId) {
+            targetId = folderId;
+        }
+        else {
+            const drive = await this.ensureUserDrive(userId);
+            if (options?.tourName) {
+                const tourFolder = await this.getOrCreateTourFolder(userId, options.tourName, options.date);
+                targetId = tourFolder.id;
+            }
+            else if (options?.useDateFolder) {
+                const dateFolder = await this.getOrCreateTourGuideDateFolder(userId, options?.date);
+                targetId = dateFolder.id;
+            }
+            else {
+                targetId = drive.root.id;
+            }
+        }
         const folder = await this.assertFolderAccess(userId, targetId);
         const ext = (file.originalname.split('.').pop() || '').toLowerCase();
         const isAvatar = folder.kind === 'avatar';
@@ -161,7 +363,7 @@ let DriveService = class DriveService {
             where: { id: userId },
             select: { email: true, name: true, role: true, storageQuotaMb: true },
         });
-        const userDir = `${this.userSlug(user?.email, user?.name, userId)}_${userId}`;
+        const userDir = (0, storage_key_util_1.userStorageDir)(userId, user?.email, user?.name);
         if (user?.role !== 'ADMIN') {
             if (buffer.length > exports.MAX_UPLOAD_BYTES) {
                 throw new common_1.BadRequestException(`Max upload size is ${this.formatBytes(exports.MAX_UPLOAD_BYTES)} per file`);
@@ -183,11 +385,17 @@ let DriveService = class DriveService {
         const baseName = (0, file_validation_util_1.sanitizeFileName)(clientName || file.originalname || `file.${ext || 'bin'}`);
         const finalName = isAvatar ? `avatar.${finalExt}` : baseName;
         const storedName = isAvatar ? finalName : `${Date.now()}-${finalName}`;
-        const storageKey = `drive/${userDir}/${targetId}/${storedName}`;
+        const storageKey = await this.storageKeyFor(userId, folder, storedName);
         if (isAvatar) {
-            const oldFiles = await this.storage.list(`drive/${userDir}/${targetId}/`);
-            for (const f of oldFiles) {
-                await this.storage.remove(f.key);
+            const prefixes = new Set([
+                `${await this.folderPrefix(userId, folder)}/`,
+                `drive/${userDir}/${targetId}/`,
+            ]);
+            for (const prefix of prefixes) {
+                const oldFiles = await this.storage.list(prefix);
+                for (const f of oldFiles) {
+                    await this.storage.remove(f.key);
+                }
             }
             await this.prisma.driveFile.deleteMany({
                 where: { userId, folderId: targetId },
@@ -303,9 +511,7 @@ let DriveService = class DriveService {
             const pipeline = (0, sharp_1.default)(file.buffer, { failOn: 'none' })
                 .rotate()
                 .resize(exports.AVATAR_SIZE, exports.AVATAR_SIZE, { fit: 'cover', position: 'centre' });
-            const buffer = await (isPng
-                ? pipeline.png({ quality: 95 })
-                : pipeline.jpeg({ quality: 90 })).toBuffer();
+            const buffer = await (isPng ? pipeline.png({ quality: 95 }) : pipeline.jpeg({ quality: 90 })).toBuffer();
             return {
                 buffer,
                 mimeType: isPng ? 'image/png' : 'image/jpeg',
@@ -368,7 +574,7 @@ let DriveService = class DriveService {
     }
 };
 exports.DriveService = DriveService;
-exports.DriveService = DriveService = __decorate([
+exports.DriveService = DriveService = DriveService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(1, (0, common_1.Inject)(storage_1.STORAGE)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService, Object])

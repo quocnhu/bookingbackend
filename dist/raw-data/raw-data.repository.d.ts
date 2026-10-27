@@ -93,6 +93,21 @@ export declare class RawDataRepository {
         outcome: string | null;
         linkedBookingId: string | null;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
+    countDuplicateRowsForBooking(bookingId: string): Prisma.PrismaPromise<number>;
+    delete(id: string): Prisma.Prisma__RawDataClient<{
+        id: string;
+        action: string | null;
+        createdAt: Date;
+        email: string | null;
+        updatedAt: Date;
+        status: string;
+        templateTag: string | null;
+        sourceId: string;
+        payload: Prisma.JsonValue;
+        payloadHash: string | null;
+        outcome: string | null;
+        linkedBookingId: string | null;
+    }, never, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
     countByStatus(status: string): Prisma.PrismaPromise<number>;
     countByField(field: 'action' | 'outcome'): Promise<Record<string, number>>;
 }

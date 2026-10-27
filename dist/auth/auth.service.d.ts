@@ -59,6 +59,7 @@ export declare class AuthService {
         role: import("@prisma/client").$Enums.RoleType;
         userType: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
+        isActive: boolean;
         createdAt: Date;
         providerId: string | null;
         permissions: string[];
@@ -94,6 +95,7 @@ export declare class AuthService {
         role: import("@prisma/client").$Enums.RoleType;
         userType: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
+        isActive: boolean;
         createdAt: Date;
         providerId: string | null;
         permissions: string[];

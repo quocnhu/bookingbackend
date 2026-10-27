@@ -96,9 +96,12 @@ let ToursService = class ToursService {
             code = await this.generateTourCode(dto.name, dto.durationDays ?? 1);
         }
         const { typePrices, ...rest } = dto;
+        const durationDays = this.resolveDurationDays(dto);
         const tour = await this.prisma.tour.create({
             data: {
                 ...rest,
+                durationDays: durationDays ?? dto.durationDays,
+                departureTimes: this.normalizeDepartureTimes(dto.departureTimes),
                 code,
                 slug: await this.nextSlug(dto.name),
                 typePrices: typePrices && typePrices.length > 0
@@ -134,6 +137,21 @@ let ToursService = class ToursService {
         }
         return code;
     }
+    normalizeDepartureTimes(times) {
+        if (times === undefined)
+            return undefined;
+        return Array.from(new Set(times.map((t) => t.trim()).filter(Boolean))).sort();
+    }
+    resolveDurationDays(dto) {
+        if (dto.durationDays != null)
+            return dto.durationDays;
+        if (dto.durationValue != null && dto.durationUnit) {
+            return dto.durationUnit === 'DAY'
+                ? dto.durationValue
+                : Math.max(1, Math.ceil(dto.durationValue / 24));
+        }
+        return undefined;
+    }
     async update(id, dto) {
         const before = await this.findOne(id);
         if (dto.code && dto.code !== before.code) {
@@ -144,11 +162,14 @@ let ToursService = class ToursService {
                 throw new common_1.ConflictException('Tour code already exists');
         }
         const { typePrices, ...rest } = dto;
+        const durationDays = this.resolveDurationDays(dto);
         await this.prisma.$transaction([
             this.prisma.tour.update({
                 where: { id },
                 data: {
                     ...rest,
+                    durationDays: durationDays ?? dto.durationDays,
+                    departureTimes: this.normalizeDepartureTimes(dto.departureTimes),
                     slug: before.slug ??
                         (await this.nextSlug(dto.name ?? before.name, id)),
                 },

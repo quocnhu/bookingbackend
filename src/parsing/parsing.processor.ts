@@ -9,8 +9,14 @@ import { ParserRegistry } from './parsers/parser-registry';
 import { PARSE_QUEUE, ParseJobData } from './parsing.queue';
 import { validateBookingFields } from './validation/booking-fields.schema';
 
-/** Outcomes that actually wrote the Booking table → send the confirmation mail. */
-const FORWARD_OUTCOMES = new Set(['CREATED', 'UPDATED', 'CANCELLED']);
+/** Outcomes that should trigger a sync notice to the mailbox. */
+const FORWARD_OUTCOMES = new Set([
+  'CREATED',
+  'UPDATED',
+  'CANCELLED',
+  'SKIPPED',
+  'UNCHANGED',
+]);
 
 /**
  * BullMQ worker for Stage 2 (per .md steps 11-18):
@@ -81,12 +87,31 @@ export class ParsingProcessor extends WorkerHost {
       this.resolveEmailDate(payload),
     );
 
+    const isDuplicate = outcome === 'UNCHANGED' || outcome === 'SKIPPED';
+
+    // Only the FIRST duplicate mail is kept (as the DUPLICATE audit row) and
+    // notified. Every later copy is blocked completely: no rawData row and no
+    // notification.
+    if (isDuplicate) {
+      const earlierDuplicates =
+        await this.rawDataRepo.countDuplicateRowsForBooking(booking.id);
+      if (earlierDuplicates > 0) {
+        await this.rawDataRepo.delete(rawDataId);
+        this.logger.log(
+          `Blocked duplicate mail ${rawDataId} for booking ${booking.bookingRef} — an earlier duplicate was already recorded`,
+        );
+        return { status: 'duplicate_blocked', bookingId: booking.id };
+      }
+    }
+
     // Record WHAT the email was (new booking / amendment / cancellation) and
     // what the system did with it — the raw-mail list is filtered on these.
+    // Make duplicates/blocked mails explicit so they're not confused with new bookings.
+    const displayAction = isDuplicate ? 'DUPLICATE' : validation.data!.action;
     await this.rawDataService.markParsed(
       rawDataId,
       booking.id,
-      validation.data!.action,
+      displayAction,
       outcome,
     );
     this.logger.log(

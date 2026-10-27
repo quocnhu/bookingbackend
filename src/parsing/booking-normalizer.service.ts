@@ -94,6 +94,9 @@ export class BookingNormalizerService {
           parsed.checkIn ??
           parsed.checkin,
       ),
+      departureTime: this.pickString(
+        parsed.departureTime ?? parsed.departure ?? parsed.time,
+      ),
       totalPax: this.pickNumber(
         parsed.totalPax ?? parsed.travellers ?? parsed.paxTotal,
       ),
@@ -177,11 +180,13 @@ export class BookingNormalizerService {
       : undefined;
   }
 
-private normalizeDate(raw: unknown): string | undefined {
+  private normalizeDate(raw: unknown): string | undefined {
     const value = this.pickString(raw);
     if (!value) return undefined;
     // Parse as Vietnam local time (UTC+7) and convert to ISO string for storage
-    const date = new Date(value + (value.includes('T') ? '' : 'T00:00:00') + '+07:00');
+    const date = new Date(
+      value + (value.includes('T') ? '' : 'T00:00:00') + '+07:00',
+    );
     return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
   }
 

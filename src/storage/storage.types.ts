@@ -6,7 +6,7 @@ export interface StorageEntry {
 }
 
 export interface FileStorage {
-  readonly driver: 'local' | 's3';
+  readonly driver: 'local' | 's3' | 'supabase';
 
   save(
     key: string,

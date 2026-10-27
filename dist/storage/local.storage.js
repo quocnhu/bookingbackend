@@ -36,10 +36,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LocalStorage = void 0;
 const fsp = __importStar(require("fs/promises"));
 const path = __importStar(require("path"));
+const storage_config_1 = require("./storage.config");
 class LocalStorage {
     driver = 'local';
-    root = path.join(process.cwd(), 'uploads');
-    publicBase = process.env.PUBLIC_UPLOADS_BASE || 'http://localhost:4000/uploads';
+    root = (0, storage_config_1.uploadRootPath)();
+    publicBase = (0, storage_config_1.publicUploadsBase)();
     resolveSafe(key) {
         const abs = path.resolve(this.root, key);
         const rootResolved = path.resolve(this.root);

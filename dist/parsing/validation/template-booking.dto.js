@@ -34,6 +34,7 @@ class TemplateBookingDto {
     latitude;
     longitude;
     startingDate;
+    departureTime;
     customerName;
     hotelName;
     phone;
@@ -106,6 +107,11 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Object)
 ], TemplateBookingDto.prototype, "startingDate", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsMilitaryTime)(),
+    __metadata("design:type", String)
+], TemplateBookingDto.prototype, "departureTime", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

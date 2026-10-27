@@ -17,11 +17,13 @@ export type RawDataStatus =
  *  - CREATE — a new booking, or a re-sent confirmation of a known one
  *  - MODIFY — an amendment: the same reference with different details
  *  - CANCEL — the booking was cancelled
+ *  - DUPLICATE — a duplicate/re-sent mail that was blocked (no change)
  */
 export const RAW_DATA_ACTION = {
   CREATE: 'CREATE',
   MODIFY: 'MODIFY',
   CANCEL: 'CANCEL',
+  DUPLICATE: 'DUPLICATE',
 } as const;
 
 export type RawDataAction =

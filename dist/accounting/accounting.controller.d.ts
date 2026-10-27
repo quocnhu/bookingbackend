@@ -140,7 +140,6 @@ export declare class AccountingController {
         createdAt: Date;
         updatedAt: Date;
         status: import("@prisma/client").$Enums.TourReportStatus;
-        notes: string | null;
         assignmentId: string;
         submittedById: string | null;
         submittedByName: string | null;
@@ -150,6 +149,7 @@ export declare class AccountingController {
         distanceKm: number | null;
         fuelCost: import("@prisma/client/runtime/library").Decimal | null;
         tollParking: import("@prisma/client/runtime/library").Decimal | null;
+        notes: string | null;
         verifiedById: string | null;
         verifiedByName: string | null;
         verifiedAt: Date | null;
@@ -175,7 +175,6 @@ export declare class AccountingController {
         createdAt: Date;
         updatedAt: Date;
         status: import("@prisma/client").$Enums.TourReportStatus;
-        notes: string | null;
         assignmentId: string;
         submittedById: string | null;
         submittedByName: string | null;
@@ -185,6 +184,7 @@ export declare class AccountingController {
         distanceKm: number | null;
         fuelCost: import("@prisma/client/runtime/library").Decimal | null;
         tollParking: import("@prisma/client/runtime/library").Decimal | null;
+        notes: string | null;
         verifiedById: string | null;
         verifiedByName: string | null;
         verifiedAt: Date | null;

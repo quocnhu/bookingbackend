@@ -55,6 +55,7 @@ let BookingNormalizerService = class BookingNormalizerService {
                 parsed.date ??
                 parsed.checkIn ??
                 parsed.checkin),
+            departureTime: this.pickString(parsed.departureTime ?? parsed.departure ?? parsed.time),
             totalPax: this.pickNumber(parsed.totalPax ?? parsed.travellers ?? parsed.paxTotal),
             paxDetail: this.pickString(parsed.paxDetail ?? parsed.pax ?? parsed.priceLines),
             tourId: this.pickString(parsed.tourId),

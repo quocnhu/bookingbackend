@@ -89,7 +89,7 @@ export class BookingController {
 
   @Delete(':id')
   @Permissions('booking.delete')
-  remove(@Param('id') id: string) {
-    return this.bookingService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.bookingService.remove(id, actor);
   }
 }

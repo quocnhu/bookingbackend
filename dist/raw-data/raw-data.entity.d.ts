@@ -9,6 +9,7 @@ export declare const RAW_DATA_ACTION: {
     readonly CREATE: "CREATE";
     readonly MODIFY: "MODIFY";
     readonly CANCEL: "CANCEL";
+    readonly DUPLICATE: "DUPLICATE";
 };
 export type RawDataAction = (typeof RAW_DATA_ACTION)[keyof typeof RAW_DATA_ACTION];
 export declare const RAW_DATA_OUTCOME: {

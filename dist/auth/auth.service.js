@@ -320,6 +320,7 @@ let AuthService = class AuthService {
             role: user.role,
             userType: user.userType,
             authProvider: user.authProvider,
+            isActive: user.isActive,
             createdAt: user.createdAt,
             providerId: user.providerId,
             permissions: authUser.permissions,

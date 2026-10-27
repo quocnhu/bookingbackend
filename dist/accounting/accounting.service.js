@@ -17,6 +17,7 @@ const audit_service_1 = require("../audit/audit.service");
 const notification_service_1 = require("../notifications/notification.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
 const client_2 = require("@prisma/client");
+const drive_service_1 = require("../drive/drive.service");
 const PAYABLE_ROLES = [client_1.RoleType.TOUR_GUIDE, client_1.RoleType.DRIVER];
 exports.PAYEE_LABELS = {
     [client_1.PayeeType.TRANSPORT_PROVIDER]: 'Transportation Provider',
@@ -32,11 +33,13 @@ let AccountingService = class AccountingService {
     audit;
     notificationService;
     gateway;
-    constructor(prisma, audit, notificationService, gateway) {
+    drive;
+    constructor(prisma, audit, notificationService, gateway, drive) {
         this.prisma = prisma;
         this.audit = audit;
         this.notificationService = notificationService;
         this.gateway = gateway;
+        this.drive = drive;
     }
     assertAccounting(actor, perm) {
         if (actor.role === client_1.RoleType.ADMIN)
@@ -484,6 +487,9 @@ let AccountingService = class AccountingService {
             });
             return report;
         });
+        await this.drive
+            .publishTourReportEvidence(assignmentId)
+            .catch(() => undefined);
         await this.notifySubmitter(assignment, {
             type: client_2.NotificationType.MONEY_VERIFIED,
             title: `✅ Money sheet "${assignment.code}" has been confirmed`,
@@ -812,9 +818,7 @@ let AccountingService = class AccountingService {
             ? (await this.prisma.paymentPeriodLine.findMany({
                 where: {
                     period: { voidedAt: null, personId: payee.id },
-                    ...(payee.kind === 'PROVIDER'
-                        ? {}
-                        : { payableToId: payee.id }),
+                    ...(payee.kind === 'PROVIDER' ? {} : { payableToId: payee.id }),
                 },
                 select: { assignmentId: true },
             })).map((l) => l.assignmentId)
@@ -1017,9 +1021,7 @@ let AccountingService = class AccountingService {
                 guideName: a.guide?.name ?? null,
                 driverName: a.driver?.name ?? null,
                 myRole: roles.join('+') || '—',
-                netAmount: a.tourReport?.netAmount != null
-                    ? num(a.tourReport.netAmount)
-                    : null,
+                netAmount: a.tourReport?.netAmount != null ? num(a.tourReport.netAmount) : null,
                 flow: a.tourReport?.settlementFlow ?? null,
                 locked: !!a.tourReport?.moneyVerifiedAt,
                 paid: !!mine,
@@ -1056,7 +1058,14 @@ let AccountingService = class AccountingService {
                     where: { period: { voidedAt: null } },
                     select: {
                         netAmount: true,
-                        period: { select: { id: true, personId: true, fromDate: true, toDate: true } },
+                        period: {
+                            select: {
+                                id: true,
+                                personId: true,
+                                fromDate: true,
+                                toDate: true,
+                            },
+                        },
                     },
                 },
             },
@@ -1366,6 +1375,7 @@ exports.AccountingService = AccountingService = __decorate([
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_service_1.AuditService,
         notification_service_1.NotificationService,
-        notifications_gateway_1.NotificationsGateway])
+        notifications_gateway_1.NotificationsGateway,
+        drive_service_1.DriveService])
 ], AccountingService);
 //# sourceMappingURL=accounting.service.js.map

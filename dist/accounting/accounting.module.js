@@ -12,12 +12,13 @@ const accounting_controller_1 = require("./accounting.controller");
 const accounting_service_1 = require("./accounting.service");
 const audit_module_1 = require("../audit/audit.module");
 const notifications_module_1 = require("../notifications/notifications.module");
+const drive_module_1 = require("../drive/drive.module");
 let AccountingModule = class AccountingModule {
 };
 exports.AccountingModule = AccountingModule;
 exports.AccountingModule = AccountingModule = __decorate([
     (0, common_1.Module)({
-        imports: [audit_module_1.AuditModule, notifications_module_1.NotificationsModule],
+        imports: [audit_module_1.AuditModule, notifications_module_1.NotificationsModule, drive_module_1.DriveModule],
         controllers: [accounting_controller_1.AccountingController],
         providers: [accounting_service_1.AccountingService],
         exports: [accounting_service_1.AccountingService],

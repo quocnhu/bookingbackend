@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var AssignmentsService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AssignmentsService = void 0;
 const common_1 = require("@nestjs/common");
@@ -22,8 +23,10 @@ const notification_service_1 = require("../notifications/notification.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
 const leaves_service_1 = require("../leaves/leaves.service");
 const storage_1 = require("../storage");
+const drive_service_1 = require("../drive/drive.service");
+const storage_key_util_1 = require("../common/utils/storage-key.util");
 const BOARD_LOOKBACK_DAYS = 30;
-let AssignmentsService = class AssignmentsService {
+let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
     prisma;
     auditService;
     board;
@@ -31,7 +34,9 @@ let AssignmentsService = class AssignmentsService {
     gateway;
     leavesService;
     storage;
-    constructor(prisma, auditService, board, notificationService, gateway, leavesService, storage) {
+    drive;
+    logger = new common_1.Logger(AssignmentsService_1.name);
+    constructor(prisma, auditService, board, notificationService, gateway, leavesService, storage, drive) {
         this.prisma = prisma;
         this.auditService = auditService;
         this.board = board;
@@ -39,6 +44,7 @@ let AssignmentsService = class AssignmentsService {
         this.gateway = gateway;
         this.leavesService = leavesService;
         this.storage = storage;
+        this.drive = drive;
     }
     include = {
         bookings: {
@@ -302,7 +308,13 @@ let AssignmentsService = class AssignmentsService {
                 startDate: { lte: endOfToday },
                 endDate: { gte: startOfToday },
             },
-            select: { id: true, guideId: true, driverId: true, startDate: true, endDate: true },
+            select: {
+                id: true,
+                guideId: true,
+                driverId: true,
+                startDate: true,
+                endDate: true,
+            },
         });
         if (items.length === 0)
             return { dispatched: 0, skipped: 0, skippedOnLeave: 0 };
@@ -412,9 +424,7 @@ let AssignmentsService = class AssignmentsService {
                     ...(excludeAssignmentId ? { id: { not: excludeAssignmentId } } : {}),
                     startDate: { lte: end },
                     endDate: { gte: start },
-                    OR: label === 'guide'
-                        ? [{ guideId: userId }]
-                        : [{ driverId: userId }],
+                    OR: label === 'guide' ? [{ guideId: userId }] : [{ driverId: userId }],
                 },
                 select: { id: true, code: true, startDate: true, endDate: true },
             });
@@ -492,7 +502,8 @@ let AssignmentsService = class AssignmentsService {
                 totalPax: b.totalPax ?? 0,
             }));
         const tourReportLocked = a.tourReport
-            ? a.tourReport.status === 'SUBMITTED' || a.tourReport.status === 'VERIFIED'
+            ? a.tourReport.status === 'SUBMITTED' ||
+                a.tourReport.status === 'VERIFIED'
             : false;
         return {
             ...a,
@@ -529,7 +540,11 @@ let AssignmentsService = class AssignmentsService {
             this.prisma.assignment.findMany({
                 where,
                 include: this.include,
-                orderBy: [{ startDate: sortOrder ?? 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+                orderBy: [
+                    { startDate: sortOrder ?? 'asc' },
+                    { createdAt: 'asc' },
+                    { id: 'asc' },
+                ],
                 skip: (page - 1) * limit,
                 take: limit,
             }),
@@ -545,6 +560,14 @@ let AssignmentsService = class AssignmentsService {
         if (!assignment)
             throw new common_1.NotFoundException('Assignment not found');
         return assignment;
+    }
+    assertDetailsUnlocked(assignment, actor) {
+        if (actor?.role === client_1.RoleType.ADMIN)
+            return;
+        const status = assignment?.tourReport?.status;
+        if (status !== 'SUBMITTED' && status !== 'VERIFIED')
+            return;
+        throw new common_1.ConflictException(`"${assignment.code ?? 'Trip'}" is locked because the tour report has been submitted. Only an administrator can change it; accounting can unlock it by rejecting the report.`);
     }
     async create(dto, actor) {
         const startDate = new Date(dto.startDate);
@@ -578,13 +601,17 @@ let AssignmentsService = class AssignmentsService {
         });
         return this.findOne(assignment.id);
     }
-    async update(id, dto) {
+    async update(id, dto, actor) {
         const before = await this.findOne(id);
+        this.assertDetailsUnlocked(before, actor);
         const startDate = dto.startDate
             ? new Date(dto.startDate)
             : before.startDate;
         const endDate = dto.endDate ? new Date(dto.endDate) : before.endDate;
-        if (dto.guideId !== undefined || dto.driverId !== undefined || dto.startDate !== undefined || dto.endDate !== undefined) {
+        if (dto.guideId !== undefined ||
+            dto.driverId !== undefined ||
+            dto.startDate !== undefined ||
+            dto.endDate !== undefined) {
             await this.assertCrewAvailableForDates(dto.guideId !== undefined ? dto.guideId : before.guideId, dto.driverId !== undefined ? dto.driverId : before.driverId, startDate, endDate, id);
         }
         const assignment = await this.prisma.assignment.update({
@@ -615,7 +642,10 @@ let AssignmentsService = class AssignmentsService {
             beforeData: before,
             afterData: assignment,
         });
-        this.gateway.notifyAll('board:refresh', { assignmentId: id, action: 'update' });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId: id,
+            action: 'update',
+        });
         return this.findOne(id);
     }
     assertDispatchableToday(assignment) {
@@ -756,21 +786,35 @@ let AssignmentsService = class AssignmentsService {
         }
         return result;
     }
-    async assignBookings(id, dto) {
+    async assignBookings(id, dto, actor) {
         const assignment = await this.findOne(id);
+        this.assertDetailsUnlocked(assignment, actor);
         const bookingsToAssign = await this.prisma.booking.findMany({
             where: { id: { in: dto.bookingIds } },
-            select: { id: true, assignmentId: true, startingDate: true, tour: { select: { durationDays: true, name: true } } },
+            select: {
+                id: true,
+                assignmentId: true,
+                startingDate: true,
+                tour: { select: { durationDays: true, name: true } },
+            },
         });
         const busy = bookingsToAssign.find((b) => b.assignmentId && b.assignmentId !== id);
         if (busy) {
             throw new common_1.BadRequestException(`Booking ${busy.id} is already assigned to another assignment`);
         }
-        const tourNames = [...new Set(bookingsToAssign.map((b) => b.tour?.name).filter((n) => !!n))];
+        const tourNames = [
+            ...new Set(bookingsToAssign
+                .map((b) => b.tour?.name)
+                .filter((n) => !!n)),
+        ];
         if (tourNames.length > 1) {
             throw new common_1.BadRequestException(`Cannot assign bookings with different tours to the same assignment. Tours: ${tourNames.join(', ')}`);
         }
-        const uniqueStartDates = [...new Set(bookingsToAssign.map((b) => b.startingDate?.toISOString().split('T')[0]).filter((d) => !!d))];
+        const uniqueStartDates = [
+            ...new Set(bookingsToAssign
+                .map((b) => b.startingDate?.toISOString().split('T')[0])
+                .filter((d) => !!d)),
+        ];
         if (uniqueStartDates.length > 1) {
             throw new common_1.BadRequestException(`Cannot assign bookings with different dates to the same assignment. Dates: ${uniqueStartDates.join(', ')}`);
         }
@@ -808,11 +852,15 @@ let AssignmentsService = class AssignmentsService {
             action: 'ASSIGN_BOOKINGS',
             afterData: { bookingIds: dto.bookingIds },
         });
-        this.gateway.notifyAll('board:refresh', { assignmentId: id, action: 'assign_bookings' });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId: id,
+            action: 'assign_bookings',
+        });
         return this.findOne(id);
     }
-    async removeBooking(id, bookingId) {
-        await this.findOne(id);
+    async removeBooking(id, bookingId, actor) {
+        const assignment = await this.findOne(id);
+        this.assertDetailsUnlocked(assignment, actor);
         const booking = await this.prisma.booking.findUnique({
             where: { id: bookingId },
         });
@@ -828,28 +876,38 @@ let AssignmentsService = class AssignmentsService {
             },
         });
         await this.refreshSummary(id);
-        this.gateway.notifyAll('board:refresh', { assignmentId: id, action: 'remove_booking' });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId: id,
+            action: 'remove_booking',
+        });
         return this.findOne(id);
     }
-    async reorderBookings(id, bookingIds) {
+    async reorderBookings(id, bookingIds, actor) {
+        const assignment = await this.findOne(id);
+        this.assertDetailsUnlocked(assignment, actor);
         const result = await this.board.reorder(id, bookingIds);
         if (result.error)
             throw new common_1.BadRequestException(result.error);
-        this.gateway.notifyAll('board:refresh', { assignmentId: id, action: 'reorder' });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId: id,
+            action: 'reorder',
+        });
         return this.findOne(id);
     }
-    async moveBooking(fromAssignmentId, bookingId, toAssignmentId) {
-        const [booking, toAssignment] = await Promise.all([
-            this.prisma.booking.findUnique({
-                where: { id: bookingId },
-                select: { tour: { select: { name: true } } },
-            }),
-            this.prisma.assignment.findUnique({
-                where: { id: toAssignmentId },
-                select: { tourName: true },
-            }),
+    async moveBooking(fromAssignmentId, bookingId, toAssignmentId, actor) {
+        const [fromAssignment, toAssignment] = await Promise.all([
+            this.findOne(fromAssignmentId),
+            this.findOne(toAssignmentId),
         ]);
-        if (booking?.tour?.name && toAssignment?.tourName && booking.tour.name !== toAssignment.tourName) {
+        this.assertDetailsUnlocked(fromAssignment, actor);
+        this.assertDetailsUnlocked(toAssignment, actor);
+        const booking = await this.prisma.booking.findUnique({
+            where: { id: bookingId },
+            select: { tour: { select: { name: true } } },
+        });
+        if (booking?.tour?.name &&
+            toAssignment?.tourName &&
+            booking.tour.name !== toAssignment.tourName) {
             throw new common_1.BadRequestException(`Cannot move booking to a bus with a different tour. Booking tour: ${booking.tour.name}, Target bus tour: ${toAssignment.tourName}`);
         }
         const result = await this.board.move(fromAssignmentId, bookingId, toAssignmentId);
@@ -860,8 +918,14 @@ let AssignmentsService = class AssignmentsService {
             data: { movedFromBusId: fromAssignmentId },
         });
         await this.notifyMoveBooking(fromAssignmentId, toAssignmentId, bookingId);
-        this.gateway.notifyAll('board:refresh', { assignmentId: fromAssignmentId, action: 'move_out' });
-        this.gateway.notifyAll('board:refresh', { assignmentId: toAssignmentId, action: 'move_in' });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId: fromAssignmentId,
+            action: 'move_out',
+        });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId: toAssignmentId,
+            action: 'move_in',
+        });
         return this.findOne(toAssignmentId);
     }
     async notifyMoveBooking(fromAssignmentId, toAssignmentId, bookingId) {
@@ -947,7 +1011,10 @@ let AssignmentsService = class AssignmentsService {
                 where: { id: assignmentId },
                 data: { status: client_1.AssignmentStatus.CANCELED },
             });
-            this.gateway.notifyAll('board:refresh', { assignmentId, action: 'auto_cancel' });
+            this.gateway.notifyAll('board:refresh', {
+                assignmentId,
+                action: 'auto_cancel',
+            });
             return;
         }
         const geo = bookings.filter((b) => b.latitude != null && b.longitude != null);
@@ -962,7 +1029,9 @@ let AssignmentsService = class AssignmentsService {
             data: { tourName, tourType, durationDays, totalPax, latitude, longitude },
         });
     }
-    async syncDatesFromBookings(assignmentId) {
+    async syncDatesFromBookings(assignmentId, actor) {
+        const assignment = await this.findOne(assignmentId);
+        this.assertDetailsUnlocked(assignment, actor);
         const bookings = await this.prisma.booking.findMany({
             where: { assignmentId },
             select: { startingDate: true },
@@ -1070,13 +1139,10 @@ let AssignmentsService = class AssignmentsService {
             assignment.guideId !== actor.id) {
             throw new common_1.BadRequestException('Only the assigned tour guide or office staff can upload evidence');
         }
-        const guide = assignment.guide;
-        const slug = this.userSlug(guide?.email, guide?.name, assignment.guideId ?? 'tourguide');
-        const guideDir = `${slug}_${assignment.guideId ?? 'guide'}`;
-        const dateKey = assignment.startDate.toISOString().slice(0, 10);
+        const guideDir = (0, storage_key_util_1.userStorageDir)(assignment.guideId ?? actor.id, assignment.guide?.email, assignment.guide?.name);
         const ext = (file.originalname.split('.').pop() || '').toLowerCase();
         const safeName = (file.originalname.split('/').pop() || 'file').replace(/[^\w.\- ]/g, '_');
-        const storageKey = `evidence/${guideDir}/${dateKey}/${Date.now()}-${safeName}`;
+        const storageKey = (0, storage_key_util_1.pendingEvidenceKey)(guideDir, assignment.id, file.originalname);
         const { url } = await this.storage.save(storageKey, file.buffer, {
             contentType: file.mimetype || undefined,
         });
@@ -1084,6 +1150,9 @@ let AssignmentsService = class AssignmentsService {
             name: safeName,
             url,
             ext,
+            mimeType: file.mimetype || null,
+            size: file.size ?? file.buffer.length,
+            storageKey,
             uploadedAt: new Date().toISOString(),
             uploadedByName: actor.name ?? actor.email ?? null,
         };
@@ -1095,14 +1164,6 @@ let AssignmentsService = class AssignmentsService {
             changedBy: actor.id,
         });
         return entry;
-    }
-    userSlug(email, name, fallback) {
-        const raw = email?.split('@')[0] || name || fallback || 'user';
-        const slug = raw
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_+|_+$/g, '');
-        return slug || fallback || 'user';
     }
     async verifyTourReport(id, dto, actor) {
         if (actor.role !== client_1.RoleType.ADMIN && actor.role !== client_1.RoleType.OFFICE) {
@@ -1218,6 +1279,11 @@ let AssignmentsService = class AssignmentsService {
                 data: { reportVerifierId: null },
             });
         }
+        if (dto.status === 'VERIFIED') {
+            await this.drive.publishTourReportEvidence(id).catch((error) => {
+                this.logger.warn(`Could not publish evidence for assignment ${id}: ${error.message}`);
+            });
+        }
         if (assignment.guideId) {
             const isVerified = dto.status === 'VERIFIED';
             const notifType = isVerified
@@ -1292,6 +1358,9 @@ let AssignmentsService = class AssignmentsService {
                 where: { assignmentId: id },
                 data,
             });
+        });
+        await this.drive.publishTourReportEvidence(id).catch((error) => {
+            this.logger.warn(`Could not publish evidence for assignment ${id}: ${error.message}`);
         });
         if (assignment.guideId) {
             const notif = await this.notificationService.create(assignment.guideId, client_1.NotificationType.REPORT_VERIFIED, `✅ Trip "${assignment.code ?? 'Bus'}" is completed`, `${assignment.tourName ?? 'Tour'} — closed by: ${actor.name ?? '—'}`, { assignmentId: id });
@@ -1494,7 +1563,7 @@ let AssignmentsService = class AssignmentsService {
     }
 };
 exports.AssignmentsService = AssignmentsService;
-exports.AssignmentsService = AssignmentsService = __decorate([
+exports.AssignmentsService = AssignmentsService = AssignmentsService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(6, (0, common_1.Inject)(storage_1.STORAGE)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
@@ -1502,6 +1571,6 @@ exports.AssignmentsService = AssignmentsService = __decorate([
         assignment_board_service_1.AssignmentBoardService,
         notification_service_1.NotificationService,
         notifications_gateway_1.NotificationsGateway,
-        leaves_service_1.LeavesService, Object])
+        leaves_service_1.LeavesService, Object, drive_service_1.DriveService])
 ], AssignmentsService);
 //# sourceMappingURL=assignments.service.js.map

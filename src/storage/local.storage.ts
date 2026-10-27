@@ -1,17 +1,17 @@
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { FileStorage, StorageEntry } from './storage.types';
+import { publicUploadsBase, uploadRootPath } from './storage.config';
 
 /**
- * Default driver when no cloud is configured: stores files in backend/uploads,
- * served through ServeStaticModule at http://localhost:4000/uploads.
+ * Default driver when no cloud is configured: stores files in UPLOAD_ROOT
+ * (backend/uploads by default), served through ServeStaticModule at /uploads.
  */
 export class LocalStorage implements FileStorage {
   readonly driver = 'local' as const;
 
-  private readonly root = path.join(process.cwd(), 'uploads');
-  private readonly publicBase =
-    process.env.PUBLIC_UPLOADS_BASE || 'http://localhost:4000/uploads';
+  private readonly root = uploadRootPath();
+  private readonly publicBase = publicUploadsBase();
 
   private resolveSafe(key: string): string {
     const abs = path.resolve(this.root, key);

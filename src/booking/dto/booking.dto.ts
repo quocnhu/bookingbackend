@@ -4,6 +4,7 @@ import {
   IsEmail,
   IsEnum,
   IsInt,
+  IsMilitaryTime,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -88,6 +89,10 @@ export class CreateBookingDto {
 
   @IsNotEmpty()
   startingDate?: string | Date;
+
+  @IsOptional()
+  @IsMilitaryTime()
+  departureTime?: string;
 
   @IsNotEmpty()
   @IsString()
@@ -186,6 +191,10 @@ export class UpdateBookingDto {
 
   @IsOptional()
   startingDate?: string | Date;
+
+  @IsOptional()
+  @IsMilitaryTime()
+  departureTime?: string;
 
   @IsOptional()
   @IsString()

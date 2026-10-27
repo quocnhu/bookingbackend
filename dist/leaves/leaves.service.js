@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var LeavesService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LeavesService = void 0;
 const common_1 = require("@nestjs/common");
@@ -17,11 +18,14 @@ const notification_service_1 = require("../notifications/notification.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
 const client_1 = require("@prisma/client");
 const LEAVE_BLOCKING_STATUSES = [client_1.LeaveStatus.PENDING, client_1.LeaveStatus.APPROVED];
-let LeavesService = class LeavesService {
+const LEAVE_NOTICE_DAYS = 2;
+const EMERGENCY_CUTOFF_HOUR = 4;
+let LeavesService = LeavesService_1 = class LeavesService {
     prisma;
     auditService;
     notificationService;
     gateway;
+    logger = new common_1.Logger(LeavesService_1.name);
     constructor(prisma, auditService, notificationService, gateway) {
         this.prisma = prisma;
         this.auditService = auditService;
@@ -45,6 +49,23 @@ let LeavesService = class LeavesService {
         }
         return { start, end };
     }
+    assertRequestTiming(start, isEmergency) {
+        const now = new Date();
+        if (isEmergency) {
+            const cutoff = new Date(start);
+            cutoff.setHours(EMERGENCY_CUTOFF_HOUR, 0, 0, 0);
+            if (now >= cutoff) {
+                throw new common_1.BadRequestException('Emergency leave for today must be submitted before 04:00, because automatic dispatch runs at 04:00.');
+            }
+            return;
+        }
+        const earliestStart = new Date(now);
+        earliestStart.setDate(earliestStart.getDate() + LEAVE_NOTICE_DAYS);
+        earliestStart.setHours(0, 0, 0, 0);
+        if (start < earliestStart) {
+            throw new common_1.BadRequestException('Leave requests must be submitted at least 2 days before the first day off. Tick "Emergency" for a last-minute request.');
+        }
+    }
     async hasLeaveConflict(userId, start, end, excludeId) {
         const count = await this.prisma.userLeave.count({
             where: {
@@ -59,6 +80,8 @@ let LeavesService = class LeavesService {
     }
     async create(dto, actor) {
         const { start, end } = this.normalizeRange(dto.startDate, dto.endDate);
+        const isEmergency = dto.isEmergency === true;
+        this.assertRequestTiming(start, isEmergency);
         const isStaff = actor.role === client_1.RoleType.ADMIN || actor.role === client_1.RoleType.OFFICE;
         let targetUserId = actor.id;
         if (dto.userId) {
@@ -85,18 +108,39 @@ let LeavesService = class LeavesService {
                 startDate: start,
                 endDate: end,
                 reason: dto.reason,
+                isEmergency,
                 status: client_1.LeaveStatus.PENDING,
             },
             include: this.includeUser,
         });
-        if (targetUserId === actor.id) {
-            await this.notifyAdminsOfRequest(leave);
+        try {
+            if (targetUserId === actor.id) {
+                await this.notifyReviewersOfRequest(leave);
+            }
+            else {
+                const notif = await this.notificationService.create(targetUserId, client_1.NotificationType.LEAVE_REQUESTED, isEmergency
+                    ? '🚨 Emergency leave registered for you'
+                    : '📅 Leave registered for you', `${actor.name ?? actor.email} registered ${isEmergency ? 'EMERGENCY ' : ''}leave for you: ${this.formatRange(leave.startDate, leave.endDate)}.`, {
+                    leaveId: leave.id,
+                    userId: targetUserId,
+                    fromUserId: actor.id,
+                    isEmergency,
+                });
+                this.gateway.notifyUser(targetUserId, 'notification', notif);
+            }
+        }
+        catch (err) {
+            this.logger.warn(`Failed to send leave notifications for ${leave.id}: ${err.message}`);
         }
         await this.auditService.log({
             entityType: 'UserLeave',
             entityId: leave.id,
             action: 'CREATE',
-            afterData: { startDate: leave.startDate, endDate: leave.endDate },
+            afterData: {
+                startDate: leave.startDate,
+                endDate: leave.endDate,
+                isEmergency,
+            },
             changedBy: actor.id,
         });
         return leave;
@@ -152,11 +196,36 @@ let LeavesService = class LeavesService {
         };
     }
     async findMy(actor) {
-        return this.prisma.userLeave.findMany({
+        const items = await this.prisma.userLeave.findMany({
             where: { userId: actor.id },
             include: this.includeUser,
             orderBy: [{ startDate: 'desc' }],
         });
+        return items.map((it) => this.flatten(it));
+    }
+    async findMySummary(actor) {
+        const now = new Date();
+        const yearStart = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+        const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        const leaves = await this.prisma.userLeave.findMany({
+            where: {
+                userId: actor.id,
+                status: { in: LEAVE_BLOCKING_STATUSES },
+                startDate: { lte: yearEnd },
+                endDate: { gte: yearStart },
+            },
+            select: { startDate: true, endDate: true, status: true },
+        });
+        const mondayOffset = (now.getDay() + 6) % 7;
+        const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset, 0, 0, 0, 0);
+        const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6, 23, 59, 59, 999);
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        return {
+            week: this.summarizePeriod(leaves, weekStart, weekEnd),
+            month: this.summarizePeriod(leaves, monthStart, monthEnd),
+            year: this.summarizePeriod(leaves, yearStart, yearEnd),
+        };
     }
     async updateStatus(id, dto, actor) {
         if (actor.role !== client_1.RoleType.ADMIN && actor.role !== client_1.RoleType.OFFICE) {
@@ -184,10 +253,15 @@ let LeavesService = class LeavesService {
             include: this.includeUser,
         });
         const approved = dto.status === client_1.LeaveStatus.APPROVED;
-        const notif = await this.notificationService.create(leave.userId, approved ? client_1.NotificationType.LEAVE_APPROVED : client_1.NotificationType.LEAVE_REJECTED, approved
-            ? '✅ Leave request approved'
-            : '❌ Leave request rejected', `${this.formatRange(leave.startDate, leave.endDate)} — ${approved ? 'Approved' : 'Rejected'} by ${actor.name ?? actor.email}.`, { leaveId: leave.id, status: dto.status, userId: leave.userId });
-        this.gateway.notifyUser(leave.userId, 'notification', notif);
+        try {
+            const notif = await this.notificationService.create(leave.userId, approved ? client_1.NotificationType.LEAVE_APPROVED : client_1.NotificationType.LEAVE_REJECTED, approved
+                ? '✅ Leave request approved'
+                : '❌ Leave request rejected', `${this.formatRange(leave.startDate, leave.endDate)} — ${approved ? 'Approved' : 'Rejected'} by ${actor.name ?? actor.email}.`, { leaveId: leave.id, status: dto.status, userId: leave.userId });
+            this.gateway.notifyUser(leave.userId, 'notification', notif);
+        }
+        catch (err) {
+            this.logger.warn(`Failed to notify ${leave.userId} about leave ${leave.id}: ${err.message}`);
+        }
         await this.auditService.log({
             entityType: 'UserLeave',
             entityId: id,
@@ -220,6 +294,36 @@ let LeavesService = class LeavesService {
         });
         return { message: 'Leave request deleted' };
     }
+    inclusiveDays(start, end) {
+        const s = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+        const e = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+        return Math.floor((e - s) / 86_400_000) + 1;
+    }
+    summarizePeriod(leaves, periodStart, periodEnd) {
+        let approvedDays = 0;
+        let pendingDays = 0;
+        let requests = 0;
+        for (const leave of leaves) {
+            const start = new Date(Math.max(leave.startDate.getTime(), periodStart.getTime()));
+            const end = new Date(Math.min(leave.endDate.getTime(), periodEnd.getTime()));
+            if (start > end)
+                continue;
+            requests++;
+            const days = this.inclusiveDays(start, end);
+            if (leave.status === client_1.LeaveStatus.APPROVED)
+                approvedDays += days;
+            else if (leave.status === client_1.LeaveStatus.PENDING)
+                pendingDays += days;
+        }
+        return {
+            start: periodStart.toISOString(),
+            end: periodEnd.toISOString(),
+            days: approvedDays + pendingDays,
+            approvedDays,
+            pendingDays,
+            requests,
+        };
+    }
     formatRange(start, end) {
         const s = start.toISOString().slice(0, 10);
         const e = end.toISOString().slice(0, 10);
@@ -233,6 +337,7 @@ let LeavesService = class LeavesService {
             startDate: it.startDate.toISOString(),
             endDate: it.endDate.toISOString(),
             reason: it.reason,
+            isEmergency: it.isEmergency,
             status: it.status,
             reviewedByName: it.reviewedBy?.name ?? null,
             reviewedByRole: it.reviewedBy?.role ?? null,
@@ -242,23 +347,45 @@ let LeavesService = class LeavesService {
             userId: it.userId,
         };
     }
-    async notifyAdminsOfRequest(leave) {
-        const admins = await this.prisma.user.findMany({
-            where: { role: client_1.RoleType.ADMIN, isActive: true },
+    async notifyReviewersOfRequest(leave) {
+        const reviewers = await this.prisma.user.findMany({
+            where: {
+                role: { in: [client_1.RoleType.ADMIN, client_1.RoleType.OFFICE] },
+                isActive: true,
+                id: { not: leave.userId },
+            },
             select: { id: true },
         });
         const requester = leave.user?.name ?? leave.user?.email ?? 'Staff member';
-        const role = leave.user?.role === client_1.RoleType.DRIVER ? 'Driver' : 'Tour guide';
-        const title = `📅 New leave request`;
-        const body = `${requester} (${role}) registered leave: ${this.formatRange(leave.startDate, leave.endDate)}. Go to Leaves to review it.`;
-        for (const admin of admins) {
-            const notif = await this.notificationService.create(admin.id, client_1.NotificationType.LEAVE_REQUESTED, title, body, { leaveId: leave.id, userId: leave.userId });
-            this.gateway.notifyUser(admin.id, 'notification', notif);
+        const roleLabel = {
+            ADMIN: 'Admin',
+            OFFICE: 'Office',
+            TOUR_GUIDE: 'Tour guide',
+            DRIVER: 'Driver',
+            TRANSPORT_PROVIDER: 'Transport provider',
+        };
+        const role = roleLabel[leave.user?.role] ?? 'Staff member';
+        const title = leave.isEmergency
+            ? '🚨 New EMERGENCY leave request'
+            : '📅 New leave request';
+        const body = `${requester} (${role}) registered ${leave.isEmergency ? 'EMERGENCY ' : ''}leave: ${this.formatRange(leave.startDate, leave.endDate)}. Go to Leaves to review it.`;
+        for (const reviewer of reviewers) {
+            try {
+                const notif = await this.notificationService.create(reviewer.id, client_1.NotificationType.LEAVE_REQUESTED, title, body, {
+                    leaveId: leave.id,
+                    userId: leave.userId,
+                    isEmergency: leave.isEmergency === true,
+                });
+                this.gateway.notifyUser(reviewer.id, 'notification', notif);
+            }
+            catch (err) {
+                this.logger.warn(`Failed to notify reviewer ${reviewer.id} about leave ${leave.id}: ${err.message}`);
+            }
         }
     }
 };
 exports.LeavesService = LeavesService;
-exports.LeavesService = LeavesService = __decorate([
+exports.LeavesService = LeavesService = LeavesService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_service_1.AuditService,

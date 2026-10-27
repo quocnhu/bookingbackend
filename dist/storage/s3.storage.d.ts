@@ -7,9 +7,10 @@ export interface S3StorageConfig {
     secretAccessKey?: string;
     forcePathStyle?: boolean;
     publicUrl?: string;
+    driver?: 's3' | 'supabase';
 }
 export declare class S3Storage implements FileStorage {
-    readonly driver: "s3";
+    readonly driver: 's3' | 'supabase';
     private readonly client;
     private readonly bucket;
     private readonly region;

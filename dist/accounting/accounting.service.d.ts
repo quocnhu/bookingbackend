@@ -4,6 +4,7 @@ import { AuditService } from "../audit/audit.service";
 import { NotificationService } from "../notifications/notification.service";
 import { NotificationsGateway } from "../notifications/notifications.gateway";
 import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import { DriveService } from "../drive/drive.service";
 import { CreateSettlementCategoryDto, CreateSettlementDto, ExportPeriodDto, ListPeopleQueryDto, PeriodQueryDto, RejectMoneyDto, VerifyTourMoneyDto, VoidPeriodDto } from './dto/accounting.dto';
 export declare const PAYEE_LABELS: Record<PayeeType, string>;
 export interface Payee {
@@ -23,7 +24,8 @@ export declare class AccountingService {
     private readonly audit;
     private readonly notificationService;
     private readonly gateway;
-    constructor(prisma: PrismaService, audit: AuditService, notificationService: NotificationService, gateway: NotificationsGateway);
+    private readonly drive;
+    constructor(prisma: PrismaService, audit: AuditService, notificationService: NotificationService, gateway: NotificationsGateway, drive: DriveService);
     private assertAccounting;
     private assertPayable;
     private range;
@@ -59,9 +61,9 @@ export declare class AccountingService {
         rows: ({
             booking: {
                 id: string;
+                totalPax: number;
                 bookingRef: string;
                 customerName: string | null;
-                totalPax: number;
             } | null;
             category: {
                 id: string;
@@ -251,7 +253,6 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         status: import("@prisma/client").$Enums.TourReportStatus;
-        notes: string | null;
         assignmentId: string;
         submittedById: string | null;
         submittedByName: string | null;
@@ -261,6 +262,7 @@ export declare class AccountingService {
         distanceKm: number | null;
         fuelCost: Prisma.Decimal | null;
         tollParking: Prisma.Decimal | null;
+        notes: string | null;
         verifiedById: string | null;
         verifiedByName: string | null;
         verifiedAt: Date | null;
@@ -288,7 +290,6 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         status: import("@prisma/client").$Enums.TourReportStatus;
-        notes: string | null;
         assignmentId: string;
         submittedById: string | null;
         submittedByName: string | null;
@@ -298,6 +299,7 @@ export declare class AccountingService {
         distanceKm: number | null;
         fuelCost: Prisma.Decimal | null;
         tollParking: Prisma.Decimal | null;
+        notes: string | null;
         verifiedById: string | null;
         verifiedByName: string | null;
         verifiedAt: Date | null;

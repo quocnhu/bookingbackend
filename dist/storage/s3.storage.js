@@ -3,12 +3,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.S3Storage = void 0;
 const client_s3_1 = require("@aws-sdk/client-s3");
 class S3Storage {
-    driver = 's3';
+    driver;
     client;
     bucket;
     region;
     publicBase;
     constructor(config) {
+        this.driver = config.driver ?? 's3';
         this.bucket = config.bucket;
         this.region = config.region || 'us-east-1';
         this.publicBase = config.publicUrl

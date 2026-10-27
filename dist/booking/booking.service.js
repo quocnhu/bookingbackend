@@ -95,6 +95,7 @@ let BookingService = BookingService_1 = class BookingService {
             latitude: data.latitude,
             longitude: data.longitude,
             startingDate: data.startingDate ? new Date(data.startingDate) : undefined,
+            departureTime: data.departureTime,
             customerName: data.customerName,
             hotelName: data.hotelName,
             phone: data.phone,
@@ -238,6 +239,7 @@ let BookingService = BookingService_1 = class BookingService {
             startingDate: data.startingDate
                 ? new Date(data.startingDate + 'T00:00:00.000+07:00').toISOString()
                 : undefined,
+            departureTime: data.departureTime,
             customerName: data.customerName,
             hotelName: data.hotelName,
             phone: data.phone,
@@ -400,9 +402,10 @@ let BookingService = BookingService_1 = class BookingService {
                 where: { id: before.assignmentId },
                 include: { tourReport: true },
             });
-            const locked = assignment?.tourReport?.status === 'SUBMITTED' || assignment?.tourReport?.status === 'VERIFIED';
-            if (locked) {
-                throw new common_1.BadRequestException('This booking is locked because the tour report has been submitted for verification. Only accounting can unlock by rejecting the report.');
+            const locked = assignment?.tourReport?.status === 'SUBMITTED' ||
+                assignment?.tourReport?.status === 'VERIFIED';
+            if (locked && actor?.role !== client_1.RoleType.ADMIN) {
+                throw new common_1.BadRequestException('This booking is locked because the tour report has been submitted for verification. Only an administrator can change it; accounting can unlock it by rejecting the report.');
             }
         }
         const { overrideCancelWindow, ...dtoFields } = dto;
@@ -478,9 +481,10 @@ let BookingService = BookingService_1 = class BookingService {
             include: { assignment: { include: { tourReport: true } } },
         });
         for (const booking of bookings) {
-            const locked = booking.assignment?.tourReport?.status === 'SUBMITTED' || booking.assignment?.tourReport?.status === 'VERIFIED';
-            if (locked) {
-                throw new common_1.BadRequestException(`Booking ${booking.bookingRef} is locked because the tour report has been submitted for verification. Only accounting can unlock by rejecting the report.`);
+            const locked = booking.assignment?.tourReport?.status === 'SUBMITTED' ||
+                booking.assignment?.tourReport?.status === 'VERIFIED';
+            if (locked && actor?.role !== client_1.RoleType.ADMIN) {
+                throw new common_1.BadRequestException(`Booking ${booking.bookingRef} is locked because the tour report has been submitted for verification. Only an administrator can change it; accounting can unlock it by rejecting the report.`);
             }
         }
         const updated = await this.prisma.$transaction(items.map((item) => this.prisma.booking.update({
@@ -500,8 +504,19 @@ let BookingService = BookingService_1 = class BookingService {
             await this.postWrite(b);
         return updated;
     }
-    async remove(id) {
-        await this.findOne(id);
+    async remove(id, actor) {
+        const booking = await this.findOne(id);
+        if (booking.assignmentId) {
+            const assignment = await this.prisma.assignment.findUnique({
+                where: { id: booking.assignmentId },
+                select: { tourReport: { select: { status: true } } },
+            });
+            const locked = assignment?.tourReport?.status === 'SUBMITTED' ||
+                assignment?.tourReport?.status === 'VERIFIED';
+            if (locked && actor?.role !== client_1.RoleType.ADMIN) {
+                throw new common_1.BadRequestException('This booking is locked because the tour report has been submitted for verification. Only an administrator can delete it; accounting can unlock it by rejecting the report.');
+            }
+        }
         await this.prisma.booking.delete({ where: { id } });
         await this.auditService.log({
             entityType: 'Booking',

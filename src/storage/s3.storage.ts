@@ -15,15 +15,16 @@ export interface S3StorageConfig {
   secretAccessKey?: string;
   forcePathStyle?: boolean;
   publicUrl?: string;
+  driver?: 's3' | 'supabase';
 }
 
 /**
- * Driver cloud (S3 / S3-compatible: AWS, MinIO, R2, Wasabi...).
+ * Driver cloud (S3 / S3-compatible: AWS, MinIO, R2, Wasabi, Supabase).
  * Key = the current storageKey (drive/{userDir}/{folderId}/file) — the logic is
  * unchanged, only the storage location differs.
  */
 export class S3Storage implements FileStorage {
-  readonly driver = 's3' as const;
+  readonly driver: 's3' | 'supabase';
 
   private readonly client: S3Client;
   private readonly bucket: string;
@@ -31,6 +32,7 @@ export class S3Storage implements FileStorage {
   private readonly publicBase?: string;
 
   constructor(config: S3StorageConfig) {
+    this.driver = config.driver ?? 's3';
     this.bucket = config.bucket;
     this.region = config.region || 'us-east-1';
     this.publicBase = config.publicUrl

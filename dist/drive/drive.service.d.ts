@@ -18,7 +18,13 @@ export interface DriveFileView {
 export declare class DriveService {
     private readonly prisma;
     private readonly storage;
+    private readonly logger;
     constructor(prisma: PrismaService, storage: FileStorage);
+    private formatDateKey;
+    private ensureChildFolder;
+    private folderSegments;
+    private folderPrefix;
+    private storageKeyFor;
     ensureUserDrive(userId: string): Promise<{
         root: {
             id: string;
@@ -38,6 +44,45 @@ export declare class DriveService {
             parentId: string | null;
             kind: string;
         };
+        tour: {
+            id: string;
+            createdAt: Date;
+            name: string;
+            userId: string | null;
+            updatedAt: Date;
+            parentId: string | null;
+            kind: string;
+        };
+    }>;
+    ensureDateFolder(userId: string, parentId?: string, dateKey?: string): Promise<{
+        id: string;
+        createdAt: Date;
+        name: string;
+        userId: string | null;
+        updatedAt: Date;
+        parentId: string | null;
+        kind: string;
+    }>;
+    getOrCreateTourFolder(userId: string, tourName: string, date?: Date | string): Promise<{
+        id: string;
+        createdAt: Date;
+        name: string;
+        userId: string | null;
+        updatedAt: Date;
+        parentId: string | null;
+        kind: string;
+    }>;
+    publishTourReportEvidence(assignmentId: string): Promise<{
+        moved: number;
+    }>;
+    getOrCreateTourGuideDateFolder(userId: string, date?: Date | string): Promise<{
+        id: string;
+        createdAt: Date;
+        name: string;
+        userId: string | null;
+        updatedAt: Date;
+        parentId: string | null;
+        kind: string;
     }>;
     listContents(userId: string, folderId?: string): Promise<{
         current: {
@@ -68,10 +113,10 @@ export declare class DriveService {
             createdAt: Date;
             name: string;
             userId: string | null;
-            folderId: string;
-            mimeType: string | null;
-            size: number;
             storageKey: string;
+            size: number;
+            mimeType: string | null;
+            folderId: string;
         }[];
         quota: {
             unlimited: boolean;
@@ -107,6 +152,7 @@ export declare class DriveService {
         parentId: string | null;
         kind: string;
     }>;
+    private collectFolderIds;
     deleteFolder(userId: string, id: string): Promise<{
         success: boolean;
     }>;
@@ -114,16 +160,20 @@ export declare class DriveService {
         id: string;
         role: string;
     }, file: Express.Multer.File, targetUserId?: string): Promise<DriveFileView>;
-    uploadFile(userId: string, file: Express.Multer.File, folderId?: string, clientName?: string): Promise<DriveFileView>;
+    uploadFile(userId: string, file: Express.Multer.File, folderId?: string, clientName?: string, options?: {
+        date?: string | Date;
+        useDateFolder?: boolean;
+        tourName?: string;
+    }): Promise<DriveFileView>;
     renameFile(userId: string, id: string, dto: RenameFileDto): Promise<{
         id: string;
         createdAt: Date;
         name: string;
         userId: string | null;
-        folderId: string;
-        mimeType: string | null;
-        size: number;
         storageKey: string;
+        size: number;
+        mimeType: string | null;
+        folderId: string;
     }>;
     deleteFile(userId: string, id: string): Promise<{
         success: boolean;

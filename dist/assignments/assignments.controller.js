@@ -62,26 +62,26 @@ let AssignmentsController = class AssignmentsController {
     create(dto, actor) {
         return this.assignmentsService.create(dto, actor);
     }
-    update(id, dto) {
-        return this.assignmentsService.update(id, dto);
+    update(id, dto, actor) {
+        return this.assignmentsService.update(id, dto, actor);
     }
     updateStatus(id, dto) {
         return this.assignmentsService.updateStatus(id, dto);
     }
-    reorderBookings(id, dto) {
-        return this.assignmentsService.reorderBookings(id, dto.bookingIds);
+    reorderBookings(id, dto, actor) {
+        return this.assignmentsService.reorderBookings(id, dto.bookingIds, actor);
     }
-    moveBooking(id, bookingId, dto) {
-        return this.assignmentsService.moveBooking(id, bookingId, dto.toAssignmentId);
+    moveBooking(id, bookingId, dto, actor) {
+        return this.assignmentsService.moveBooking(id, bookingId, dto.toAssignmentId, actor);
     }
-    assignBookings(id, dto) {
-        return this.assignmentsService.assignBookings(id, dto);
+    assignBookings(id, dto, actor) {
+        return this.assignmentsService.assignBookings(id, dto, actor);
     }
-    removeBooking(id, bookingId) {
-        return this.assignmentsService.removeBooking(id, bookingId);
+    removeBooking(id, bookingId, actor) {
+        return this.assignmentsService.removeBooking(id, bookingId, actor);
     }
-    syncDatesFromBookings(id) {
-        return this.assignmentsService.syncDatesFromBookings(id);
+    syncDatesFromBookings(id, actor) {
+        return this.assignmentsService.syncDatesFromBookings(id, actor);
     }
     remove(id) {
         return this.assignmentsService.remove(id);
@@ -202,8 +202,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('assignment.update'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, assignment_dto_1.UpdateAssignmentDto]),
+    __metadata("design:paramtypes", [String, assignment_dto_1.UpdateAssignmentDto, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "update", null);
 __decorate([
@@ -220,8 +221,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('assignment.update'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, assignment_dto_1.ReorderBookingsDto]),
+    __metadata("design:paramtypes", [String, assignment_dto_1.ReorderBookingsDto, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "reorderBookings", null);
 __decorate([
@@ -230,8 +232,9 @@ __decorate([
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('bookingId')),
     __param(2, (0, common_1.Body)()),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, assignment_dto_1.MoveBookingDto]),
+    __metadata("design:paramtypes", [String, String, assignment_dto_1.MoveBookingDto, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "moveBooking", null);
 __decorate([
@@ -239,8 +242,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('assignment.update'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, assignment_dto_1.AssignBookingsDto]),
+    __metadata("design:paramtypes", [String, assignment_dto_1.AssignBookingsDto, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "assignBookings", null);
 __decorate([
@@ -248,16 +252,18 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('assignment.update'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('bookingId')),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "removeBooking", null);
 __decorate([
     (0, common_1.Post)(':id/sync-dates'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "syncDatesFromBookings", null);
 __decorate([

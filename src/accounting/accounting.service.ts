@@ -21,6 +21,7 @@ import { NotificationService } from '@/notifications/notification.service';
 import { NotificationsGateway } from '@/notifications/notifications.gateway';
 import { NotificationType } from '@prisma/client';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
+import { DriveService } from '@/drive/drive.service';
 import {
   CreateSettlementCategoryDto,
   CreateSettlementDto,
@@ -69,6 +70,7 @@ export class AccountingService {
     private readonly audit: AuditService,
     private readonly notificationService: NotificationService,
     private readonly gateway: NotificationsGateway,
+    private readonly drive: DriveService,
   ) {}
 
   /**
@@ -415,7 +417,9 @@ export class AccountingService {
       throw new ConflictException('Cannot delete a reversed entry');
     }
     if (original.reversesId) {
-      throw new ConflictException('Cannot delete a reversal entry; delete the original instead');
+      throw new ConflictException(
+        'Cannot delete a reversal entry; delete the original instead',
+      );
     }
     // Locked money is immutable — deletions would let live rows drift away
     // from the locked netAmount. Correct mistakes before locking.
@@ -665,6 +669,10 @@ export class AccountingService {
 
       return report;
     });
+
+    await this.drive
+      .publishTourReportEvidence(assignmentId)
+      .catch(() => undefined);
 
     await this.notifySubmitter(assignment, {
       type: NotificationType.MONEY_VERIFIED,
@@ -1051,7 +1059,10 @@ export class AccountingService {
       b.add(l.period.personId);
       periodPaidByTrip.set(l.assignmentId, b);
     }
-    const unpaidFor = (payeeId: string, kind: 'PERSON' | 'PROVIDER'): number => {
+    const unpaidFor = (
+      payeeId: string,
+      kind: 'PERSON' | 'PROVIDER',
+    ): number => {
       let n = 0;
       for (const t of settledTrips) {
         if (kind === 'PERSON') {
@@ -1112,9 +1123,7 @@ export class AccountingService {
             where: {
               // A voided period's trips must be exportable again.
               period: { voidedAt: null, personId: payee.id },
-              ...(payee.kind === 'PROVIDER'
-                ? {}
-                : { payableToId: payee.id }),
+              ...(payee.kind === 'PROVIDER' ? {} : { payableToId: payee.id }),
             },
             select: { assignmentId: true },
           })
@@ -1361,7 +1370,8 @@ export class AccountingService {
       const line = a.paymentLines[0] ?? null;
       // Paid means paid TO THIS PERSON — a provider-level line (payable to
       // the driver) must not mark the guide's row paid and vice versa.
-      const mine = a.paymentLines.find((l) => l.payableToId === personId) ?? null;
+      const mine =
+        a.paymentLines.find((l) => l.payableToId === personId) ?? null;
       const roles: string[] = [];
       if (a.guideId === personId) roles.push('GUIDE');
       if (a.driverId === personId) roles.push('DRIVER');
@@ -1379,9 +1389,7 @@ export class AccountingService {
         driverName: a.driver?.name ?? null,
         myRole: roles.join('+') || '—',
         netAmount:
-          a.tourReport?.netAmount != null
-            ? num(a.tourReport.netAmount)
-            : null,
+          a.tourReport?.netAmount != null ? num(a.tourReport.netAmount) : null,
         flow: a.tourReport?.settlementFlow ?? null,
         locked: !!a.tourReport?.moneyVerifiedAt,
         paid: !!mine,
@@ -1431,7 +1439,14 @@ export class AccountingService {
           where: { period: { voidedAt: null } },
           select: {
             netAmount: true,
-            period: { select: { id: true, personId: true, fromDate: true, toDate: true } },
+            period: {
+              select: {
+                id: true,
+                personId: true,
+                fromDate: true,
+                toDate: true,
+              },
+            },
           },
         },
       },

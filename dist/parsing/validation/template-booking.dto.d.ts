@@ -15,6 +15,7 @@ export declare class TemplateBookingDto {
     latitude?: number;
     longitude?: number;
     startingDate?: string | Date;
+    departureTime?: string;
     customerName?: string;
     hotelName?: string;
     phone?: string;

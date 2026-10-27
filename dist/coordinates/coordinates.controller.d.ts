@@ -9,9 +9,9 @@ export declare class CoordinatesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        address: string;
         latitude: number;
         longitude: number;
+        address: string;
         hotelName: string;
         starRating: string | null;
     }>;
@@ -20,9 +20,9 @@ export declare class CoordinatesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        address: string;
         latitude: number;
         longitude: number;
+        address: string;
         hotelName: string;
         starRating: string | null;
     }>;
@@ -31,9 +31,9 @@ export declare class CoordinatesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        address: string;
         latitude: number;
         longitude: number;
+        address: string;
         hotelName: string;
         starRating: string | null;
     }>;
