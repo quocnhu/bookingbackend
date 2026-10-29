@@ -1,0 +1,2 @@
+export declare const EMPLOYEE_GROUPS: readonly ["COMPANY_GUIDE", "FREELANCE_GUIDE", "COMPANY_DRIVER", "FREELANCE_DRIVER", "PROVIDER_STAFF", "PROVIDER_ACCOUNT", "OFFICE", "ADMIN", "CUSTOMER"];
+export type EmployeeGroup = (typeof EMPLOYEE_GROUPS)[number];

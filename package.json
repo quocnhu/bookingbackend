@@ -20,6 +20,7 @@
     "seed:feed": "tsx prisma/seed-feed.ts",
     "seed:google": "tsx prisma/seed-google-login.ts",
     "seed:users": "tsx prisma/seed-users.ts",
+    "seed:current": "tsx prisma/seed-current.ts",
     "reset:feed": "tsx prisma/reset-feed.ts",
     "prisma:migrate": "prisma migrate dev",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

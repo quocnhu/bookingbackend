@@ -12,6 +12,7 @@ import { LeavesService } from './leaves.service';
 import {
   CreateLeaveDto,
   QueryLeaveDto,
+  QueryTimesheetDto,
   UpdateLeaveStatusDto,
 } from './dto/leave.dto';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -34,6 +35,19 @@ export class LeavesController {
   @Get('my-summary')
   findMySummary(@CurrentUser() actor: AuthenticatedUser) {
     return this.leavesService.findMySummary(actor);
+  }
+
+  @Get('employees')
+  listEmployees(@CurrentUser() actor: AuthenticatedUser) {
+    return this.leavesService.listEmployees(actor);
+  }
+
+  @Get('timesheet')
+  getTimesheet(
+    @Query() query: QueryTimesheetDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.leavesService.getTimesheet(query, actor);
   }
 
   @Post()

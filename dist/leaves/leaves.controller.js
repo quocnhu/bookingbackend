@@ -31,6 +31,12 @@ let LeavesController = class LeavesController {
     findMySummary(actor) {
         return this.leavesService.findMySummary(actor);
     }
+    listEmployees(actor) {
+        return this.leavesService.listEmployees(actor);
+    }
+    getTimesheet(query, actor) {
+        return this.leavesService.getTimesheet(query, actor);
+    }
     create(dto, actor) {
         return this.leavesService.create(dto, actor);
     }
@@ -64,6 +70,21 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], LeavesController.prototype, "findMySummary", null);
+__decorate([
+    (0, common_1.Get)('employees'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], LeavesController.prototype, "listEmployees", null);
+__decorate([
+    (0, common_1.Get)('timesheet'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [leave_dto_1.QueryTimesheetDto, Object]),
+    __metadata("design:returntype", void 0)
+], LeavesController.prototype, "getTimesheet", null);
 __decorate([
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),

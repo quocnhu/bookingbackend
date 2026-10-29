@@ -294,6 +294,215 @@ let LeavesService = LeavesService_1 = class LeavesService {
         });
         return { message: 'Leave request deleted' };
     }
+    employeeSelect = {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        userType: true,
+        isActive: true,
+        provider: { select: { id: true, name: true, isCompany: true } },
+        guideProfile: { select: { type: true, rating: true } },
+        driverProfile: { select: { type: true, rating: true } },
+    };
+    roleOrder = {
+        [client_1.RoleType.ADMIN]: 0,
+        [client_1.RoleType.OFFICE]: 1,
+        [client_1.RoleType.TOUR_GUIDE]: 2,
+        [client_1.RoleType.DRIVER]: 3,
+        [client_1.RoleType.TRANSPORT_PROVIDER]: 4,
+        [client_1.RoleType.CUSTOMER]: 5,
+    };
+    assertLeaveManager(actor) {
+        if (actor.role !== client_1.RoleType.ADMIN && actor.role !== client_1.RoleType.OFFICE) {
+            throw new common_1.ForbiddenException('Only ADMIN/OFFICE can view the employee timesheet');
+        }
+    }
+    resolveEmployeeGroup(user) {
+        if (user.role === client_1.RoleType.TRANSPORT_PROVIDER)
+            return 'PROVIDER_ACCOUNT';
+        if (user.provider && !user.provider.isCompany)
+            return 'PROVIDER_STAFF';
+        if (user.role === client_1.RoleType.TOUR_GUIDE) {
+            return user.guideProfile?.type === client_1.GuideType.OFFICIAL
+                ? 'COMPANY_GUIDE'
+                : 'FREELANCE_GUIDE';
+        }
+        if (user.role === client_1.RoleType.DRIVER) {
+            return user.driverProfile?.type === client_1.DriverType.FREELANCE
+                ? 'FREELANCE_DRIVER'
+                : 'COMPANY_DRIVER';
+        }
+        if (user.role === client_1.RoleType.ADMIN)
+            return 'ADMIN';
+        if (user.role === client_1.RoleType.CUSTOMER)
+            return 'CUSTOMER';
+        return 'OFFICE';
+    }
+    toEmployee(user) {
+        return {
+            id: user.id,
+            name: user.name ?? user.email,
+            email: user.email,
+            role: user.role,
+            userType: user.userType,
+            isActive: user.isActive,
+            provider: user.provider
+                ? {
+                    id: user.provider.id,
+                    name: user.provider.name,
+                    isCompany: user.provider.isCompany,
+                }
+                : null,
+            group: this.resolveEmployeeGroup(user),
+            guideType: user.guideProfile?.type ?? null,
+            driverType: user.driverProfile?.type ?? null,
+            rating: user.guideProfile?.rating ?? user.driverProfile?.rating ?? null,
+        };
+    }
+    async listEmployees(actor) {
+        this.assertLeaveManager(actor);
+        const users = await this.prisma.user.findMany({
+            where: { role: { not: client_1.RoleType.CUSTOMER } },
+            select: this.employeeSelect,
+            orderBy: { name: 'asc' },
+        });
+        return users.map((u) => this.toEmployee(u));
+    }
+    async getTimesheet(query, actor) {
+        this.assertLeaveManager(actor);
+        const from = new Date(query.from);
+        const to = new Date(query.to);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+            throw new common_1.BadRequestException('Invalid timesheet dates');
+        }
+        from.setHours(0, 0, 0, 0);
+        to.setHours(23, 59, 59, 999);
+        if (from > to) {
+            throw new common_1.BadRequestException('from must be before or equal to');
+        }
+        const maxTo = new Date(from);
+        maxTo.setDate(maxTo.getDate() + 89);
+        maxTo.setHours(23, 59, 59, 999);
+        const effectiveTo = to > maxTo ? maxTo : to;
+        const where = {
+            role: { notIn: [client_1.RoleType.CUSTOMER, client_1.RoleType.ADMIN] },
+        };
+        const requestedRoles = query.roles?.length
+            ? query.roles
+            : query.role
+                ? [query.role]
+                : undefined;
+        if (requestedRoles) {
+            const allowed = requestedRoles.filter((role) => role !== client_1.RoleType.ADMIN && role !== client_1.RoleType.CUSTOMER);
+            where.role = allowed.length ? { in: allowed } : { in: [] };
+        }
+        if (query.providerIds?.length) {
+            where.providerId = { in: query.providerIds };
+        }
+        else if (query.providerId) {
+            where.providerId = query.providerId;
+        }
+        if (query.search) {
+            where.OR = [
+                { name: { contains: query.search, mode: 'insensitive' } },
+                { email: { contains: query.search, mode: 'insensitive' } },
+            ];
+        }
+        if (!query.includeInactive)
+            where.isActive = true;
+        let users = await this.prisma.user.findMany({
+            where,
+            select: this.employeeSelect,
+            orderBy: { name: 'asc' },
+        });
+        if (query.groups?.length) {
+            const groups = new Set(query.groups);
+            users = users.filter((user) => groups.has(this.resolveEmployeeGroup(user)));
+        }
+        const userIds = users.map((u) => u.id);
+        const [leaves, assignments] = await Promise.all([
+            this.prisma.userLeave.findMany({
+                where: {
+                    userId: { in: userIds },
+                    startDate: { lte: effectiveTo },
+                    endDate: { gte: from },
+                },
+                include: {
+                    reviewedBy: { select: { id: true, name: true } },
+                },
+                orderBy: { startDate: 'asc' },
+            }),
+            this.prisma.assignment.findMany({
+                where: {
+                    status: { not: client_1.AssignmentStatus.CANCELED },
+                    startDate: { lte: effectiveTo },
+                    endDate: { gte: from },
+                    OR: [{ guideId: { not: null } }, { driverId: { not: null } }],
+                },
+                select: {
+                    id: true,
+                    code: true,
+                    tourName: true,
+                    status: true,
+                    startDate: true,
+                    endDate: true,
+                    guideId: true,
+                    driverId: true,
+                    vehicle: { select: { plateNumber: true } },
+                },
+                orderBy: { startDate: 'asc' },
+            }),
+        ]);
+        const leaveMap = new Map();
+        for (const leave of leaves) {
+            const arr = leaveMap.get(leave.userId) ?? [];
+            arr.push({
+                id: leave.id,
+                startDate: leave.startDate.toISOString(),
+                endDate: leave.endDate.toISOString(),
+                reason: leave.reason,
+                isEmergency: leave.isEmergency,
+                status: leave.status,
+                reviewedByName: leave.reviewedBy?.name ?? null,
+                reviewedAt: leave.reviewedAt?.toISOString() ?? null,
+            });
+            leaveMap.set(leave.userId, arr);
+        }
+        const assignmentMap = new Map();
+        const pushAssignment = (userId, a) => {
+            const arr = assignmentMap.get(userId) ?? [];
+            arr.push({
+                id: a.id,
+                code: a.code,
+                tourName: a.tourName,
+                status: a.status,
+                startDate: a.startDate.toISOString(),
+                endDate: a.endDate.toISOString(),
+                plateNumber: a.vehicle?.plateNumber ?? null,
+            });
+            assignmentMap.set(userId, arr);
+        };
+        for (const a of assignments) {
+            if (a.guideId)
+                pushAssignment(a.guideId, a);
+            if (a.driverId)
+                pushAssignment(a.driverId, a);
+        }
+        const employees = users
+            .sort((a, b) => this.roleOrder[a.role] - this.roleOrder[b.role] ||
+            (a.name ?? a.email).localeCompare(b.name ?? b.email))
+            .map((u) => ({
+            ...this.toEmployee(u),
+            leaves: leaveMap.get(u.id) ?? [],
+            assignments: assignmentMap.get(u.id) ?? [],
+        }));
+        return {
+            from: from.toISOString(),
+            to: effectiveTo.toISOString(),
+            employees,
+        };
+    }
     inclusiveDays(start, end) {
         const s = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
         const e = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());

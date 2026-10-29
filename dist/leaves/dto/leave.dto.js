@@ -9,10 +9,22 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QueryLeaveDto = exports.UpdateLeaveStatusDto = exports.CreateLeaveDto = void 0;
+exports.QueryTimesheetDto = exports.QueryLeaveDto = exports.UpdateLeaveStatusDto = exports.CreateLeaveDto = void 0;
+const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const client_1 = require("@prisma/client");
+const employee_group_1 = require("../employee-group");
+const toArray = ({ value }) => {
+    if (value === undefined || value === null || value === '')
+        return undefined;
+    if (Array.isArray(value))
+        return value;
+    return String(value)
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+};
 class CreateLeaveDto {
     startDate;
     endDate;
@@ -109,4 +121,66 @@ __decorate([
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], QueryLeaveDto.prototype, "createdTo", void 0);
+class QueryTimesheetDto {
+    from;
+    to;
+    role;
+    roles;
+    groups;
+    search;
+    providerId;
+    providerIds;
+    includeInactive;
+}
+exports.QueryTimesheetDto = QueryTimesheetDto;
+__decorate([
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], QueryTimesheetDto.prototype, "from", void 0);
+__decorate([
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], QueryTimesheetDto.prototype, "to", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.RoleType),
+    __metadata("design:type", String)
+], QueryTimesheetDto.prototype, "role", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(toArray),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsEnum)(client_1.RoleType, { each: true }),
+    __metadata("design:type", Array)
+], QueryTimesheetDto.prototype, "roles", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(toArray),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsIn)(employee_group_1.EMPLOYEE_GROUPS, { each: true }),
+    __metadata("design:type", Array)
+], QueryTimesheetDto.prototype, "groups", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], QueryTimesheetDto.prototype, "search", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], QueryTimesheetDto.prototype, "providerId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(toArray),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], QueryTimesheetDto.prototype, "providerIds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => value === true || value === 'true'),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], QueryTimesheetDto.prototype, "includeInactive", void 0);
 //# sourceMappingURL=leave.dto.js.map

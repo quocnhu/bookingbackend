@@ -12,11 +12,20 @@ import { NotificationsGateway } from '@/notifications/notifications.gateway';
 import {
   CreateLeaveDto,
   QueryLeaveDto,
+  QueryTimesheetDto,
   UpdateLeaveStatusDto,
 } from './dto/leave.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
-import { LeaveStatus, NotificationType, RoleType } from '@prisma/client';
+import {
+  AssignmentStatus,
+  DriverType,
+  GuideType,
+  LeaveStatus,
+  NotificationType,
+  RoleType,
+} from '@prisma/client';
 import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
+import type { EmployeeGroup } from './employee-group';
 
 const LEAVE_BLOCKING_STATUSES = [LeaveStatus.PENDING, LeaveStatus.APPROVED];
 
@@ -394,6 +403,240 @@ export class LeavesService {
       changedBy: actor.id,
     });
     return { message: 'Leave request deleted' };
+  }
+
+  private readonly employeeSelect = {
+    id: true,
+    name: true,
+    email: true,
+    role: true,
+    userType: true,
+    isActive: true,
+    provider: { select: { id: true, name: true, isCompany: true } },
+    guideProfile: { select: { type: true, rating: true } },
+    driverProfile: { select: { type: true, rating: true } },
+  };
+
+  private readonly roleOrder: Record<RoleType, number> = {
+    [RoleType.ADMIN]: 0,
+    [RoleType.OFFICE]: 1,
+    [RoleType.TOUR_GUIDE]: 2,
+    [RoleType.DRIVER]: 3,
+    [RoleType.TRANSPORT_PROVIDER]: 4,
+    [RoleType.CUSTOMER]: 5,
+  };
+
+  private assertLeaveManager(actor: AuthenticatedUser) {
+    if (actor.role !== RoleType.ADMIN && actor.role !== RoleType.OFFICE) {
+      throw new ForbiddenException(
+        'Only ADMIN/OFFICE can view the employee timesheet',
+      );
+    }
+  }
+
+  private resolveEmployeeGroup(user: any): EmployeeGroup {
+    if (user.role === RoleType.TRANSPORT_PROVIDER) return 'PROVIDER_ACCOUNT';
+    if (user.provider && !user.provider.isCompany) return 'PROVIDER_STAFF';
+    if (user.role === RoleType.TOUR_GUIDE) {
+      return user.guideProfile?.type === GuideType.OFFICIAL
+        ? 'COMPANY_GUIDE'
+        : 'FREELANCE_GUIDE';
+    }
+    if (user.role === RoleType.DRIVER) {
+      return user.driverProfile?.type === DriverType.FREELANCE
+        ? 'FREELANCE_DRIVER'
+        : 'COMPANY_DRIVER';
+    }
+    if (user.role === RoleType.ADMIN) return 'ADMIN';
+    if (user.role === RoleType.CUSTOMER) return 'CUSTOMER';
+    return 'OFFICE';
+  }
+
+  private toEmployee(user: any) {
+    return {
+      id: user.id,
+      name: user.name ?? user.email,
+      email: user.email,
+      role: user.role,
+      userType: user.userType,
+      isActive: user.isActive,
+      provider: user.provider
+        ? {
+            id: user.provider.id,
+            name: user.provider.name,
+            isCompany: user.provider.isCompany,
+          }
+        : null,
+      group: this.resolveEmployeeGroup(user),
+      guideType: user.guideProfile?.type ?? null,
+      driverType: user.driverProfile?.type ?? null,
+      rating: user.guideProfile?.rating ?? user.driverProfile?.rating ?? null,
+    };
+  }
+
+  /** Every employee (all roles except CUSTOMER) for leave management dropdowns. */
+  async listEmployees(actor: AuthenticatedUser) {
+    this.assertLeaveManager(actor);
+    const users = await this.prisma.user.findMany({
+      where: { role: { not: RoleType.CUSTOMER } },
+      select: this.employeeSelect,
+      orderBy: { name: 'asc' },
+    });
+    return users.map((u) => this.toEmployee(u));
+  }
+
+  /**
+   * Employee timesheet: one row per employee, one cell per day in the range.
+   * Unlike the crew availability calendar (guides/drivers only), this covers
+   * every working role — including provider-managed and freelance drivers —
+   * but excludes CUSTOMER and ADMIN accounts.
+   */
+  async getTimesheet(query: QueryTimesheetDto, actor: AuthenticatedUser) {
+    this.assertLeaveManager(actor);
+
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new BadRequestException('Invalid timesheet dates');
+    }
+    from.setHours(0, 0, 0, 0);
+    to.setHours(23, 59, 59, 999);
+    if (from > to) {
+      throw new BadRequestException('from must be before or equal to');
+    }
+
+    // Keep the table readable: never render more than 90 days.
+    const maxTo = new Date(from);
+    maxTo.setDate(maxTo.getDate() + 89);
+    maxTo.setHours(23, 59, 59, 999);
+    const effectiveTo = to > maxTo ? maxTo : to;
+
+    const where: any = {
+      role: { notIn: [RoleType.CUSTOMER, RoleType.ADMIN] },
+    };
+    const requestedRoles = query.roles?.length
+      ? query.roles
+      : query.role
+        ? [query.role]
+        : undefined;
+    if (requestedRoles) {
+      const allowed = requestedRoles.filter(
+        (role) => role !== RoleType.ADMIN && role !== RoleType.CUSTOMER,
+      );
+      where.role = allowed.length ? { in: allowed } : { in: [] };
+    }
+    if (query.providerIds?.length) {
+      where.providerId = { in: query.providerIds };
+    } else if (query.providerId) {
+      where.providerId = query.providerId;
+    }
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { email: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+    if (!query.includeInactive) where.isActive = true;
+
+    let users = await this.prisma.user.findMany({
+      where,
+      select: this.employeeSelect,
+      orderBy: { name: 'asc' },
+    });
+    if (query.groups?.length) {
+      const groups = new Set<EmployeeGroup>(query.groups);
+      users = users.filter((user) =>
+        groups.has(this.resolveEmployeeGroup(user)),
+      );
+    }
+    const userIds = users.map((u) => u.id);
+
+    const [leaves, assignments] = await Promise.all([
+      this.prisma.userLeave.findMany({
+        where: {
+          userId: { in: userIds },
+          startDate: { lte: effectiveTo },
+          endDate: { gte: from },
+        },
+        include: {
+          reviewedBy: { select: { id: true, name: true } },
+        },
+        orderBy: { startDate: 'asc' },
+      }),
+      this.prisma.assignment.findMany({
+        where: {
+          status: { not: AssignmentStatus.CANCELED },
+          startDate: { lte: effectiveTo },
+          endDate: { gte: from },
+          OR: [{ guideId: { not: null } }, { driverId: { not: null } }],
+        },
+        select: {
+          id: true,
+          code: true,
+          tourName: true,
+          status: true,
+          startDate: true,
+          endDate: true,
+          guideId: true,
+          driverId: true,
+          vehicle: { select: { plateNumber: true } },
+        },
+        orderBy: { startDate: 'asc' },
+      }),
+    ]);
+
+    const leaveMap = new Map<string, any[]>();
+    for (const leave of leaves) {
+      const arr = leaveMap.get(leave.userId) ?? [];
+      arr.push({
+        id: leave.id,
+        startDate: leave.startDate.toISOString(),
+        endDate: leave.endDate.toISOString(),
+        reason: leave.reason,
+        isEmergency: leave.isEmergency,
+        status: leave.status,
+        reviewedByName: leave.reviewedBy?.name ?? null,
+        reviewedAt: leave.reviewedAt?.toISOString() ?? null,
+      });
+      leaveMap.set(leave.userId, arr);
+    }
+
+    const assignmentMap = new Map<string, any[]>();
+    const pushAssignment = (userId: string, a: (typeof assignments)[number]) => {
+      const arr = assignmentMap.get(userId) ?? [];
+      arr.push({
+        id: a.id,
+        code: a.code,
+        tourName: a.tourName,
+        status: a.status,
+        startDate: a.startDate.toISOString(),
+        endDate: a.endDate.toISOString(),
+        plateNumber: a.vehicle?.plateNumber ?? null,
+      });
+      assignmentMap.set(userId, arr);
+    };
+    for (const a of assignments) {
+      if (a.guideId) pushAssignment(a.guideId, a);
+      if (a.driverId) pushAssignment(a.driverId, a);
+    }
+
+    const employees = users
+      .sort(
+        (a, b) =>
+          this.roleOrder[a.role] - this.roleOrder[b.role] ||
+          (a.name ?? a.email).localeCompare(b.name ?? b.email),
+      )
+      .map((u) => ({
+        ...this.toEmployee(u),
+        leaves: leaveMap.get(u.id) ?? [],
+        assignments: assignmentMap.get(u.id) ?? [],
+      }));
+
+    return {
+      from: from.toISOString(),
+      to: effectiveTo.toISOString(),
+      employees,
+    };
   }
 
   /** Whole calendar days between two dates, inclusive (time-of-day ignored). */

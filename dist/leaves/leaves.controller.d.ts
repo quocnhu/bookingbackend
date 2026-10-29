@@ -1,5 +1,5 @@
 import { LeavesService } from './leaves.service';
-import { CreateLeaveDto, QueryLeaveDto, UpdateLeaveStatusDto } from './dto/leave.dto';
+import { CreateLeaveDto, QueryLeaveDto, QueryTimesheetDto, UpdateLeaveStatusDto } from './dto/leave.dto';
 import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 export declare class LeavesController {
     private readonly leavesService;
@@ -46,6 +46,46 @@ export declare class LeavesController {
             pendingDays: number;
             requests: number;
         };
+    }>;
+    listEmployees(actor: AuthenticatedUser): Promise<{
+        id: any;
+        name: any;
+        email: any;
+        role: any;
+        userType: any;
+        isActive: any;
+        provider: {
+            id: any;
+            name: any;
+            isCompany: any;
+        } | null;
+        group: "ADMIN" | "OFFICE" | "CUSTOMER" | "COMPANY_GUIDE" | "FREELANCE_GUIDE" | "COMPANY_DRIVER" | "FREELANCE_DRIVER" | "PROVIDER_STAFF" | "PROVIDER_ACCOUNT";
+        guideType: any;
+        driverType: any;
+        rating: any;
+    }[]>;
+    getTimesheet(query: QueryTimesheetDto, actor: AuthenticatedUser): Promise<{
+        from: string;
+        to: string;
+        employees: {
+            leaves: any[];
+            assignments: any[];
+            id: any;
+            name: any;
+            email: any;
+            role: any;
+            userType: any;
+            isActive: any;
+            provider: {
+                id: any;
+                name: any;
+                isCompany: any;
+            } | null;
+            group: "ADMIN" | "OFFICE" | "CUSTOMER" | "COMPANY_GUIDE" | "FREELANCE_GUIDE" | "COMPANY_DRIVER" | "FREELANCE_DRIVER" | "PROVIDER_STAFF" | "PROVIDER_ACCOUNT";
+            guideType: any;
+            driverType: any;
+            rating: any;
+        }[];
     }>;
     create(dto: CreateLeaveDto, actor: AuthenticatedUser): Promise<{
         user: {
