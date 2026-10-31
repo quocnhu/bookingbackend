@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BookingProvider, PaymentStatus, TourType } from '@prisma/client';
 import { buildExtra } from './extra.util';
 import { detectAction } from './action.util';
+import { emailFromHeader } from './email.util';
 import type { BookingFields } from './validation/booking-fields.schema';
 
 const TOUR_TYPES: TourType[] = [TourType.PRIVATE_TOUR, TourType.GROUP_TOUR];
@@ -63,6 +64,16 @@ export class BookingNormalizerService {
       return { clean: false, reason: 'NO_BOOKING_REF' };
     }
 
+    const parsedMail = this.pickString(
+      parsed.mail ?? parsed.customerEmail ?? parsed.billingEmail,
+    );
+    const mail =
+      parsedMail ??
+      emailFromHeader(payload.from) ??
+      this.pickString(payload.emailAddress);
+    const extra = { ...(this.buildExtra(parsed) ?? {}) };
+    if (!parsedMail && mail) extra.mailSource = 'sender-fallback';
+
     const data: CleanBookingData = {
       action,
       bookingRef,
@@ -83,10 +94,7 @@ export class BookingNormalizerService {
       ),
       hotelName: this.pickString(parsed.hotelName ?? parsed.pickUp),
       phone: this.pickString(parsed.phone ?? parsed.customerPhone),
-      mail:
-        this.pickString(
-          parsed.mail ?? parsed.customerEmail ?? parsed.billingEmail,
-        ) ?? this.pickString(payload.emailAddress),
+      mail,
       startingDate: this.normalizeDate(
         parsed.startingDate ??
           parsed.tripDate ??
@@ -112,7 +120,7 @@ export class BookingNormalizerService {
       payment: this.normalizePayment(parsed.payment),
       isNoShow: this.pickBoolean(parsed.isNoShow ?? parsed.noShow),
       noShowReason: this.pickString(parsed.noShowReason),
-      extra: this.buildExtra(parsed),
+      extra: Object.keys(extra).length ? extra : undefined,
     };
 
     return { clean: true, data };

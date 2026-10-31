@@ -20,6 +20,7 @@ const booking_forward_service_1 = require("../booking/booking-forward.service");
 const parser_registry_1 = require("./parsers/parser-registry");
 const parsing_queue_1 = require("./parsing.queue");
 const booking_fields_schema_1 = require("./validation/booking-fields.schema");
+const email_util_1 = require("./email.util");
 const FORWARD_OUTCOMES = new Set([
     'CREATED',
     'UPDATED',
@@ -62,6 +63,13 @@ let ParsingProcessor = ParsingProcessor_1 = class ParsingProcessor extends bullm
                 status: 'parse_failed',
                 reason: `${parser.templateTag}:PARSER_NO_MATCH`,
             };
+        }
+        if (!fields.mail?.trim()) {
+            const senderMail = (0, email_util_1.emailFromHeader)(payload.from);
+            if (senderMail) {
+                fields.mail = senderMail;
+                fields.extra = { ...(fields.extra ?? {}), mailSource: 'sender-fallback' };
+            }
         }
         const validation = (0, booking_fields_schema_1.validateBookingFields)(fields);
         if (!validation.valid) {

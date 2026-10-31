@@ -178,9 +178,7 @@ let ViatorParser = class ViatorParser {
             channel: (0, channel_util_1.resolveBookingChannel)(rows.get('bookingChannel'), rows.get('soldBy')) ??
                 client_1.BookingProvider.VIATOR,
             customerName: rows.get('customer') || undefined,
-            mail: rows.get('customerEmail') ||
-                asString(payload.emailAddress) ||
-                undefined,
+            mail: rows.get('customerEmail') || undefined,
             phone: rows.get('customerPhone') || undefined,
             tourName: product || undefined,
             tourType: this.detectTourType(rate, product),
@@ -264,9 +262,7 @@ let ViatorParser = class ViatorParser {
             channel: (0, channel_util_1.resolveBookingChannel)(b.bookingChannel, b.soldBy) ??
                 client_1.BookingProvider.VIATOR,
             customerName: asString(b.customer ?? b.customerName) || undefined,
-            mail: asString(b.customerEmail ?? b.mail) ||
-                asString(payload.emailAddress) ||
-                undefined,
+            mail: asString(b.customerEmail ?? b.mail) || undefined,
             phone: asString(b.customerPhone ?? b.phone) || undefined,
             tourName: product || undefined,
             tourType: this.detectTourType(rate, product),

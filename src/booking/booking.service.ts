@@ -543,7 +543,7 @@ startingDate: data.startingDate
   }
 
   async create(dto: CreateBookingDto, actor?: AuthenticatedUser) {
-    this.assertEmailForChannel(dto);
+    this.assertBookingContactFields(dto);
     // Guard invalid state: ASSIGNED requires a bus. The bookings-table
     // status dropdown used to allow ASSIGNED with assignmentId=null,
     // which hides the row from both Assignments (no bus) and the
@@ -605,14 +605,15 @@ startingDate: data.startingDate
   }
 
   /**
-   * The admin Add Booking form requires an email; the public tour booking form
-   * on the website does not (a guest may have no email). The DTO cannot tell
-   * them apart, so this is checked here based on `channel`.
+   * Email and pax detail are required for every booking created through the
+   * API. Parsed-email bookings go through `upsert()` and are not affected.
    */
-  private assertEmailForChannel(dto: CreateBookingDto): void {
-    if (dto.channel === BookingProvider.WEBSITE) return;
+  private assertBookingContactFields(dto: CreateBookingDto): void {
     if (!dto.mail?.trim()) {
       throw new BadRequestException('Email is required');
+    }
+    if (!dto.paxDetail?.trim()) {
+      throw new BadRequestException('Pax detail is required');
     }
   }
 

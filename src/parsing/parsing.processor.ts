@@ -8,6 +8,7 @@ import { BookingForwardService } from '@/booking/booking-forward.service';
 import { ParserRegistry } from './parsers/parser-registry';
 import { PARSE_QUEUE, ParseJobData } from './parsing.queue';
 import { validateBookingFields } from './validation/booking-fields.schema';
+import { emailFromHeader } from './email.util';
 
 /** Outcomes that should trigger a sync notice to the mailbox. */
 const FORWARD_OUTCOMES = new Set([
@@ -63,6 +64,14 @@ export class ParsingProcessor extends WorkerHost {
         status: 'parse_failed',
         reason: `${parser.templateTag}:PARSER_NO_MATCH`,
       };
+    }
+
+    if (!fields.mail?.trim()) {
+      const senderMail = emailFromHeader(payload.from);
+      if (senderMail) {
+        fields.mail = senderMail;
+        fields.extra = { ...(fields.extra ?? {}), mailSource: 'sender-fallback' };
+      }
     }
 
     const validation = validateBookingFields(fields);

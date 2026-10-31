@@ -75,11 +75,11 @@ export function buildEmailUpdateData(
   delete data.source;
 
   // A Viator message-centre mail (advancedViator template) carries the THREAD
-  // relay address (NOT-<uuid>@expmessaging.tripadvisor.com), not the customer
-  // email. It must never overwrite the real customer email already stored on
-  // the booking — the conversation mail only ADDS information (pickup point,
-  // WhatsApp, wishes…) to the booking created by the confirmation mail.
-  if (isThreadRelayMail(parsed) && existing.mail) {
+  // relay address (NOT-<uuid>@expmessaging.tripadvisor.com), and a template
+  // without a customer email falls back to the sender address. Neither is the
+  // customer email, so they must never overwrite one already stored on the
+  // booking — the mail only ADDS information to the confirmation booking.
+  if (isFallbackMail(parsed) && existing.mail) {
     delete data.mail;
   }
 
@@ -107,12 +107,15 @@ export function buildEmailUpdateData(
  */
 
 /**
- * Does the mail carry the Viator THREAD relay address instead of a customer
- * email? The advancedViator parser flags it in `extra.mailSource`.
+ * Does the mail carry a sender/thread address instead of a customer email?
+ * Parsers flag this in `extra.mailSource`.
  */
-function isThreadRelayMail(parsed: EmailFields): boolean {
+function isFallbackMail(parsed: EmailFields): boolean {
   const extra = parsed.extra as unknown as Record<string, unknown> | undefined;
-  return extra?.mailSource === 'thread-relay';
+  return (
+    extra?.mailSource === 'thread-relay' ||
+    extra?.mailSource === 'sender-fallback'
+  );
 }
 
 export function hasBookingChanges(

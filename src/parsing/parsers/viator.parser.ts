@@ -219,10 +219,7 @@ export class ViatorParser implements TemplateParser {
         resolveBookingChannel(rows.get('bookingChannel'), rows.get('soldBy')) ??
         BookingProvider.VIATOR,
       customerName: rows.get('customer') || undefined,
-      mail:
-        rows.get('customerEmail') ||
-        asString(payload.emailAddress) ||
-        undefined,
+      mail: rows.get('customerEmail') || undefined,
       phone: rows.get('customerPhone') || undefined,
       tourName: product || undefined,
       tourType: this.detectTourType(rate, product),
@@ -326,10 +323,7 @@ export class ViatorParser implements TemplateParser {
         resolveBookingChannel(b.bookingChannel, b.soldBy) ??
         BookingProvider.VIATOR,
       customerName: asString(b.customer ?? b.customerName) || undefined,
-      mail:
-        asString(b.customerEmail ?? b.mail) ||
-        asString(payload.emailAddress) ||
-        undefined,
+      mail: asString(b.customerEmail ?? b.mail) || undefined,
       phone: asString(b.customerPhone ?? b.phone) || undefined,
       tourName: product || undefined,
       tourType: this.detectTourType(rate, product),

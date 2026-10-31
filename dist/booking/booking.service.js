@@ -347,7 +347,7 @@ let BookingService = BookingService_1 = class BookingService {
         return booking;
     }
     async create(dto, actor) {
-        this.assertEmailForChannel(dto);
+        this.assertBookingContactFields(dto);
         if (dto.status === client_1.BookingStatus.ASSIGNED) {
             dto = { ...dto, status: client_1.BookingStatus.PENDING };
         }
@@ -388,11 +388,12 @@ let BookingService = BookingService_1 = class BookingService {
     looksGenerated(bookingRef) {
         return /^(PRV|GR|MB)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingRef);
     }
-    assertEmailForChannel(dto) {
-        if (dto.channel === client_1.BookingProvider.WEBSITE)
-            return;
+    assertBookingContactFields(dto) {
         if (!dto.mail?.trim()) {
             throw new common_1.BadRequestException('Email is required');
+        }
+        if (!dto.paxDetail?.trim()) {
+            throw new common_1.BadRequestException('Pax detail is required');
         }
     }
     async update(id, dto, actor) {

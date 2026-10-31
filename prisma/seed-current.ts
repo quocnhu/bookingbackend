@@ -10,6 +10,7 @@ import {
   TourType,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { TOUR_DETAILS } from './tour-details';
 
 const prisma = new PrismaClient();
 
@@ -2530,10 +2531,16 @@ async function main() {
   }
 
   for (const tour of TOURS) {
-    const { typePrices, itineraries, departures, gallery, ...tourData } = tour;
+    const detail = TOUR_DETAILS[tour.code];
+    const merged = detail ? { ...tour, ...detail } : tour;
+    const { typePrices, itineraries, departures, gallery, ...tourData } = merged;
+    const { thumbnailUrl, ...tourFields } = tourData;
     const saved = await prisma.tour.upsert({
       where: { code: tour.code },
-      update: tourData,
+      update: {
+        ...tourFields,
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
+      },
       create: tourData,
     });
 

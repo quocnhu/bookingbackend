@@ -146,7 +146,7 @@ export declare class BookingService {
         emailDate: Date | null;
     }>;
     private looksGenerated;
-    private assertEmailForChannel;
+    private assertBookingContactFields;
     update(id: string, dto: UpdateBookingDto, actor?: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;

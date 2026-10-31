@@ -30,10 +30,10 @@ import {
  * Every field the user enters manually is required; if missing, the
  * ValidationPipe blocks it right at the controller.
  *
- * `mail` is the exception: the public form allows a guest to leave the email
- * blank, so it is optional here, while the admin flow requires it — checked
- * based on `channel` in BookingService.create(). Making it required in the DTO
- * would break public tour booking.
+ * `mail` is optional here so the controller can accept parsed-email payloads,
+ * but BookingService.create() requires it for every API-created booking.
+ * `paxDetail` is also optional at the DTO level: the manual and website flows
+ * require it in BookingService.create(), while parsed-email bookings may omit it.
  *
  * `bookingRef` is optional because the server generates it. `notes` is a free
  * text note from the user. `paxDetail` is NOT a note — it is data written by

@@ -47,7 +47,6 @@ export class AirbnbParser implements TemplateParser {
       startingDate: start ?? end,
       totalPax: this.matchPax(body),
       address: this.matchAddress(body),
-      mail: asString(payload.emailAddress) || undefined,
       phone: this.matchPhone(body),
     };
   }

@@ -12,7 +12,7 @@ function buildEmailUpdateData(parsed, existing, action) {
     }
     delete data.bookingRef;
     delete data.source;
-    if (isThreadRelayMail(parsed) && existing.mail) {
+    if (isFallbackMail(parsed) && existing.mail) {
         delete data.mail;
     }
     const mergedExtra = {
@@ -26,9 +26,10 @@ function buildEmailUpdateData(parsed, existing, action) {
     data.status = action === 'CANCEL' ? client_1.BookingStatus.CANCELED : existing.status;
     return data;
 }
-function isThreadRelayMail(parsed) {
+function isFallbackMail(parsed) {
     const extra = parsed.extra;
-    return extra?.mailSource === 'thread-relay';
+    return (extra?.mailSource === 'thread-relay' ||
+        extra?.mailSource === 'sender-fallback');
 }
 function hasBookingChanges(data, existing) {
     for (const [key, value] of Object.entries(data)) {

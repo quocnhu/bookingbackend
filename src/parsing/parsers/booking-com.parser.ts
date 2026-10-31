@@ -47,7 +47,6 @@ export class BookingComParser implements TemplateParser {
       totalPax: this.matchPax(body),
       hotelName: this.matchHotel(body),
       address: this.matchAddress(body),
-      mail: asString(payload.emailAddress) || undefined,
     };
   }
 

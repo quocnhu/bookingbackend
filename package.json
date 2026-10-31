@@ -21,6 +21,8 @@
     "seed:google": "tsx prisma/seed-google-login.ts",
     "seed:users": "tsx prisma/seed-users.ts",
     "seed:current": "tsx prisma/seed-current.ts",
+    "seed:tour-details": "tsx prisma/seed-tour-details.ts",
+    "seed:tour-images": "tsx prisma/seed-tour-images.ts",
     "reset:feed": "tsx prisma/reset-feed.ts",
     "prisma:migrate": "prisma migrate dev",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const extra_util_1 = require("./extra.util");
 const action_util_1 = require("./action.util");
+const email_util_1 = require("./email.util");
 const TOUR_TYPES = [client_1.TourType.PRIVATE_TOUR, client_1.TourType.GROUP_TOUR];
 const PAYMENT_STATUSES = [
     client_1.PaymentStatus.PENDING,
@@ -39,6 +40,13 @@ let BookingNormalizerService = class BookingNormalizerService {
         if (!bookingRef) {
             return { clean: false, reason: 'NO_BOOKING_REF' };
         }
+        const parsedMail = this.pickString(parsed.mail ?? parsed.customerEmail ?? parsed.billingEmail);
+        const mail = parsedMail ??
+            (0, email_util_1.emailFromHeader)(payload.from) ??
+            this.pickString(payload.emailAddress);
+        const extra = { ...(this.buildExtra(parsed) ?? {}) };
+        if (!parsedMail && mail)
+            extra.mailSource = 'sender-fallback';
         const data = {
             action,
             bookingRef,
@@ -49,7 +57,7 @@ let BookingNormalizerService = class BookingNormalizerService {
             customerName: this.pickString(parsed.customerName ?? parsed.customer ?? parsed.billingName),
             hotelName: this.pickString(parsed.hotelName ?? parsed.pickUp),
             phone: this.pickString(parsed.phone ?? parsed.customerPhone),
-            mail: this.pickString(parsed.mail ?? parsed.customerEmail ?? parsed.billingEmail) ?? this.pickString(payload.emailAddress),
+            mail,
             startingDate: this.normalizeDate(parsed.startingDate ??
                 parsed.tripDate ??
                 parsed.date ??
@@ -67,7 +75,7 @@ let BookingNormalizerService = class BookingNormalizerService {
             payment: this.normalizePayment(parsed.payment),
             isNoShow: this.pickBoolean(parsed.isNoShow ?? parsed.noShow),
             noShowReason: this.pickString(parsed.noShowReason),
-            extra: this.buildExtra(parsed),
+            extra: Object.keys(extra).length ? extra : undefined,
         };
         return { clean: true, data };
     }

@@ -39,7 +39,6 @@ let BookingComParser = class BookingComParser {
             totalPax: this.matchPax(body),
             hotelName: this.matchHotel(body),
             address: this.matchAddress(body),
-            mail: asString(payload.emailAddress) || undefined,
         };
     }
     matchRef(body) {
