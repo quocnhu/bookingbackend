@@ -9,7 +9,10 @@ export interface CookieOptions {
 }
 
 export function cookieOptions(maxAgeSeconds: number): CookieOptions {
-  const secure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
+  const secureEnv = process.env.COOKIE_SECURE;
+  const secure =
+    secureEnv === 'true' ||
+    (secureEnv !== 'false' && process.env.NODE_ENV === 'production');
   const sameSiteEnv = process.env.COOKIE_SAME_SITE as CookieOptions['sameSite'] | undefined;
 
   let sameSite: CookieOptions['sameSite'];

@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+.git
+.gitignore
+.env
+.env.*
+google-service-account.json
+uploads
+test
+*.log
+.DS_Store
+.agents
+.claude
+.windsurf
+e2e-advanced-viator.ts
+fake-email.sim.ts
