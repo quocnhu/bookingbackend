@@ -6,6 +6,8 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { GmailAuthService } from '@/ingestion/gmail-auth.provider';
 import { REDIS_CLIENT } from '@/common/redis/redis.constants';
 import {
+  BOOKING_SYNC_BODY_MARKER,
+  BOOKING_SYNC_DUPLICATE_BODY_MARKER,
   BOOKING_SYNC_HEADER,
   BOOKING_SYNC_HEADER_VALUE,
   BOOKING_SYNC_SUBJECT_PREFIX,
@@ -278,8 +280,8 @@ export class BookingForwardService {
 
     const header =
       input.outcome === 'SKIPPED' || input.outcome === 'UNCHANGED'
-        ? `This mail with booking ref "${input.bookingRef}" was blocked as a duplication and not re-processed.`
-        : `This mail with booking ref "${input.bookingRef}" was pushed to the Booking table successfully.`;
+        ? `This mail with booking ref "${input.bookingRef}" ${BOOKING_SYNC_DUPLICATE_BODY_MARKER}.`
+        : `This mail with booking ref "${input.bookingRef}" ${BOOKING_SYNC_BODY_MARKER}.`;
 
     return [header, '', meta, '', original, ''].join('\n');
   }
@@ -290,8 +292,8 @@ export class BookingForwardService {
 
     const header =
       input.outcome === 'SKIPPED' || input.outcome === 'UNCHANGED'
-        ? `This mail with booking ref &quot;${this.escapeHtml(input.bookingRef)}&quot; was blocked as a duplication and not re-processed.`
-        : `This mail with booking ref &quot;${this.escapeHtml(input.bookingRef)}&quot; was pushed to the Booking table successfully.`;
+        ? `This mail with booking ref &quot;${this.escapeHtml(input.bookingRef)}&quot; ${BOOKING_SYNC_DUPLICATE_BODY_MARKER}.`
+        : `This mail with booking ref &quot;${this.escapeHtml(input.bookingRef)}&quot; ${BOOKING_SYNC_BODY_MARKER}.`;
 
     return [
       '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f1f1f">',

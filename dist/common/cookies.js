@@ -6,7 +6,9 @@ exports.parseDuration = parseDuration;
 exports.ACCESS_TOKEN_COOKIE = 'booking_access_token';
 exports.REFRESH_TOKEN_COOKIE = 'booking_refresh_token';
 function cookieOptions(maxAgeSeconds) {
-    const secure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
+    const secureEnv = process.env.COOKIE_SECURE;
+    const secure = secureEnv === 'true' ||
+        (secureEnv !== 'false' && process.env.NODE_ENV === 'production');
     const sameSiteEnv = process.env.COOKIE_SAME_SITE;
     let sameSite;
     if (sameSiteEnv) {

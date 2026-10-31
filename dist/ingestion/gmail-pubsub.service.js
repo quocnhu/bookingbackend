@@ -77,7 +77,12 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
             }
             try {
                 const mail = await this.fetchMessage(gmail, messageId, emailAddress);
+                const noticeText = `${mail.body ?? ''}\n${mail.html ?? ''}`
+                    .toLowerCase();
+                const isSystemNoticeBody = noticeText.includes(booking_forward_constants_1.BOOKING_SYNC_BODY_MARKER.toLowerCase()) ||
+                    noticeText.includes(booking_forward_constants_1.BOOKING_SYNC_DUPLICATE_BODY_MARKER.toLowerCase());
                 if (mail.isBookingSync ||
+                    isSystemNoticeBody ||
                     mail.subject
                         .trimStart()
                         .toLowerCase()

@@ -187,15 +187,15 @@ let BookingForwardService = BookingForwardService_1 = class BookingForwardServic
             input.body?.trim() ? input.body.trim() : '(no text body)',
         ].join('\n');
         const header = input.outcome === 'SKIPPED' || input.outcome === 'UNCHANGED'
-            ? `This mail with booking ref "${input.bookingRef}" was blocked as a duplication and not re-processed.`
-            : `This mail with booking ref "${input.bookingRef}" was pushed to the Booking table successfully.`;
+            ? `This mail with booking ref "${input.bookingRef}" ${booking_forward_constants_1.BOOKING_SYNC_DUPLICATE_BODY_MARKER}.`
+            : `This mail with booking ref "${input.bookingRef}" ${booking_forward_constants_1.BOOKING_SYNC_BODY_MARKER}.`;
         return [header, '', meta, '', original, ''].join('\n');
     }
     htmlBody(input) {
         const row = (label, value) => `<tr><td style="padding:2px 12px 2px 0;color:#8c8c8c">${this.escapeHtml(label)}</td><td>${this.escapeHtml(value)}</td></tr>`;
         const header = input.outcome === 'SKIPPED' || input.outcome === 'UNCHANGED'
-            ? `This mail with booking ref &quot;${this.escapeHtml(input.bookingRef)}&quot; was blocked as a duplication and not re-processed.`
-            : `This mail with booking ref &quot;${this.escapeHtml(input.bookingRef)}&quot; was pushed to the Booking table successfully.`;
+            ? `This mail with booking ref &quot;${this.escapeHtml(input.bookingRef)}&quot; ${booking_forward_constants_1.BOOKING_SYNC_DUPLICATE_BODY_MARKER}.`
+            : `This mail with booking ref &quot;${this.escapeHtml(input.bookingRef)}&quot; ${booking_forward_constants_1.BOOKING_SYNC_BODY_MARKER}.`;
         return [
             '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f1f1f">',
             `<p style="margin:0 0 12px;font-size:15px"><strong>${header}</strong></p>`,

@@ -37,7 +37,6 @@ let WebsiteParser = class WebsiteParser {
                 return true;
         }
         return ((0, template_util_1.isRoutedToTag)({ from, subject }, 'website') ||
-            subject.includes('new booking') ||
             /wptravelengine|wp travel engine/i.test(text) ||
             text.includes('Billing Details') ||
             /\bwp-admin\/post\.php\?post=\d+/i.test(text));
@@ -48,6 +47,9 @@ let WebsiteParser = class WebsiteParser {
         const text = html || body;
         const rich = this.parseHtml(text, payload);
         if (rich) {
+            if (this.isFallbackRef(rich.bookingRef) && !this.hasMeaningfulData(rich)) {
+                return null;
+            }
             payload.booking = rich;
             return this.toFields(rich, payload);
         }
@@ -157,6 +159,22 @@ let WebsiteParser = class WebsiteParser {
         if (priceMatch && key && !normalized.toLowerCase().includes('subtotal')) {
             priceLinesParts.push(`${key}: ${priceMatch[1]}x$${priceMatch[2]}=$${priceMatch[3]}`);
         }
+    }
+    isFallbackRef(ref) {
+        return Boolean(ref?.startsWith('WEB-FALLBACK-'));
+    }
+    hasMeaningfulData(rich) {
+        return Boolean(rich.tourName ||
+            rich.packageName ||
+            rich.tripDate ||
+            rich.travellers ||
+            rich.billingName ||
+            rich.billingEmail ||
+            rich.billingAddress ||
+            rich.pickUp ||
+            rich.pickUpAddress ||
+            rich.totalcost ||
+            rich.priceLines);
     }
     resolveBookingRef(bookingLink, payload) {
         if (bookingLink) {

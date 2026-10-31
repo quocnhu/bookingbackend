@@ -18,6 +18,8 @@ import {
 import { GmailAuthService } from './gmail-auth.provider';
 import type { GmailPushPayload } from './dto/gmail-push-payload.dto';
 import {
+  BOOKING_SYNC_BODY_MARKER,
+  BOOKING_SYNC_DUPLICATE_BODY_MARKER,
   BOOKING_SYNC_HEADER,
   BOOKING_SYNC_HEADER_VALUE,
   BOOKING_SYNC_SUBJECT_PREFIX,
@@ -118,9 +120,19 @@ export class GmailPubSubService {
         const mail = await this.fetchMessage(gmail, messageId, emailAddress);
 
         // Loop guard: the "pushed to Booking table" confirmation is sent to this
-        // very mailbox. It is a system notice, never a booking mail.
+        // very mailbox. It is a system notice, never a booking mail. The custom
+        // header is lost when the operator forwards the notice again, so the
+        // body markers are checked too.
+        const noticeText = `${mail.body ?? ''}\n${mail.html ?? ''}`
+          .toLowerCase();
+        const isSystemNoticeBody =
+          noticeText.includes(BOOKING_SYNC_BODY_MARKER.toLowerCase()) ||
+          noticeText.includes(
+            BOOKING_SYNC_DUPLICATE_BODY_MARKER.toLowerCase(),
+          );
         if (
           mail.isBookingSync ||
+          isSystemNoticeBody ||
           mail.subject
             .trimStart()
             .toLowerCase()

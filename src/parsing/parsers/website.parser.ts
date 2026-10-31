@@ -73,7 +73,6 @@ export class WebsiteParser implements TemplateParser {
 
     return (
       isRoutedToTag({ from, subject }, 'website') ||
-      subject.includes('new booking') ||
       /wptravelengine|wp travel engine/i.test(text) ||
       text.includes('Billing Details') ||
       /\bwp-admin\/post\.php\?post=\d+/i.test(text)
@@ -87,6 +86,12 @@ export class WebsiteParser implements TemplateParser {
 
     const rich = this.parseHtml(text, payload);
     if (rich) {
+      // A forwarded non-website mail can still reach this parser (the default
+      // tag is "website" for any "…booking…" subject). Do not persist an empty
+      // WEB-FALLBACK-<threadId> skeleton when nothing was extracted.
+      if (this.isFallbackRef(rich.bookingRef) && !this.hasMeaningfulData(rich)) {
+        return null;
+      }
       payload.booking = rich;
       return this.toFields(rich, payload);
     }
@@ -223,6 +228,27 @@ export class WebsiteParser implements TemplateParser {
         `${key}: ${priceMatch[1]}x$${priceMatch[2]}=$${priceMatch[3]}`,
       );
     }
+  }
+
+  private isFallbackRef(ref: string | null): boolean {
+    return Boolean(ref?.startsWith('WEB-FALLBACK-'));
+  }
+
+  /** True when a fallback-ref parse actually extracted useful booking data. */
+  private hasMeaningfulData(rich: WebsiteBooking): boolean {
+    return Boolean(
+      rich.tourName ||
+        rich.packageName ||
+        rich.tripDate ||
+        rich.travellers ||
+        rich.billingName ||
+        rich.billingEmail ||
+        rich.billingAddress ||
+        rich.pickUp ||
+        rich.pickUpAddress ||
+        rich.totalcost ||
+        rich.priceLines,
+    );
   }
 
   /** "post=3286" → "WEB-3286"; fallback uses threadId/messageId for retry stability. */

@@ -8,6 +8,8 @@ export declare class WebsiteParser implements TemplateParser {
     extract(payload: Record<string, unknown>): BookingFields | null;
     private parseHtml;
     private captureRow;
+    private isFallbackRef;
+    private hasMeaningfulData;
     private resolveBookingRef;
     private toFields;
     private detectTourType;
