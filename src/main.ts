@@ -18,7 +18,9 @@ async function bootstrap() {
     throw new Error('JWT_SECRET must be a strong random secret in production');
   }
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
     .split(',')

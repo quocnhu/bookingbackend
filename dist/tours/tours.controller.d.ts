@@ -51,6 +51,22 @@ export declare class ToursController {
             tourId: string;
             price: import("@prisma/client/runtime/library").Decimal;
         })[];
+        categories: ({
+            category: {
+                id: string;
+                createdAt: Date;
+                name: string;
+                isActive: boolean;
+                updatedAt: Date;
+                description: string | null;
+                slug: string;
+                sortOrder: number;
+            };
+        } & {
+            tourId: string;
+            categoryId: string;
+            isPrimary: boolean;
+        })[];
         type: import("@prisma/client").$Enums.TourType;
         id: string;
         name: string;
@@ -60,6 +76,8 @@ export declare class ToursController {
         departureTimes: string[];
         durationValue: number | null;
         durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+        freeCancellationValue: number | null;
+        freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
         freeCancellationHours: number | null;
         cancellationPolicy: string | null;
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -126,6 +144,22 @@ export declare class ToursController {
             tourId: string;
             price: import("@prisma/client/runtime/library").Decimal;
         })[];
+        categories: ({
+            category: {
+                id: string;
+                createdAt: Date;
+                name: string;
+                isActive: boolean;
+                updatedAt: Date;
+                description: string | null;
+                slug: string;
+                sortOrder: number;
+            };
+        } & {
+            tourId: string;
+            categoryId: string;
+            isPrimary: boolean;
+        })[];
         type: import("@prisma/client").$Enums.TourType;
         id: string;
         name: string;
@@ -135,6 +169,8 @@ export declare class ToursController {
         departureTimes: string[];
         durationValue: number | null;
         durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+        freeCancellationValue: number | null;
+        freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
         freeCancellationHours: number | null;
         cancellationPolicy: string | null;
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -167,6 +203,8 @@ export declare class ToursController {
         departureTimes: string[];
         durationValue: number | null;
         durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+        freeCancellationValue: number | null;
+        freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
         freeCancellationHours: number | null;
         cancellationPolicy: string | null;
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -234,6 +272,22 @@ export declare class ToursController {
             tourId: string;
             price: import("@prisma/client/runtime/library").Decimal;
         })[];
+        categories: ({
+            category: {
+                id: string;
+                createdAt: Date;
+                name: string;
+                isActive: boolean;
+                updatedAt: Date;
+                description: string | null;
+                slug: string;
+                sortOrder: number;
+            };
+        } & {
+            tourId: string;
+            categoryId: string;
+            isPrimary: boolean;
+        })[];
         type: import("@prisma/client").$Enums.TourType;
         id: string;
         name: string;
@@ -243,6 +297,8 @@ export declare class ToursController {
         departureTimes: string[];
         durationValue: number | null;
         durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+        freeCancellationValue: number | null;
+        freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
         freeCancellationHours: number | null;
         cancellationPolicy: string | null;
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -310,6 +366,22 @@ export declare class ToursController {
             tourId: string;
             price: import("@prisma/client/runtime/library").Decimal;
         })[];
+        categories: ({
+            category: {
+                id: string;
+                createdAt: Date;
+                name: string;
+                isActive: boolean;
+                updatedAt: Date;
+                description: string | null;
+                slug: string;
+                sortOrder: number;
+            };
+        } & {
+            tourId: string;
+            categoryId: string;
+            isPrimary: boolean;
+        })[];
         type: import("@prisma/client").$Enums.TourType;
         id: string;
         name: string;
@@ -319,6 +391,8 @@ export declare class ToursController {
         departureTimes: string[];
         durationValue: number | null;
         durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+        freeCancellationValue: number | null;
+        freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
         freeCancellationHours: number | null;
         cancellationPolicy: string | null;
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -386,6 +460,22 @@ export declare class ToursController {
             tourId: string;
             price: import("@prisma/client/runtime/library").Decimal;
         })[];
+        categories: ({
+            category: {
+                id: string;
+                createdAt: Date;
+                name: string;
+                isActive: boolean;
+                updatedAt: Date;
+                description: string | null;
+                slug: string;
+                sortOrder: number;
+            };
+        } & {
+            tourId: string;
+            categoryId: string;
+            isPrimary: boolean;
+        })[];
         type: import("@prisma/client").$Enums.TourType;
         id: string;
         name: string;
@@ -395,6 +485,8 @@ export declare class ToursController {
         departureTimes: string[];
         durationValue: number | null;
         durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+        freeCancellationValue: number | null;
+        freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
         freeCancellationHours: number | null;
         cancellationPolicy: string | null;
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -462,6 +554,22 @@ export declare class ToursController {
             tourId: string;
             price: import("@prisma/client/runtime/library").Decimal;
         })[];
+        categories: ({
+            category: {
+                id: string;
+                createdAt: Date;
+                name: string;
+                isActive: boolean;
+                updatedAt: Date;
+                description: string | null;
+                slug: string;
+                sortOrder: number;
+            };
+        } & {
+            tourId: string;
+            categoryId: string;
+            isPrimary: boolean;
+        })[];
         type: import("@prisma/client").$Enums.TourType;
         id: string;
         name: string;
@@ -471,6 +579,8 @@ export declare class ToursController {
         departureTimes: string[];
         durationValue: number | null;
         durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+        freeCancellationValue: number | null;
+        freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
         freeCancellationHours: number | null;
         cancellationPolicy: string | null;
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -538,6 +648,22 @@ export declare class ToursController {
             tourId: string;
             price: import("@prisma/client/runtime/library").Decimal;
         })[];
+        categories: ({
+            category: {
+                id: string;
+                createdAt: Date;
+                name: string;
+                isActive: boolean;
+                updatedAt: Date;
+                description: string | null;
+                slug: string;
+                sortOrder: number;
+            };
+        } & {
+            tourId: string;
+            categoryId: string;
+            isPrimary: boolean;
+        })[];
         type: import("@prisma/client").$Enums.TourType;
         id: string;
         name: string;
@@ -547,6 +673,8 @@ export declare class ToursController {
         departureTimes: string[];
         durationValue: number | null;
         durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+        freeCancellationValue: number | null;
+        freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
         freeCancellationHours: number | null;
         cancellationPolicy: string | null;
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;

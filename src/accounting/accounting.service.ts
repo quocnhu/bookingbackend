@@ -11,6 +11,7 @@ import {
   FeeFlowType,
   GuideType,
   PayeeType,
+  PaymentMethod,
   Prisma,
   RoleType,
   TourReportStatus,
@@ -31,6 +32,7 @@ import {
   RejectMoneyDto,
   VerifyTourMoneyDto,
   VoidPeriodDto,
+  MarkPeriodPaidDto,
 } from './dto/accounting.dto';
 
 const PAYABLE_ROLES: RoleType[] = [RoleType.TOUR_GUIDE, RoleType.DRIVER];
@@ -1709,6 +1711,60 @@ export class AccountingService {
       changedBy: actor.id,
     });
     return voided;
+  }
+
+  /**
+   * Confirms the actual bank/cash payout for an exported crew period. Export
+   * advances the paid-through watermark; this only records that the transfer
+   * really happened, so the two money events stay independently auditable.
+   */
+  async markPeriodPaid(
+    actor: AuthenticatedUser,
+    periodId: string,
+    dto: MarkPeriodPaidDto,
+  ) {
+    this.assertAccounting(actor, 'accounting.period.export');
+    const period = await this.prisma.paymentPeriod.findUnique({
+      where: { id: periodId },
+    });
+    if (!period) throw new NotFoundException('Payment period not found');
+    if (period.voidedAt) {
+      throw new ConflictException('Voided periods cannot be marked paid');
+    }
+    if (period.paidAt) return period;
+    const method = dto.method ?? PaymentMethod.BANK_TRANSFER;
+    if (method === PaymentMethod.PAYPAL) {
+      throw new BadRequestException('Crew payouts use cash or bank transfer');
+    }
+    const now = new Date();
+    const paid = await this.prisma.paymentPeriod.update({
+      where: { id: periodId },
+      data: {
+        paidAt: now,
+        paidById: actor.id,
+        paidByName: actor.name ?? actor.email ?? null,
+        paymentMethod: method,
+        paymentReference: dto.reference ?? null,
+      },
+    });
+    await this.audit.log({
+      entityType: 'PaymentPeriod',
+      entityId: paid.id,
+      action: 'MARK_PAID',
+      beforeData: {
+        paidAt: period.paidAt,
+        payeeName: period.payeeName,
+        totalNet: period.totalNet.toString(),
+      } as Prisma.InputJsonValue,
+      afterData: {
+        paidAt: paid.paidAt,
+        method,
+        reference: dto.reference ?? null,
+        paidByName: paid.paidByName,
+      } as Prisma.InputJsonValue,
+      changedBy: actor.id,
+    });
+    return paid;
   }
 
   async periodHistory(actor: AuthenticatedUser, personId?: string) {

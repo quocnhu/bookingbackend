@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsInt,
@@ -19,6 +20,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import {
   BookingProvider,
   BookingStatus,
+  PaymentMethod,
   PaymentStatus,
   TourType,
 } from '@prisma/client';
@@ -144,6 +146,23 @@ export class CreateBookingDto {
   payment?: PaymentStatus;
 
   @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
+
+  @IsOptional()
+  @IsBoolean()
+  payLater?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  paymentDueAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 2000)
+  paymentNote?: string;
+
+  @IsOptional()
   @IsBoolean()
   isNoShow?: boolean;
 
@@ -151,6 +170,122 @@ export class CreateBookingDto {
   @IsString()
   @Length(0, 200)
   noShowReason?: string;
+}
+
+/** Preview the server-side total before a website booking/payment is created. */
+export class WebsiteQuoteDto {
+  @IsNotEmpty()
+  @IsString()
+  tourId: string;
+
+  @IsNotEmpty()
+  @IsEnum(TourType)
+  tourType: TourType;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  totalPax: number;
+}
+
+/** Public/website booking, always tied to the signed-in customer account. */
+export class CreateWebsiteBookingDto {
+  @IsNotEmpty()
+  @IsString()
+  tourId: string;
+
+  @IsNotEmpty()
+  @IsEnum(TourType)
+  tourType: TourType;
+
+  @IsNotEmpty()
+  startingDate: string | Date;
+
+  @IsOptional()
+  @IsMilitaryTime()
+  departureTime?: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @Length(1, 200)
+  customerName: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @Length(1, 200)
+  hotelName: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @Matches(/^[+]?[\d\s\-()]{7,20}$/)
+  phone: string;
+
+  @IsEmail()
+  @Length(1, 100)
+  mail: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  totalPax: number;
+
+  @IsNotEmpty()
+  @IsString()
+  @Length(1, 1000)
+  paxDetail: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @Length(1, 200)
+  address: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude?: number;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 1000)
+  notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  payLater?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 2000)
+  paymentNote?: string;
+}
+
+export class CollectBookingPaymentDto {
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  method?: PaymentMethod;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 2000)
+  note?: string;
+}
+
+export class ConfirmBookingPaymentDto extends CollectBookingPaymentDto {
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  reference?: string;
 }
 
 export class UpdateBookingDto {

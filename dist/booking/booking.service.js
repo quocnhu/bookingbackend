@@ -337,17 +337,252 @@ let BookingService = BookingService_1 = class BookingService {
         ]);
         return { items, total, page, limit };
     }
+    async collectBookingPayment(id, dto, actor) {
+        const booking = await this.prisma.booking.findUnique({
+            where: { id },
+            include: { assignment: { select: { guideId: true, driverId: true } } },
+        });
+        if (!booking)
+            throw new common_1.NotFoundException('Booking not found');
+        if (!booking.payLater) {
+            throw new common_1.BadRequestException('This booking is not a pay-later booking');
+        }
+        if (booking.payment === client_1.PaymentStatus.PAID) {
+            throw new common_1.ConflictException('Booking payment is already confirmed');
+        }
+        const isCrew = !!actor?.id &&
+            (actor.id === booking.assignment?.guideId ||
+                actor.id === booking.assignment?.driverId);
+        const canManage = actor.role === client_1.RoleType.ADMIN ||
+            actor.role === client_1.RoleType.OFFICE ||
+            actor.permissions?.includes('accounting.money.verify') ||
+            actor.permissions?.includes('accounting.read');
+        if (!isCrew && !canManage) {
+            throw new common_1.ForbiddenException('Only the assigned crew or Accounting can record this collection');
+        }
+        if (dto.method === client_1.PaymentMethod.PAYPAL || dto.method === client_1.PaymentMethod.OTA) {
+            throw new common_1.BadRequestException('Cash or bank transfer is required here');
+        }
+        const updated = await this.prisma.booking.update({
+            where: { id },
+            data: {
+                paymentCollectedAt: new Date(),
+                paymentCollectedById: actor.id,
+                paymentCollectedByName: actor.name ?? actor.email ?? null,
+                paymentMethod: dto.method ?? booking.paymentMethod ?? client_1.PaymentMethod.CASH,
+                ...(dto.note ? { paymentNote: dto.note } : {}),
+            },
+        });
+        await this.auditService.log({
+            entityType: 'Booking',
+            entityId: id,
+            action: 'COLLECT_PAYMENT',
+            beforeData: booking,
+            afterData: updated,
+            changedBy: actor.id,
+        });
+        return updated;
+    }
+    async confirmBookingPayment(id, dto, actor) {
+        const canConfirm = actor.role === client_1.RoleType.ADMIN ||
+            actor.permissions?.includes('accounting.money.verify');
+        if (!canConfirm) {
+            throw new common_1.ForbiddenException('Accounting confirmation is required');
+        }
+        const booking = await this.prisma.booking.findUnique({
+            where: { id },
+            include: {
+                assignment: { select: { guideId: true, driverId: true } },
+                payments: { where: { status: client_1.PaymentRecordStatus.PAID }, take: 1 },
+            },
+        });
+        if (!booking)
+            throw new common_1.NotFoundException('Booking not found');
+        if (!booking.payLater) {
+            throw new common_1.BadRequestException('This booking is not a pay-later booking');
+        }
+        if (booking.payment === client_1.PaymentStatus.PAID) {
+            return booking;
+        }
+        if (dto.method === client_1.PaymentMethod.PAYPAL || dto.method === client_1.PaymentMethod.OTA) {
+            throw new common_1.BadRequestException('Cash or bank transfer is required here');
+        }
+        let amount = Number(booking.totalAmount ?? 0);
+        if (!amount && booking.tourId && booking.tourType && booking.totalPax > 0) {
+            const quote = await this.quoteWebsite(booking.tourId, booking.tourType, booking.totalPax);
+            amount = quote.totalAmount;
+        }
+        if (!amount || amount <= 0) {
+            throw new common_1.BadRequestException('Booking total is missing');
+        }
+        const collectedById = booking.paymentCollectedById ?? actor.id;
+        const payerType = collectedById === booking.assignment?.guideId
+            ? client_1.PayerType.GUIDE
+            : client_1.PayerType.STAFF;
+        const method = dto.method ?? booking.paymentMethod ?? client_1.PaymentMethod.CASH;
+        const now = new Date();
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const row = await tx.booking.update({
+                where: { id },
+                data: {
+                    payment: client_1.PaymentStatus.PAID,
+                    paymentMethod: method,
+                    paymentCollectedAt: booking.paymentCollectedAt ?? now,
+                    paymentCollectedById: booking.paymentCollectedById ?? actor.id,
+                    paymentCollectedByName: booking.paymentCollectedByName ?? actor.name ?? actor.email ?? null,
+                    paymentConfirmedAt: now,
+                    paymentConfirmedById: actor.id,
+                    paymentConfirmedByName: actor.name ?? actor.email ?? null,
+                    ...(dto.note ? { paymentNote: dto.note } : {}),
+                },
+            });
+            if (booking.payments.length === 0) {
+                await tx.bookingPayment.create({
+                    data: {
+                        bookingId: booking.id,
+                        amount: new client_1.Prisma.Decimal(amount),
+                        currency: booking.currency,
+                        method,
+                        payerType,
+                        status: client_1.PaymentRecordStatus.PAID,
+                        paidAt: now,
+                        createdById: actor.id,
+                        confirmedById: actor.id,
+                        confirmedByName: actor.name ?? actor.email ?? null,
+                        note: dto.reference
+                            ? `${dto.note ?? 'Pay-later collected'}; ref ${dto.reference}`
+                            : (dto.note ?? 'Pay-later collected'),
+                    },
+                });
+            }
+            return row;
+        });
+        await this.auditService.log({
+            entityType: 'Booking',
+            entityId: id,
+            action: 'CONFIRM_PAYMENT',
+            beforeData: booking,
+            afterData: updated,
+            changedBy: actor.id,
+        });
+        return updated;
+    }
     async findOne(id) {
         const booking = await this.prisma.booking.findUnique({
             where: { id },
-            include: { tour: true, rawData: { select: { payload: true } } },
+            include: {
+                tour: true,
+                rawData: { select: { payload: true } },
+                customerUser: { select: { id: true, name: true, email: true } },
+                payments: { orderBy: { createdAt: 'desc' } },
+            },
         });
         if (!booking)
             throw new common_1.NotFoundException('Booking not found');
         return booking;
     }
+    async quoteWebsite(tourId, tourType, totalPax) {
+        const tour = await this.prisma.tour.findUnique({
+            where: { id: tourId },
+            select: {
+                id: true,
+                name: true,
+                currency: true,
+                durationDays: true,
+                adultPrice: true,
+                childPrice: true,
+                infantPrice: true,
+                privateDiscountPercent: true,
+                groupDiscountPercent: true,
+                promotionStartsAt: true,
+                promotionEndsAt: true,
+                typePrices: {
+                    where: { type: tourType },
+                    select: { adultPrice: true, childPrice: true, infantPrice: true },
+                },
+            },
+        });
+        if (!tour)
+            throw new common_1.NotFoundException('Tour not found');
+        const typePrice = tour.typePrices[0];
+        const source = typePrice ??
+            (tour.typePrices.length === 0
+                ? {
+                    adultPrice: tour.adultPrice,
+                    childPrice: tour.childPrice,
+                    infantPrice: tour.infantPrice,
+                }
+                : null);
+        const unit = Number(source?.adultPrice ?? 0) ||
+            Number(source?.childPrice ?? 0) ||
+            Number(source?.infantPrice ?? 0);
+        if (!source || unit <= 0) {
+            throw new common_1.BadRequestException('This tour type is not available');
+        }
+        const now = Date.now();
+        const startsAt = tour.promotionStartsAt
+            ? new Date(tour.promotionStartsAt).getTime()
+            : null;
+        const endsAt = tour.promotionEndsAt
+            ? new Date(tour.promotionEndsAt).getTime()
+            : null;
+        const inWindow = (startsAt === null || now >= startsAt) &&
+            (endsAt === null || now <= endsAt);
+        const pct = inWindow
+            ? Number(tourType === client_1.TourType.GROUP_TOUR
+                ? (tour.groupDiscountPercent ?? 0)
+                : (tour.privateDiscountPercent ?? 0))
+            : 0;
+        const discountPercent = pct > 0 ? pct : 0;
+        const unitPrice = Math.round(unit * (1 - discountPercent / 100) * 100) / 100;
+        const totalAmount = Math.round(unitPrice * totalPax * 100) / 100;
+        return {
+            tourId: tour.id,
+            tourName: tour.name,
+            tourType,
+            totalPax,
+            durationDays: Math.max(1, tour.durationDays ?? 1),
+            unitPrice,
+            discountPercent,
+            totalAmount,
+            currency: tour.currency || 'VND',
+        };
+    }
+    websiteQuote(dto) {
+        return this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax);
+    }
+    async createWebsite(dto, actor) {
+        if (!actor?.id)
+            throw new common_1.ForbiddenException('Please sign in to book');
+        const quote = await this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax);
+        const payLater = !!dto.payLater;
+        const start = new Date(dto.startingDate);
+        if (Number.isNaN(start.getTime())) {
+            throw new common_1.BadRequestException('Invalid start date');
+        }
+        const dueAt = new Date(start.getTime() + quote.durationDays * 24 * 60 * 60 * 1000);
+        const payload = {
+            ...dto,
+            channel: client_1.BookingProvider.WEBSITE,
+            source: 'website',
+            payment: client_1.PaymentStatus.PENDING,
+            paymentMethod: payLater ? undefined : client_1.PaymentMethod.PAYPAL,
+            payLater,
+            paymentDueAt: payLater ? dueAt : undefined,
+            paymentNote: payLater
+                ? (dto.paymentNote?.trim() ||
+                    'Collect the remaining payment at the end of the tour.')
+                : undefined,
+            totalAmount: quote.totalAmount,
+            currency: quote.currency,
+            customerUserId: actor.id,
+        };
+        const booking = await this.create(payload, actor);
+        return { booking, quote };
+    }
     async create(dto, actor) {
         this.assertBookingContactFields(dto);
+        await this.assertTourTypeOffered(dto.tourId, dto.tourType);
         if (dto.status === client_1.BookingStatus.ASSIGNED) {
             dto = { ...dto, status: client_1.BookingStatus.PENDING };
         }
@@ -359,8 +594,22 @@ let BookingService = BookingService_1 = class BookingService {
                 const data = { ...dto, bookingRef };
                 if (dto.startingDate)
                     data.startingDate = new Date(dto.startingDate);
-                if (!data.payment)
-                    data.payment = client_1.PaymentStatus.PAID;
+                if (!data.payment) {
+                    data.payment =
+                        data.channel === client_1.BookingProvider.WEBSITE
+                            ? client_1.PaymentStatus.PENDING
+                            : client_1.PaymentStatus.PAID;
+                }
+                if (data.payLater)
+                    data.payment = client_1.PaymentStatus.PENDING;
+                if (!data.totalAmount &&
+                    data.tourId &&
+                    data.tourType &&
+                    Number(data.totalPax) > 0) {
+                    const quote = await this.quoteWebsite(data.tourId, data.tourType, Number(data.totalPax));
+                    data.totalAmount = quote.totalAmount;
+                    data.currency = quote.currency;
+                }
                 data.createdWho = actor?.name ?? actor?.email ?? 'System';
                 booking = await this.prisma.booking.create({ data });
                 break;
@@ -376,6 +625,22 @@ let BookingService = BookingService_1 = class BookingService {
         }
         if (!booking)
             throw new common_1.ConflictException('Booking reference already exists');
+        if (booking.channel === client_1.BookingProvider.MANUAL &&
+            booking.payment === client_1.PaymentStatus.PAID) {
+            await this.prisma.bookingPayment.create({
+                data: {
+                    bookingId: booking.id,
+                    amount: new client_1.Prisma.Decimal(Number(booking.totalAmount ?? 0)),
+                    currency: booking.currency,
+                    method: booking.paymentMethod ?? client_1.PaymentMethod.CASH,
+                    payerType: client_1.PayerType.CUSTOMER,
+                    status: client_1.PaymentRecordStatus.PAID,
+                    paidAt: new Date(),
+                    createdById: actor?.id ?? null,
+                    note: 'Manual booking received at creation',
+                },
+            });
+        }
         await this.auditService.log({
             entityType: 'Booking',
             entityId: booking.id,
@@ -387,6 +652,20 @@ let BookingService = BookingService_1 = class BookingService {
     }
     looksGenerated(bookingRef) {
         return /^(PRV|GR|MB)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingRef);
+    }
+    async assertTourTypeOffered(tourId, tourType) {
+        const typePrices = await this.prisma.tourTypePrice.findMany({
+            where: { tourId },
+        });
+        if (typePrices.length === 0)
+            return;
+        const match = typePrices.find((price) => price.type === tourType);
+        const offered = match != null &&
+            [match.adultPrice, match.childPrice, match.infantPrice].some((value) => Number(value) > 0);
+        if (!offered) {
+            const label = tourType === client_1.TourType.PRIVATE_TOUR ? 'Private tour' : 'Group tour';
+            throw new common_1.BadRequestException(`${label} is not available for this tour`);
+        }
     }
     assertBookingContactFields(dto) {
         if (!dto.mail?.trim()) {

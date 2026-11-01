@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { TOUR_DETAILS } from './tour-details';
+import { TOUR_PRICE_OVERRIDES } from './tour-price-overrides';
 
 const prisma = new PrismaClient();
 
@@ -13,10 +14,14 @@ async function main() {
     if (!detail) continue;
 
     const { typePrices, itineraries, ...tourData } = detail;
+    const override = TOUR_PRICE_OVERRIDES[tour.code];
 
     await prisma.tour.update({
       where: { id: tour.id },
-      data: tourData,
+      data: {
+        ...tourData,
+        ...(override ? { name: override.name } : {}),
+      },
     });
 
     for (const price of typePrices) {

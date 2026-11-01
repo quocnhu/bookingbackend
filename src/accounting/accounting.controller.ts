@@ -21,6 +21,7 @@ import {
   VerifyTourMoneyDto,
   RejectMoneyDto,
   VoidPeriodDto,
+  MarkPeriodPaidDto,
 } from './dto/accounting.dto';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
@@ -141,6 +142,16 @@ export class AccountingController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.accountingService.voidPeriod(user, id, dto);
+  }
+
+  @Post('period/:id/mark-paid')
+  @HttpCode(HttpStatus.OK)
+  markPeriodPaid(
+    @Param('id') id: string,
+    @Body() dto: MarkPeriodPaidDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.accountingService.markPeriodPaid(actor, id, dto);
   }
 
   @Get('period/history')

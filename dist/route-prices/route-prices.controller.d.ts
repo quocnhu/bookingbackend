@@ -44,6 +44,8 @@ export declare class RoutePricesController {
             departureTimes: string[];
             durationValue: number | null;
             durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+            freeCancellationValue: number | null;
+            freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
             freeCancellationHours: number | null;
             cancellationPolicy: string | null;
             adultPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -96,6 +98,8 @@ export declare class RoutePricesController {
             departureTimes: string[];
             durationValue: number | null;
             durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+            freeCancellationValue: number | null;
+            freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
             freeCancellationHours: number | null;
             cancellationPolicy: string | null;
             adultPrice: import("@prisma/client/runtime/library").Decimal | null;
@@ -148,6 +152,8 @@ export declare class RoutePricesController {
             departureTimes: string[];
             durationValue: number | null;
             durationUnit: import("@prisma/client").$Enums.DurationUnit | null;
+            freeCancellationValue: number | null;
+            freeCancellationUnit: import("@prisma/client").$Enums.DurationUnit | null;
             freeCancellationHours: number | null;
             cancellationPolicy: string | null;
             adultPrice: import("@prisma/client/runtime/library").Decimal | null;

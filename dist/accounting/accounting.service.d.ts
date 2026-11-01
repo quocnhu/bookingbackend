@@ -5,7 +5,7 @@ import { NotificationService } from "../notifications/notification.service";
 import { NotificationsGateway } from "../notifications/notifications.gateway";
 import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 import { DriveService } from "../drive/drive.service";
-import { CreateSettlementCategoryDto, CreateSettlementDto, ExportPeriodDto, ListPeopleQueryDto, PeriodQueryDto, RejectMoneyDto, VerifyTourMoneyDto, VoidPeriodDto } from './dto/accounting.dto';
+import { CreateSettlementCategoryDto, CreateSettlementDto, ExportPeriodDto, ListPeopleQueryDto, PeriodQueryDto, RejectMoneyDto, VerifyTourMoneyDto, VoidPeriodDto, MarkPeriodPaidDto } from './dto/accounting.dto';
 export declare const PAYEE_LABELS: Record<PayeeType, string>;
 export interface Payee {
     id: string;
@@ -76,13 +76,13 @@ export declare class AccountingService {
             createdAt: Date;
             updatedAt: Date;
             assignmentId: string | null;
-            amount: Prisma.Decimal;
-            note: string | null;
-            createdByName: string | null;
             categoryId: string | null;
+            note: string | null;
+            amount: Prisma.Decimal;
             createdById: string;
-            reversesId: string | null;
             bookingId: string | null;
+            createdByName: string | null;
+            reversesId: string | null;
         })[];
         categories: {
             id: string;
@@ -106,13 +106,13 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        amount: Prisma.Decimal;
-        note: string | null;
-        createdByName: string | null;
         categoryId: string | null;
+        note: string | null;
+        amount: Prisma.Decimal;
         createdById: string;
-        reversesId: string | null;
         bookingId: string | null;
+        createdByName: string | null;
+        reversesId: string | null;
     }>;
     listSettlements(actor: AuthenticatedUser, assignmentId: string): Promise<({
         booking: {
@@ -133,13 +133,13 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        amount: Prisma.Decimal;
-        note: string | null;
-        createdByName: string | null;
         categoryId: string | null;
+        note: string | null;
+        amount: Prisma.Decimal;
         createdById: string;
-        reversesId: string | null;
         bookingId: string | null;
+        createdByName: string | null;
+        reversesId: string | null;
     })[]>;
     createSettlement(actor: AuthenticatedUser, assignmentId: string, dto: CreateSettlementDto): Promise<{
         category: {
@@ -156,13 +156,13 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        amount: Prisma.Decimal;
-        note: string | null;
-        createdByName: string | null;
         categoryId: string | null;
+        note: string | null;
+        amount: Prisma.Decimal;
         createdById: string;
-        reversesId: string | null;
         bookingId: string | null;
+        createdByName: string | null;
+        reversesId: string | null;
     }>;
     private createSettlementCore;
     updateSettlement(actor: AuthenticatedUser, id: string, dto: {
@@ -174,39 +174,39 @@ export declare class AccountingService {
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        amount: Prisma.Decimal;
-        note: string | null;
-        createdByName: string | null;
         categoryId: string | null;
+        note: string | null;
+        amount: Prisma.Decimal;
         createdById: string;
-        reversesId: string | null;
         bookingId: string | null;
+        createdByName: string | null;
+        reversesId: string | null;
     }>;
     deleteTourMoney(actor: AuthenticatedUser, assignmentId: string, settlementId: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        amount: Prisma.Decimal;
-        note: string | null;
-        createdByName: string | null;
         categoryId: string | null;
+        note: string | null;
+        amount: Prisma.Decimal;
         createdById: string;
-        reversesId: string | null;
         bookingId: string | null;
+        createdByName: string | null;
+        reversesId: string | null;
     }>;
     deleteSettlement(actor: AuthenticatedUser, id: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
         assignmentId: string | null;
-        amount: Prisma.Decimal;
-        note: string | null;
-        createdByName: string | null;
         categoryId: string | null;
+        note: string | null;
+        amount: Prisma.Decimal;
         createdById: string;
-        reversesId: string | null;
         bookingId: string | null;
+        createdByName: string | null;
+        reversesId: string | null;
     }>;
     private sumRows;
     private computeNet;
@@ -736,9 +736,11 @@ export declare class AccountingService {
     voidPeriod(actor: AuthenticatedUser, periodId: string, dto: VoidPeriodDto): Promise<{
         id: string;
         createdAt: Date;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         note: string | null;
-        createdByName: string | null;
+        paidAt: Date | null;
         createdById: string;
+        createdByName: string | null;
         personId: string;
         payeeType: import("@prisma/client").$Enums.PayeeType;
         payeeName: string | null;
@@ -748,6 +750,34 @@ export declare class AccountingService {
         personReturnsToCompany: Prisma.Decimal;
         companyReturnsToPerson: Prisma.Decimal;
         totalNet: Prisma.Decimal;
+        paidById: string | null;
+        paidByName: string | null;
+        paymentReference: string | null;
+        voidedAt: Date | null;
+        voidedById: string | null;
+        voidedByName: string | null;
+        voidReason: string | null;
+    }>;
+    markPeriodPaid(actor: AuthenticatedUser, periodId: string, dto: MarkPeriodPaidDto): Promise<{
+        id: string;
+        createdAt: Date;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+        note: string | null;
+        paidAt: Date | null;
+        createdById: string;
+        createdByName: string | null;
+        personId: string;
+        payeeType: import("@prisma/client").$Enums.PayeeType;
+        payeeName: string | null;
+        fromDate: Date;
+        toDate: Date;
+        tourCount: number;
+        personReturnsToCompany: Prisma.Decimal;
+        companyReturnsToPerson: Prisma.Decimal;
+        totalNet: Prisma.Decimal;
+        paidById: string | null;
+        paidByName: string | null;
+        paymentReference: string | null;
         voidedAt: Date | null;
         voidedById: string | null;
         voidedByName: string | null;

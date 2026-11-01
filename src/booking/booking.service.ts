@@ -11,7 +11,10 @@ import {
   Booking,
   BookingProvider,
   BookingStatus,
+  PaymentMethod,
+  PaymentRecordStatus,
   PaymentStatus,
+  PayerType,
   Prisma,
   RoleType,
   TourType,
@@ -26,9 +29,13 @@ import { AssignmentBoardService } from '@/queues/assignment-board.service';
 import { AssignmentQueue } from '@/queues/assignment.queue';
 import {
   CreateBookingDto,
+  CreateWebsiteBookingDto,
   BookingPatchDto,
+  CollectBookingPaymentDto,
+  ConfirmBookingPaymentDto,
   QueryBookingDto,
   UpdateBookingDto,
+  WebsiteQuoteDto,
 } from './dto/booking.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
 import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
@@ -533,17 +540,313 @@ startingDate: data.startingDate
     return { items, total, page, limit };
   }
 
+  /**
+   * Pay-later step 1: the assigned guide/driver (or Accounting) records that
+   * cash was collected. The booking is NOT paid yet.
+   */
+  async collectBookingPayment(
+    id: string,
+    dto: CollectBookingPaymentDto,
+    actor: AuthenticatedUser,
+  ) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: { assignment: { select: { guideId: true, driverId: true } } },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (!booking.payLater) {
+      throw new BadRequestException('This booking is not a pay-later booking');
+    }
+    if (booking.payment === PaymentStatus.PAID) {
+      throw new ConflictException('Booking payment is already confirmed');
+    }
+    const isCrew =
+      !!actor?.id &&
+      (actor.id === booking.assignment?.guideId ||
+        actor.id === booking.assignment?.driverId);
+    const canManage =
+      actor.role === RoleType.ADMIN ||
+      actor.role === RoleType.OFFICE ||
+      actor.permissions?.includes('accounting.money.verify') ||
+      actor.permissions?.includes('accounting.read');
+    if (!isCrew && !canManage) {
+      throw new ForbiddenException(
+        'Only the assigned crew or Accounting can record this collection',
+      );
+    }
+    if (dto.method === PaymentMethod.PAYPAL || dto.method === PaymentMethod.OTA) {
+      throw new BadRequestException('Cash or bank transfer is required here');
+    }
+    const updated = await this.prisma.booking.update({
+      where: { id },
+      data: {
+        paymentCollectedAt: new Date(),
+        paymentCollectedById: actor.id,
+        paymentCollectedByName: actor.name ?? actor.email ?? null,
+        paymentMethod: dto.method ?? booking.paymentMethod ?? PaymentMethod.CASH,
+        ...(dto.note ? { paymentNote: dto.note } : {}),
+      },
+    });
+    await this.auditService.log({
+      entityType: 'Booking',
+      entityId: id,
+      action: 'COLLECT_PAYMENT',
+      beforeData: booking,
+      afterData: updated,
+      changedBy: actor.id,
+    });
+    return updated;
+  }
+
+  /**
+   * Pay-later step 2: Accounting confirms the money. Only this step marks the
+   * booking PAID and writes the receipt row.
+   */
+  async confirmBookingPayment(
+    id: string,
+    dto: ConfirmBookingPaymentDto,
+    actor: AuthenticatedUser,
+  ) {
+    const canConfirm =
+      actor.role === RoleType.ADMIN ||
+      actor.permissions?.includes('accounting.money.verify');
+    if (!canConfirm) {
+      throw new ForbiddenException('Accounting confirmation is required');
+    }
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        assignment: { select: { guideId: true, driverId: true } },
+        payments: { where: { status: PaymentRecordStatus.PAID }, take: 1 },
+      },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (!booking.payLater) {
+      throw new BadRequestException('This booking is not a pay-later booking');
+    }
+    if (booking.payment === PaymentStatus.PAID) {
+      return booking;
+    }
+    if (dto.method === PaymentMethod.PAYPAL || dto.method === PaymentMethod.OTA) {
+      throw new BadRequestException('Cash or bank transfer is required here');
+    }
+
+    let amount = Number(booking.totalAmount ?? 0);
+    if (!amount && booking.tourId && booking.tourType && booking.totalPax > 0) {
+      const quote = await this.quoteWebsite(
+        booking.tourId,
+        booking.tourType,
+        booking.totalPax,
+      );
+      amount = quote.totalAmount;
+    }
+    if (!amount || amount <= 0) {
+      throw new BadRequestException('Booking total is missing');
+    }
+
+    const collectedById =
+      booking.paymentCollectedById ?? actor.id;
+    const payerType =
+      collectedById === booking.assignment?.guideId
+        ? PayerType.GUIDE
+        : PayerType.STAFF;
+    const method =
+      dto.method ?? booking.paymentMethod ?? PaymentMethod.CASH;
+    const now = new Date();
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.booking.update({
+        where: { id },
+        data: {
+          payment: PaymentStatus.PAID,
+          paymentMethod: method,
+          paymentCollectedAt: booking.paymentCollectedAt ?? now,
+          paymentCollectedById: booking.paymentCollectedById ?? actor.id,
+          paymentCollectedByName:
+            booking.paymentCollectedByName ?? actor.name ?? actor.email ?? null,
+          paymentConfirmedAt: now,
+          paymentConfirmedById: actor.id,
+          paymentConfirmedByName: actor.name ?? actor.email ?? null,
+          ...(dto.note ? { paymentNote: dto.note } : {}),
+        },
+      });
+      if (booking.payments.length === 0) {
+        await tx.bookingPayment.create({
+          data: {
+            bookingId: booking.id,
+            amount: new Prisma.Decimal(amount),
+            currency: booking.currency,
+            method,
+            payerType,
+            status: PaymentRecordStatus.PAID,
+            paidAt: now,
+            createdById: actor.id,
+            confirmedById: actor.id,
+            confirmedByName: actor.name ?? actor.email ?? null,
+            note: dto.reference
+              ? `${dto.note ?? 'Pay-later collected'}; ref ${dto.reference}`
+              : (dto.note ?? 'Pay-later collected'),
+          },
+        });
+      }
+      return row;
+    });
+
+    await this.auditService.log({
+      entityType: 'Booking',
+      entityId: id,
+      action: 'CONFIRM_PAYMENT',
+      beforeData: booking,
+      afterData: updated,
+      changedBy: actor.id,
+    });
+    return updated;
+  }
+
   async findOne(id: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
-      include: { tour: true, rawData: { select: { payload: true } } },
+      include: {
+        tour: true,
+        rawData: { select: { payload: true } },
+        customerUser: { select: { id: true, name: true, email: true } },
+        payments: { orderBy: { createdAt: 'desc' } },
+      },
     });
     if (!booking) throw new NotFoundException('Booking not found');
     return booking;
   }
 
+  /**
+   * Server-side website price. The client may display this, but the amount
+   * stored on the booking and sent to PayPal always comes from here.
+   */
+  private async quoteWebsite(
+    tourId: string,
+    tourType: TourType,
+    totalPax: number,
+  ) {
+    const tour = await this.prisma.tour.findUnique({
+      where: { id: tourId },
+      select: {
+        id: true,
+        name: true,
+        currency: true,
+        durationDays: true,
+        adultPrice: true,
+        childPrice: true,
+        infantPrice: true,
+        privateDiscountPercent: true,
+        groupDiscountPercent: true,
+        promotionStartsAt: true,
+        promotionEndsAt: true,
+        typePrices: {
+          where: { type: tourType },
+          select: { adultPrice: true, childPrice: true, infantPrice: true },
+        },
+      },
+    });
+    if (!tour) throw new NotFoundException('Tour not found');
+
+    const typePrice = tour.typePrices[0];
+    const source =
+      typePrice ??
+      (tour.typePrices.length === 0
+        ? {
+            adultPrice: tour.adultPrice,
+            childPrice: tour.childPrice,
+            infantPrice: tour.infantPrice,
+          }
+        : null);
+    const unit =
+      Number(source?.adultPrice ?? 0) ||
+      Number(source?.childPrice ?? 0) ||
+      Number(source?.infantPrice ?? 0);
+    if (!source || unit <= 0) {
+      throw new BadRequestException('This tour type is not available');
+    }
+
+    const now = Date.now();
+    const startsAt = tour.promotionStartsAt
+      ? new Date(tour.promotionStartsAt).getTime()
+      : null;
+    const endsAt = tour.promotionEndsAt
+      ? new Date(tour.promotionEndsAt).getTime()
+      : null;
+    const inWindow =
+      (startsAt === null || now >= startsAt) &&
+      (endsAt === null || now <= endsAt);
+    const pct = inWindow
+      ? Number(
+          tourType === TourType.GROUP_TOUR
+            ? (tour.groupDiscountPercent ?? 0)
+            : (tour.privateDiscountPercent ?? 0),
+        )
+      : 0;
+    const discountPercent = pct > 0 ? pct : 0;
+    const unitPrice = Math.round(unit * (1 - discountPercent / 100) * 100) / 100;
+    const totalAmount = Math.round(unitPrice * totalPax * 100) / 100;
+
+    return {
+      tourId: tour.id,
+      tourName: tour.name,
+      tourType,
+      totalPax,
+      durationDays: Math.max(1, tour.durationDays ?? 1),
+      unitPrice,
+      discountPercent,
+      totalAmount,
+      currency: tour.currency || 'VND',
+    };
+  }
+
+  websiteQuote(dto: WebsiteQuoteDto) {
+    return this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax);
+  }
+
+  /**
+   * A website booking is always owned by the signed-in account. The server
+   * computes the total and starts the booking as unpaid; PayPal capture (or
+   * Accounting for pay-later) is the only path to PAID.
+   */
+  async createWebsite(dto: CreateWebsiteBookingDto, actor?: AuthenticatedUser) {
+    if (!actor?.id) throw new ForbiddenException('Please sign in to book');
+    const quote = await this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax);
+    const payLater = !!dto.payLater;
+    const start = new Date(dto.startingDate);
+    if (Number.isNaN(start.getTime())) {
+      throw new BadRequestException('Invalid start date');
+    }
+    const dueAt = new Date(
+      start.getTime() + quote.durationDays * 24 * 60 * 60 * 1000,
+    );
+    const payload = {
+      ...dto,
+      channel: BookingProvider.WEBSITE,
+      source: 'website',
+      payment: PaymentStatus.PENDING,
+      paymentMethod: payLater ? undefined : PaymentMethod.PAYPAL,
+      payLater,
+      paymentDueAt: payLater ? dueAt : undefined,
+      paymentNote: payLater
+        ? (dto.paymentNote?.trim() ||
+          'Collect the remaining payment at the end of the tour.')
+        : undefined,
+      totalAmount: quote.totalAmount,
+      currency: quote.currency,
+      customerUserId: actor.id,
+    } as CreateBookingDto & {
+      totalAmount: number;
+      currency: string;
+      customerUserId: string;
+    };
+    const booking = await this.create(payload, actor);
+    return { booking, quote };
+  }
+
   async create(dto: CreateBookingDto, actor?: AuthenticatedUser) {
     this.assertBookingContactFields(dto);
+    await this.assertTourTypeOffered(dto.tourId, dto.tourType);
     // Guard invalid state: ASSIGNED requires a bus. The bookings-table
     // status dropdown used to allow ASSIGNED with assignmentId=null,
     // which hides the row from both Assignments (no bus) and the
@@ -564,7 +867,27 @@ startingDate: data.startingDate
       try {
         const data: any = { ...dto, bookingRef };
         if (dto.startingDate) data.startingDate = new Date(dto.startingDate);
-        if (!data.payment) data.payment = PaymentStatus.PAID;
+        if (!data.payment) {
+          data.payment =
+            data.channel === BookingProvider.WEBSITE
+              ? PaymentStatus.PENDING
+              : PaymentStatus.PAID;
+        }
+        if (data.payLater) data.payment = PaymentStatus.PENDING;
+        if (
+          !data.totalAmount &&
+          data.tourId &&
+          data.tourType &&
+          Number(data.totalPax) > 0
+        ) {
+          const quote = await this.quoteWebsite(
+            data.tourId,
+            data.tourType,
+            Number(data.totalPax),
+          );
+          data.totalAmount = quote.totalAmount;
+          data.currency = quote.currency;
+        }
         data.createdWho = actor?.name ?? actor?.email ?? 'System';
         booking = await this.prisma.booking.create({ data });
         break;
@@ -580,6 +903,25 @@ startingDate: data.startingDate
       }
     }
     if (!booking) throw new ConflictException('Booking reference already exists');
+
+    if (
+      booking.channel === BookingProvider.MANUAL &&
+      booking.payment === PaymentStatus.PAID
+    ) {
+      await this.prisma.bookingPayment.create({
+        data: {
+          bookingId: booking.id,
+          amount: new Prisma.Decimal(Number(booking.totalAmount ?? 0)),
+          currency: booking.currency,
+          method: booking.paymentMethod ?? PaymentMethod.CASH,
+          payerType: PayerType.CUSTOMER,
+          status: PaymentRecordStatus.PAID,
+          paidAt: new Date(),
+          createdById: actor?.id ?? null,
+          note: 'Manual booking received at creation',
+        },
+      });
+    }
 
     await this.auditService.log({
       entityType: 'Booking',
@@ -608,6 +950,33 @@ startingDate: data.startingDate
    * Email and pax detail are required for every booking created through the
    * API. Parsed-email bookings go through `upsert()` and are not affected.
    */
+  /**
+   * A tour type is offered only when at least one of its adult/child/infant
+   * prices is greater than zero. All three at zero means the operator does not
+   * sell that type, so website/manual bookings must be rejected for it.
+   * Tours without per-type rows keep the legacy behaviour.
+   */
+  private async assertTourTypeOffered(
+    tourId: string,
+    tourType: TourType,
+  ): Promise<void> {
+    const typePrices = await this.prisma.tourTypePrice.findMany({
+      where: { tourId },
+    });
+    if (typePrices.length === 0) return;
+    const match = typePrices.find((price) => price.type === tourType);
+    const offered =
+      match != null &&
+      [match.adultPrice, match.childPrice, match.infantPrice].some(
+        (value) => Number(value) > 0,
+      );
+    if (!offered) {
+      const label =
+        tourType === TourType.PRIVATE_TOUR ? 'Private tour' : 'Group tour';
+      throw new BadRequestException(`${label} is not available for this tour`);
+    }
+  }
+
   private assertBookingContactFields(dto: CreateBookingDto): void {
     if (!dto.mail?.trim()) {
       throw new BadRequestException('Email is required');

@@ -57,6 +57,16 @@ export class CreateTourDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
+  freeCancellationValue?: number;
+
+  @IsOptional()
+  @IsEnum(DurationUnit)
+  freeCancellationUnit?: DurationUnit;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
   freeCancellationHours?: number;
 
   @IsOptional()
@@ -109,6 +119,15 @@ export class CreateTourDto {
   @ValidateNested({ each: true })
   @Type(() => TourTypePriceDto)
   typePrices?: TourTypePriceDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  categoryIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  primaryCategoryId?: string;
 }
 
 export class TourTypePriceDto {
@@ -173,6 +192,16 @@ export class UpdateTourDto {
   @IsOptional()
   @IsEnum(DurationUnit)
   durationUnit?: DurationUnit;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  freeCancellationValue?: number;
+
+  @IsOptional()
+  @IsEnum(DurationUnit)
+  freeCancellationUnit?: DurationUnit;
 
   @IsOptional()
   @Type(() => Number)
@@ -270,6 +299,15 @@ export class UpdateTourDto {
   @ValidateNested({ each: true })
   @Type(() => TourTypePriceDto)
   typePrices?: TourTypePriceDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  categoryIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  primaryCategoryId?: string;
 }
 
 export class ItineraryItemDto {
@@ -326,4 +364,8 @@ export class QueryTourDto extends PaginationDto {
   @IsOptional()
   @IsEnum(TourType)
   type?: TourType;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
 }

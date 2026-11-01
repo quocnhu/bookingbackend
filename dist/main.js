@@ -18,7 +18,9 @@ async function bootstrap() {
             process.env.JWT_SECRET.includes('change-me'))) {
         throw new Error('JWT_SECRET must be a strong random secret in production');
     }
-    const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    const app = await core_1.NestFactory.create(app_module_1.AppModule, {
+        rawBody: true,
+    });
     const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
         .split(',')
         .map((s) => s.trim())

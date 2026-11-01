@@ -60,6 +60,7 @@ export declare class DashboardService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
@@ -78,6 +79,18 @@ export declare class DashboardService {
             extra: import("@prisma/client/runtime/library").JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            customerUserId: string | null;
+            paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+            payLater: boolean;
+            paymentDueAt: Date | null;
+            paymentNote: string | null;
+            totalAmount: import("@prisma/client/runtime/library").Decimal | null;
+            paymentCollectedAt: Date | null;
+            paymentCollectedById: string | null;
+            paymentCollectedByName: string | null;
+            paymentConfirmedAt: Date | null;
+            paymentConfirmedById: string | null;
+            paymentConfirmedByName: string | null;
             paxSequence: number;
             movedFromBusId: string | null;
             emailDate: Date | null;

@@ -11,9 +11,13 @@ import {
 import { BookingService } from './booking.service';
 import {
   BatchUpdateBookingsDto,
+  CollectBookingPaymentDto,
+  ConfirmBookingPaymentDto,
   CreateBookingDto,
+  CreateWebsiteBookingDto,
   QueryBookingDto,
   UpdateBookingDto,
+  WebsiteQuoteDto,
 } from './dto/booking.dto';
 import { TourType } from '@prisma/client';
 import {
@@ -41,6 +45,43 @@ export class BookingController {
    * Booking Ref field. Must be declared BEFORE `:id` — otherwise the param
    * would swallow this string.
    */
+  /** Authenticated website quote. Amount is recalculated again on create. */
+  @Post('website/quote')
+  quoteWebsite(@Body() dto: WebsiteQuoteDto) {
+    return this.bookingService.websiteQuote(dto);
+  }
+
+  /**
+   * Website booking for the signed-in customer. It deliberately has no
+   * booking.create permission: customers may book, but only through this
+   * ownership-checked path.
+   */
+  @Post('website')
+  createWebsite(
+    @Body() dto: CreateWebsiteBookingDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.bookingService.createWebsite(dto, actor);
+  }
+
+  @Post(':id/payment/collect')
+  collectPayment(
+    @Param('id') id: string,
+    @Body() dto: CollectBookingPaymentDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.bookingService.collectBookingPayment(id, dto, actor);
+  }
+
+  @Post(':id/payment/confirm')
+  confirmPayment(
+    @Param('id') id: string,
+    @Body() dto: ConfirmBookingPaymentDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.bookingService.confirmBookingPayment(id, dto, actor);
+  }
+
   @Get('next-ref')
   @Permissions('booking.create')
   nextRef(@Query('tourType') tourType?: string) {

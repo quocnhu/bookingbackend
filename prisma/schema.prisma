@@ -38,6 +38,27 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentRecordStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  PAYPAL
+  CASH
+  BANK_TRANSFER
+  OTA
+}
+
+enum PayerType {
+  CUSTOMER
+  OTA
+  GUIDE
+  STAFF
+}
+
 enum BookingStatus {
   PENDING // Newly created / waiting for vehicle assignment
   ASSIGNED // Assigned to a trip (Assignment)
@@ -201,6 +222,10 @@ model User {
   moneyPayableTos   TourReport[]        @relation("MoneyPayableTo")
   settledTours      PaymentPeriodLine[] @relation("LinePayableTo")
 
+  // Customer bookings and their payment receipts
+  customerBookings Booking[]        @relation("CustomerBookings")
+  bookingPayments  BookingPayment[] @relation("BookingPaymentCreatedBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -306,7 +331,9 @@ model Tour {
   durationDays          Int?          @default(1) // Half-day tours = 1; otherwise number of days
   durationValue         Int? // e.g. 5
   durationUnit          DurationUnit? // HOUR or DAY; null = fall back to durationDays
-  freeCancellationHours Int? // Free cancellation cutoff before departure; null = not offered
+  freeCancellationHours Int? // Derived cutoff in hours; null = not offered
+  freeCancellationValue Int? // What the admin typed, e.g. 1 or 24
+  freeCancellationUnit  DurationUnit? // HOUR or DAY, paired with freeCancellationValue
   cancellationPolicy    String?       @db.Text // Optional display text
 
   // Promotion / discount — separate per tour type
@@ -334,6 +361,34 @@ model Tour {
   typePrices  TourTypePrice[]
   prices      RoutePrice[]
   bookings    Booking[]
+  categories  TourCategoryLink[]
+}
+
+model TourCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tours TourCategoryLink[]
+
+  @@index([isActive, sortOrder])
+}
+
+model TourCategoryLink {
+  tourId     String
+  categoryId String
+  isPrimary  Boolean @default(false)
+
+  tour     Tour         @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  category TourCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([tourId, categoryId])
+  @@index([categoryId])
 }
 
 model TourTypePrice {
@@ -467,6 +522,23 @@ model Booking {
   tourName     String?
   payment      PaymentStatus? @default(PAID)
 
+  // Customer money
+  customerUserId         String?
+  customerUser           User?            @relation("CustomerBookings", fields: [customerUserId], references: [id], onDelete: SetNull)
+  paymentMethod          PaymentMethod?
+  payLater               Boolean          @default(false)
+  paymentDueAt           DateTime?
+  paymentNote            String?          @db.Text
+  totalAmount            Decimal?         @db.Decimal(12, 2)
+  currency               String           @default("VND")
+  paymentCollectedAt     DateTime?
+  paymentCollectedById   String?
+  paymentCollectedByName String?
+  paymentConfirmedAt     DateTime?
+  paymentConfirmedById   String?
+  paymentConfirmedByName String?
+  payments               BookingPayment[]
+
   isNoShow     Boolean @default(false)
   noShowReason String?
 
@@ -507,6 +579,47 @@ model Booking {
 
   @@unique([source, confirmationCode])
   @@index([assignmentId, paxSequence])
+  @@index([customerUserId])
+  @@index([payment, payLater])
+}
+
+model BookingPayment {
+  id        String  @id @default(uuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  amount    Decimal             @db.Decimal(12, 2)
+  currency  String              @default("VND")
+  method    PaymentMethod
+  payerType PayerType           @default(CUSTOMER)
+  status    PaymentRecordStatus @default(PENDING)
+
+  // PayPal (or another gateway) tracking. Order/capture ids are unique to make
+  // capture and webhook handling idempotent.
+  provider          String?
+  providerOrderId   String?  @unique
+  providerCaptureId String?  @unique
+  providerAmount    Decimal? @db.Decimal(12, 2)
+  providerCurrency  String?
+  exchangeRate      Decimal? @db.Decimal(14, 4)
+
+  grossAmount      Decimal? @db.Decimal(12, 2)
+  commissionAmount Decimal? @db.Decimal(12, 2)
+
+  paidAt DateTime?
+
+  createdById     String?
+  createdBy       User?   @relation("BookingPaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  confirmedById   String?
+  confirmedByName String?
+  note            String? @db.Text
+  rawPayload      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId, status])
+  @@index([provider, status])
 }
 
 model Assignment {
@@ -703,6 +816,13 @@ model PaymentPeriod {
   createdBy     User     @relation("PeriodCreatedBy", fields: [createdById], references: [id])
   createdByName String?
   createdAt     DateTime @default(now())
+
+  // Actual payout confirmation (separate from the export watermark).
+  paidAt           DateTime?
+  paidById         String?
+  paidByName       String?
+  paymentMethod    PaymentMethod?
+  paymentReference String?
 
   // Period was VOIDED because it was wrong. Never hard-deleted — money data must
   // remain for reconciliation. All logic (watermark, dedupe, history) skips voided periods.

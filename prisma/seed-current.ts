@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { TOUR_DETAILS } from './tour-details';
+import { applyTourCategories } from './tour-categories';
 
 const prisma = new PrismaClient();
 
@@ -1448,7 +1449,7 @@ const TOURS: SeedTour[] = [
   },
   {
     "code": "TOUR-0004",
-    "name": "5-Hour Sunrise or Sunset Jeep Tour from Mui Ne",
+    "name": "Mui Ne: Small-Group Sunrise or Sunset Sand Dunes Jeep Tour",
     "type": "GROUP_TOUR",
     "thumbnailUrl": null,
     "slug": null,
@@ -1600,7 +1601,7 @@ const TOURS: SeedTour[] = [
   },
   {
     "code": "TOUR-0008",
-    "name": "1-Day Mekong Delta Tour: Less-Touristy Cai Be & Vinh Long (Max 10)",
+    "name": "1-Day Mekong Delta Tour: Less-Touristy Cai Be & Vinh Long(Max 10)",
     "type": "GROUP_TOUR",
     "thumbnailUrl": null,
     "slug": null,
@@ -1676,7 +1677,7 @@ const TOURS: SeedTour[] = [
   },
   {
     "code": "TOUR-0010",
-    "name": "1-Day Ho Chi Minh City & Cu Chi Tunnels - Deluxe Group Of 10 Max",
+    "name": "1-Day Ho Chi Minh City & Cu Chi Tunnels-Deluxe Group Of 10 Max",
     "type": "GROUP_TOUR",
     "thumbnailUrl": null,
     "slug": null,
@@ -1790,7 +1791,7 @@ const TOURS: SeedTour[] = [
   },
   {
     "code": "TOUR-0013",
-    "name": "1-Day Explore Non-Touristy Side Of Mekong Delta - Group 10 Max",
+    "name": "1-Day Explore Non-Touristy Side Of Mekong Delta- Group 10 Max",
     "type": "GROUP_TOUR",
     "thumbnailUrl": null,
     "slug": null,
@@ -1904,7 +1905,7 @@ const TOURS: SeedTour[] = [
   },
   {
     "code": "TOUR-0016",
-    "name": "2-Day Mekong Delta with Cai Rang Floating Market from HCM City",
+    "name": "2-Day Mekong Delta with Cai Cang Floating Market from HCM City",
     "type": "GROUP_TOUR",
     "thumbnailUrl": null,
     "slug": null,
@@ -2184,44 +2185,6 @@ const TOURS: SeedTour[] = [
     "gallery": []
   },
   {
-    "code": "TOUR-0023",
-    "name": "3-Day Best Ecotourism Experiences in Mekong Delta from HCM City",
-    "type": "GROUP_TOUR",
-    "thumbnailUrl": null,
-    "slug": null,
-    "adultPrice": 0,
-    "childPrice": 0,
-    "infantPrice": 0,
-    "currency": "VND",
-    "durationDays": 3,
-    "durationValue": 3,
-    "durationUnit": "DAY",
-    "freeCancellationHours": 24,
-    "cancellationPolicy": null,
-    "privateDiscountPercent": 0,
-    "groupDiscountPercent": 0,
-    "promotionStartsAt": null,
-    "promotionEndsAt": null,
-    "departureLocation": null,
-    "departureTimes": [
-      "08:00",
-      "13:00"
-    ],
-    "transportation": null,
-    "overview": null,
-    "includedServices": null,
-    "excludedServices": null,
-    "childrenPolicy": null,
-    "regulations": null,
-    "highlights": null,
-    "insurancePolicy": null,
-    "mapQuery": null,
-    "typePrices": [],
-    "itineraries": [],
-    "departures": [],
-    "gallery": []
-  },
-  {
     "code": "TOUR-0024",
     "name": "1-Day Can Gio Island-Mangrove Biosphere Reserve-Trekking",
     "type": "GROUP_TOUR",
@@ -2233,44 +2196,6 @@ const TOURS: SeedTour[] = [
     "currency": "VND",
     "durationDays": 1,
     "durationValue": 1,
-    "durationUnit": "DAY",
-    "freeCancellationHours": 24,
-    "cancellationPolicy": null,
-    "privateDiscountPercent": 0,
-    "groupDiscountPercent": 0,
-    "promotionStartsAt": null,
-    "promotionEndsAt": null,
-    "departureLocation": null,
-    "departureTimes": [
-      "08:00",
-      "13:00"
-    ],
-    "transportation": null,
-    "overview": null,
-    "includedServices": null,
-    "excludedServices": null,
-    "childrenPolicy": null,
-    "regulations": null,
-    "highlights": null,
-    "insurancePolicy": null,
-    "mapQuery": null,
-    "typePrices": [],
-    "itineraries": [],
-    "departures": [],
-    "gallery": []
-  },
-  {
-    "code": "TOUR-0025",
-    "name": "2-Day Free & Easy Mui Ne Beach Tour from Ho Chi Minh City",
-    "type": "GROUP_TOUR",
-    "thumbnailUrl": null,
-    "slug": null,
-    "adultPrice": 0,
-    "childPrice": 0,
-    "infantPrice": 0,
-    "currency": "VND",
-    "durationDays": 2,
-    "durationValue": 2,
     "durationUnit": "DAY",
     "freeCancellationHours": 24,
     "cancellationPolicy": null,
@@ -2335,44 +2260,6 @@ const TOURS: SeedTour[] = [
     "departures": [],
     "gallery": []
   },
-  {
-    "code": "TOUR-0027",
-    "name": "Private Ho Chi Minh City Shore Excursion for Cruise Passengers",
-    "type": "PRIVATE_TOUR",
-    "thumbnailUrl": null,
-    "slug": null,
-    "adultPrice": 0,
-    "childPrice": 0,
-    "infantPrice": 0,
-    "currency": "VND",
-    "durationDays": 1,
-    "durationValue": 1,
-    "durationUnit": "DAY",
-    "freeCancellationHours": 24,
-    "cancellationPolicy": null,
-    "privateDiscountPercent": 0,
-    "groupDiscountPercent": 0,
-    "promotionStartsAt": null,
-    "promotionEndsAt": null,
-    "departureLocation": null,
-    "departureTimes": [
-      "08:00",
-      "13:00"
-    ],
-    "transportation": null,
-    "overview": null,
-    "includedServices": null,
-    "excludedServices": null,
-    "childrenPolicy": null,
-    "regulations": null,
-    "highlights": null,
-    "insurancePolicy": null,
-    "mapQuery": null,
-    "typePrices": [],
-    "itineraries": [],
-    "departures": [],
-    "gallery": []
-  }
 ];
 
 async function main() {
@@ -2583,8 +2470,10 @@ async function main() {
     }
   }
 
+  const categoryResult = await applyTourCategories(prisma);
+
   console.log(
-    `✅ Seeded ${PERMISSIONS.length} permissions, ${ROLES.length} roles, ${USERS.length} users, ${TOURS.length} tours`,
+    `✅ Seeded ${PERMISSIONS.length} permissions, ${ROLES.length} roles, ${USERS.length} users, ${TOURS.length} tours, ${categoryResult.categories} categories`,
   );
 }
 

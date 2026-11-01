@@ -1,3 +1,4 @@
+import { PaymentMethod } from '@prisma/client';
 import {
   IsBoolean,
   IsDateString,
@@ -178,4 +179,15 @@ export class VoidPeriodDto {
   @MinLength(5)
   @MaxLength(500)
   reason!: string;
+}
+
+export class MarkPeriodPaidDto {
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  method?: PaymentMethod;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reference?: string;
 }

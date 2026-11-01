@@ -1,5 +1,5 @@
 import { PaginationDto } from "../../common/dto/pagination.dto";
-import { BookingProvider, BookingStatus, PaymentStatus, TourType } from '@prisma/client';
+import { BookingProvider, BookingStatus, PaymentMethod, PaymentStatus, TourType } from '@prisma/client';
 export declare class CreateBookingDto {
     bookingRef?: string;
     source?: string;
@@ -22,8 +22,42 @@ export declare class CreateBookingDto {
     tourType: TourType;
     tourName?: string;
     payment?: PaymentStatus;
+    paymentMethod?: PaymentMethod;
+    payLater?: boolean;
+    paymentDueAt?: string;
+    paymentNote?: string;
     isNoShow?: boolean;
     noShowReason?: string;
+}
+export declare class WebsiteQuoteDto {
+    tourId: string;
+    tourType: TourType;
+    totalPax: number;
+}
+export declare class CreateWebsiteBookingDto {
+    tourId: string;
+    tourType: TourType;
+    startingDate: string | Date;
+    departureTime?: string;
+    customerName: string;
+    hotelName: string;
+    phone: string;
+    mail: string;
+    totalPax: number;
+    paxDetail: string;
+    address: string;
+    latitude?: number;
+    longitude?: number;
+    notes?: string;
+    payLater?: boolean;
+    paymentNote?: string;
+}
+export declare class CollectBookingPaymentDto {
+    method?: PaymentMethod;
+    note?: string;
+}
+export declare class ConfirmBookingPaymentDto extends CollectBookingPaymentDto {
+    reference?: string;
 }
 export declare class UpdateBookingDto {
     status?: BookingStatus;

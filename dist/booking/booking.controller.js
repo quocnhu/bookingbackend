@@ -27,6 +27,18 @@ let BookingController = class BookingController {
     findAll(query, actor) {
         return this.bookingService.findAll(query, actor);
     }
+    quoteWebsite(dto) {
+        return this.bookingService.websiteQuote(dto);
+    }
+    createWebsite(dto, actor) {
+        return this.bookingService.createWebsite(dto, actor);
+    }
+    collectPayment(id, dto, actor) {
+        return this.bookingService.collectBookingPayment(id, dto, actor);
+    }
+    confirmPayment(id, dto, actor) {
+        return this.bookingService.confirmBookingPayment(id, dto, actor);
+    }
     nextRef(tourType) {
         const type = tourType === 'PRIVATE_TOUR'
             ? client_1.TourType.PRIVATE_TOUR
@@ -61,6 +73,39 @@ __decorate([
     __metadata("design:paramtypes", [booking_dto_1.QueryBookingDto, Object]),
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Post)('website/quote'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [booking_dto_1.WebsiteQuoteDto]),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "quoteWebsite", null);
+__decorate([
+    (0, common_1.Post)('website'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [booking_dto_1.CreateWebsiteBookingDto, Object]),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "createWebsite", null);
+__decorate([
+    (0, common_1.Post)(':id/payment/collect'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, booking_dto_1.CollectBookingPaymentDto, Object]),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "collectPayment", null);
+__decorate([
+    (0, common_1.Post)(':id/payment/confirm'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, booking_dto_1.ConfirmBookingPaymentDto, Object]),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "confirmPayment", null);
 __decorate([
     (0, common_1.Get)('next-ref'),
     (0, permissions_decorator_1.Permissions)('booking.create'),

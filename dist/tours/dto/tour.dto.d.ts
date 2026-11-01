@@ -9,6 +9,8 @@ export declare class CreateTourDto {
     durationDays?: number;
     durationValue?: number;
     durationUnit?: DurationUnit;
+    freeCancellationValue?: number;
+    freeCancellationUnit?: DurationUnit;
     freeCancellationHours?: number;
     cancellationPolicy?: string;
     adultPrice?: number;
@@ -20,6 +22,8 @@ export declare class CreateTourDto {
     promotionStartsAt?: string;
     promotionEndsAt?: string;
     typePrices?: TourTypePriceDto[];
+    categoryIds?: string[];
+    primaryCategoryId?: string;
 }
 export declare class TourTypePriceDto {
     type: TourType;
@@ -37,6 +41,8 @@ export declare class UpdateTourDto {
     durationDays?: number;
     durationValue?: number;
     durationUnit?: DurationUnit;
+    freeCancellationValue?: number;
+    freeCancellationUnit?: DurationUnit;
     freeCancellationHours?: number;
     cancellationPolicy?: string;
     departureLocation?: string;
@@ -58,6 +64,8 @@ export declare class UpdateTourDto {
     promotionStartsAt?: string;
     promotionEndsAt?: string;
     typePrices?: TourTypePriceDto[];
+    categoryIds?: string[];
+    primaryCategoryId?: string;
 }
 export declare class ItineraryItemDto {
     id?: string;
@@ -78,4 +86,5 @@ export declare class ReorderGalleryDto {
 }
 export declare class QueryTourDto extends PaginationDto {
     type?: TourType;
+    category?: string;
 }

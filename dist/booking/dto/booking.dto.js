@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BatchUpdateBookingsDto = exports.BookingPatchDto = exports.QueryBookingDto = exports.UpdateBookingDto = exports.CreateBookingDto = void 0;
+exports.BatchUpdateBookingsDto = exports.BookingPatchDto = exports.QueryBookingDto = exports.UpdateBookingDto = exports.ConfirmBookingPaymentDto = exports.CollectBookingPaymentDto = exports.CreateWebsiteBookingDto = exports.WebsiteQuoteDto = exports.CreateBookingDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
@@ -36,6 +36,10 @@ class CreateBookingDto {
     tourType;
     tourName;
     payment;
+    paymentMethod;
+    payLater;
+    paymentDueAt;
+    paymentNote;
     isNoShow;
     noShowReason;
 }
@@ -165,6 +169,27 @@ __decorate([
 ], CreateBookingDto.prototype, "payment", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.PaymentMethod),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "paymentMethod", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateBookingDto.prototype, "payLater", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "paymentDueAt", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 2000),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "paymentNote", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], CreateBookingDto.prototype, "isNoShow", void 0);
@@ -174,6 +199,168 @@ __decorate([
     (0, class_validator_1.Length)(0, 200),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "noShowReason", void 0);
+class WebsiteQuoteDto {
+    tourId;
+    tourType;
+    totalPax;
+}
+exports.WebsiteQuoteDto = WebsiteQuoteDto;
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], WebsiteQuoteDto.prototype, "tourId", void 0);
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsEnum)(client_1.TourType),
+    __metadata("design:type", String)
+], WebsiteQuoteDto.prototype, "tourType", void 0);
+__decorate([
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(12),
+    __metadata("design:type", Number)
+], WebsiteQuoteDto.prototype, "totalPax", void 0);
+class CreateWebsiteBookingDto {
+    tourId;
+    tourType;
+    startingDate;
+    departureTime;
+    customerName;
+    hotelName;
+    phone;
+    mail;
+    totalPax;
+    paxDetail;
+    address;
+    latitude;
+    longitude;
+    notes;
+    payLater;
+    paymentNote;
+}
+exports.CreateWebsiteBookingDto = CreateWebsiteBookingDto;
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "tourId", void 0);
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsEnum)(client_1.TourType),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "tourType", void 0);
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", Object)
+], CreateWebsiteBookingDto.prototype, "startingDate", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsMilitaryTime)(),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "departureTime", void 0);
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "customerName", void 0);
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "hotelName", void 0);
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Matches)(/^[+]?[\d\s\-()]{7,20}$/),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "phone", void 0);
+__decorate([
+    (0, class_validator_1.IsEmail)(),
+    (0, class_validator_1.Length)(1, 100),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "mail", void 0);
+__decorate([
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(12),
+    __metadata("design:type", Number)
+], CreateWebsiteBookingDto.prototype, "totalPax", void 0);
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 1000),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "paxDetail", void 0);
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(1, 200),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "address", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(-90),
+    (0, class_validator_1.Max)(90),
+    __metadata("design:type", Number)
+], CreateWebsiteBookingDto.prototype, "latitude", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(-180),
+    (0, class_validator_1.Max)(180),
+    __metadata("design:type", Number)
+], CreateWebsiteBookingDto.prototype, "longitude", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 1000),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "notes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateWebsiteBookingDto.prototype, "payLater", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 2000),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "paymentNote", void 0);
+class CollectBookingPaymentDto {
+    method;
+    note;
+}
+exports.CollectBookingPaymentDto = CollectBookingPaymentDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.PaymentMethod),
+    __metadata("design:type", String)
+], CollectBookingPaymentDto.prototype, "method", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 2000),
+    __metadata("design:type", String)
+], CollectBookingPaymentDto.prototype, "note", void 0);
+class ConfirmBookingPaymentDto extends CollectBookingPaymentDto {
+    reference;
+}
+exports.ConfirmBookingPaymentDto = ConfirmBookingPaymentDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 500),
+    __metadata("design:type", String)
+], ConfirmBookingPaymentDto.prototype, "reference", void 0);
 class UpdateBookingDto {
     status;
     overrideCancelWindow;

@@ -1261,6 +1261,52 @@ let AccountingService = class AccountingService {
         });
         return voided;
     }
+    async markPeriodPaid(actor, periodId, dto) {
+        this.assertAccounting(actor, 'accounting.period.export');
+        const period = await this.prisma.paymentPeriod.findUnique({
+            where: { id: periodId },
+        });
+        if (!period)
+            throw new common_1.NotFoundException('Payment period not found');
+        if (period.voidedAt) {
+            throw new common_1.ConflictException('Voided periods cannot be marked paid');
+        }
+        if (period.paidAt)
+            return period;
+        const method = dto.method ?? client_1.PaymentMethod.BANK_TRANSFER;
+        if (method === client_1.PaymentMethod.PAYPAL) {
+            throw new common_1.BadRequestException('Crew payouts use cash or bank transfer');
+        }
+        const now = new Date();
+        const paid = await this.prisma.paymentPeriod.update({
+            where: { id: periodId },
+            data: {
+                paidAt: now,
+                paidById: actor.id,
+                paidByName: actor.name ?? actor.email ?? null,
+                paymentMethod: method,
+                paymentReference: dto.reference ?? null,
+            },
+        });
+        await this.audit.log({
+            entityType: 'PaymentPeriod',
+            entityId: paid.id,
+            action: 'MARK_PAID',
+            beforeData: {
+                paidAt: period.paidAt,
+                payeeName: period.payeeName,
+                totalNet: period.totalNet.toString(),
+            },
+            afterData: {
+                paidAt: paid.paidAt,
+                method,
+                reference: dto.reference ?? null,
+                paidByName: paid.paidByName,
+            },
+            changedBy: actor.id,
+        });
+        return paid;
+    }
     async periodHistory(actor, personId) {
         this.assertAccounting(actor);
         const periods = await this.prisma.paymentPeriod.findMany({

@@ -1,4 +1,5 @@
 import type { TourType } from '@prisma/client';
+import { TOUR_PRICE_OVERRIDES } from './tour-price-overrides';
 
 export type TourDetailSeed = {
   adultPrice: number;
@@ -153,7 +154,7 @@ const buildDetail = (type: TourType, input: DetailInput): TourDetailSeed => {
   };
 };
 
-export const TOUR_DETAILS: Record<string, TourDetailSeed> = {
+const BASE_TOUR_DETAILS: Record<string, TourDetailSeed> = {
   'TOUR-0001': buildDetail('GROUP_TOUR', {
     groupAdult: 890000,
     privateAdult: 2450000,
@@ -1231,5 +1232,33 @@ export const TOUR_DETAILS: Record<string, TourDetailSeed> = {
     ],
   }),
 };
+
+const withPriceOverride = (
+  code: string,
+  detail: TourDetailSeed,
+): TourDetailSeed => {
+  const override = TOUR_PRICE_OVERRIDES[code];
+  if (!override) return detail;
+
+  return {
+    ...detail,
+    adultPrice: override.priceFromVnd,
+    childPrice: 0,
+    infantPrice: 0,
+    typePrices: detail.typePrices.map((price) => ({
+      ...price,
+      adultPrice: price.type === 'GROUP_TOUR' ? override.priceFromVnd : 0,
+      childPrice: 0,
+      infantPrice: 0,
+    })),
+  };
+};
+
+export const TOUR_DETAILS: Record<string, TourDetailSeed> = Object.fromEntries(
+  Object.entries(BASE_TOUR_DETAILS).map(([code, detail]) => [
+    code,
+    withPriceOverride(code, detail),
+  ]),
+);
 
 export default TOUR_DETAILS;

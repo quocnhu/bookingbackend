@@ -1,3 +1,4 @@
+import { PaymentMethod } from '@prisma/client';
 declare const PAYABLE_ROLES: readonly ["TOUR_GUIDE", "DRIVER"];
 declare const PAYEE_TYPES: readonly ["TRANSPORT_PROVIDER", "COMPANY_GUIDE", "COMPANY_DRIVER", "FREELANCE"];
 export declare class PayeeTypeDto {
@@ -52,5 +53,9 @@ export declare class LimitQueryDto {
 }
 export declare class VoidPeriodDto {
     reason: string;
+}
+export declare class MarkPeriodPaidDto {
+    method?: PaymentMethod;
+    reference?: string;
 }
 export {};

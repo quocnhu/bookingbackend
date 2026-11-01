@@ -23,6 +23,8 @@ class CreateTourDto {
     durationDays;
     durationValue;
     durationUnit;
+    freeCancellationValue;
+    freeCancellationUnit;
     freeCancellationHours;
     cancellationPolicy;
     adultPrice;
@@ -34,6 +36,8 @@ class CreateTourDto {
     promotionStartsAt;
     promotionEndsAt;
     typePrices;
+    categoryIds;
+    primaryCategoryId;
 }
 exports.CreateTourDto = CreateTourDto;
 __decorate([
@@ -80,6 +84,18 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.DurationUnit),
     __metadata("design:type", String)
 ], CreateTourDto.prototype, "durationUnit", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], CreateTourDto.prototype, "freeCancellationValue", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.DurationUnit),
+    __metadata("design:type", String)
+], CreateTourDto.prototype, "freeCancellationUnit", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
@@ -148,6 +164,17 @@ __decorate([
     (0, class_transformer_1.Type)(() => TourTypePriceDto),
     __metadata("design:type", Array)
 ], CreateTourDto.prototype, "typePrices", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], CreateTourDto.prototype, "categoryIds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateTourDto.prototype, "primaryCategoryId", void 0);
 class TourTypePriceDto {
     type;
     adultPrice;
@@ -192,6 +219,8 @@ class UpdateTourDto {
     durationDays;
     durationValue;
     durationUnit;
+    freeCancellationValue;
+    freeCancellationUnit;
     freeCancellationHours;
     cancellationPolicy;
     departureLocation;
@@ -213,6 +242,8 @@ class UpdateTourDto {
     promotionStartsAt;
     promotionEndsAt;
     typePrices;
+    categoryIds;
+    primaryCategoryId;
 }
 exports.UpdateTourDto = UpdateTourDto;
 __decorate([
@@ -261,6 +292,18 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.DurationUnit),
     __metadata("design:type", String)
 ], UpdateTourDto.prototype, "durationUnit", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], UpdateTourDto.prototype, "freeCancellationValue", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.DurationUnit),
+    __metadata("design:type", String)
+], UpdateTourDto.prototype, "freeCancellationUnit", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
@@ -379,6 +422,17 @@ __decorate([
     (0, class_transformer_1.Type)(() => TourTypePriceDto),
     __metadata("design:type", Array)
 ], UpdateTourDto.prototype, "typePrices", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], UpdateTourDto.prototype, "categoryIds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateTourDto.prototype, "primaryCategoryId", void 0);
 class ItineraryItemDto {
     id;
     dayNumber;
@@ -456,6 +510,7 @@ __decorate([
 ], ReorderGalleryDto.prototype, "files", void 0);
 class QueryTourDto extends pagination_dto_1.PaginationDto {
     type;
+    category;
 }
 exports.QueryTourDto = QueryTourDto;
 __decorate([
@@ -463,4 +518,9 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.TourType),
     __metadata("design:type", String)
 ], QueryTourDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], QueryTourDto.prototype, "category", void 0);
 //# sourceMappingURL=tour.dto.js.map

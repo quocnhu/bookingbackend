@@ -5,7 +5,7 @@ import {
   Inject,
   NotFoundException,
 } from '@nestjs/common';
-import { DurationUnit } from '@prisma/client';
+import { DurationUnit, Prisma, TourType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { STORAGE } from '@/storage';
@@ -19,7 +19,12 @@ import {
 } from './dto/tour.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
 import sharp from 'sharp';
-import { validateFile, sanitizeFileName, ALLOWED_IMAGE_TYPES, MAX_FILE_SIZE } from '@/common/utils/file-validation.util';
+import {
+  validateFile,
+  sanitizeFileName,
+  ALLOWED_IMAGE_TYPES,
+  MAX_FILE_SIZE,
+} from '@/common/utils/file-validation.util';
 import { uniqueTourSlug } from './slug.util';
 
 @Injectable()
@@ -31,15 +36,23 @@ export class ToursService {
   ) {}
 
   async findAll(query: QueryTourDto): Promise<PaginatedResult<any>> {
-    const { page, limit, type } = query;
-    const where: any = {};
+    const { page, limit, type, category } = query;
+    const where: Prisma.TourWhereInput = {};
     if (type) {
       where.type = type;
+    }
+    if (category) {
+      where.categories = {
+        some: { category: { slug: category, isActive: true } },
+      };
     }
     const [items, total] = await Promise.all([
       this.prisma.tour.findMany({
         where,
-        include: { typePrices: true },
+        include: {
+          typePrices: true,
+          categories: { include: { category: true } },
+        },
         orderBy: { name: 'asc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -55,6 +68,7 @@ export class ToursService {
       include: {
         itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
         typePrices: true,
+        categories: { include: { category: true } },
         prices: { include: { provider: true } },
       },
     });
@@ -74,6 +88,7 @@ export class ToursService {
       include: {
         itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
         typePrices: true,
+        categories: { include: { category: true } },
         prices: { include: { provider: true } },
       },
     });
@@ -97,20 +112,26 @@ export class ToursService {
     } else {
       code = await this.generateTourCode(dto.name, dto.durationDays ?? 1);
     }
-    const { typePrices, ...rest } = dto;
+    const { typePrices, categoryIds, primaryCategoryId, ...rest } = dto;
+    const offeredTypePrices = this.filterOfferedTypePrices(typePrices);
+    const categoryLinks = await this.resolveCategoryLinks(
+      categoryIds,
+      primaryCategoryId,
+    );
     const durationDays = this.resolveDurationDays(dto);
     const tour = await this.prisma.tour.create({
       data: {
         ...rest,
+        ...this.resolveFreeCancellation(dto),
         durationDays: durationDays ?? dto.durationDays,
         departureTimes: this.normalizeDepartureTimes(dto.departureTimes),
         code,
         // The public URL of the tour page — keyword-rich and stable.
         slug: await this.nextSlug(dto.name),
         typePrices:
-          typePrices && typePrices.length > 0
+          offeredTypePrices.length > 0
             ? {
-                create: typePrices.map((tp) => ({
+                create: offeredTypePrices.map((tp) => ({
                   type: tp.type,
                   adultPrice: tp.adultPrice ?? 0,
                   childPrice: tp.childPrice ?? 0,
@@ -118,6 +139,10 @@ export class ToursService {
                   currency: tp.currency ?? dto.currency ?? 'USD',
                 })),
               }
+            : undefined,
+        categories:
+          categoryLinks && categoryLinks.length > 0
+            ? { create: categoryLinks }
             : undefined,
       },
     });
@@ -147,11 +172,11 @@ export class ToursService {
     return code;
   }
 
-  private normalizeDepartureTimes(
-    times?: string[],
-  ): string[] | undefined {
+  private normalizeDepartureTimes(times?: string[]): string[] | undefined {
     if (times === undefined) return undefined;
-    return Array.from(new Set(times.map((t) => t.trim()).filter(Boolean))).sort();
+    return Array.from(
+      new Set(times.map((t) => t.trim()).filter(Boolean)),
+    ).sort();
   }
 
   private resolveDurationDays(dto: {
@@ -168,6 +193,83 @@ export class ToursService {
     return undefined;
   }
 
+  private filterOfferedTypePrices(
+    typePrices?: {
+      type: TourType;
+      adultPrice?: number;
+      childPrice?: number;
+      infantPrice?: number;
+      currency?: string;
+    }[],
+  ) {
+    return (typePrices ?? []).filter((price) =>
+      [price.adultPrice, price.childPrice, price.infantPrice].some(
+        (value) => Number(value ?? 0) > 0,
+      ),
+    );
+  }
+
+  private async resolveCategoryLinks(
+    categoryIds?: string[],
+    primaryCategoryId?: string,
+  ) {
+    if (categoryIds === undefined) return undefined;
+    const unique = Array.from(
+      new Set(categoryIds.map((id) => id.trim()).filter(Boolean)),
+    );
+    if (unique.length === 0) return [];
+
+    const found = await this.prisma.tourCategory.findMany({
+      where: { id: { in: unique } },
+      select: { id: true },
+    });
+    if (found.length !== unique.length) {
+      throw new BadRequestException(
+        'One or more selected categories do not exist',
+      );
+    }
+
+    const primary =
+      primaryCategoryId && unique.includes(primaryCategoryId)
+        ? primaryCategoryId
+        : unique[0];
+    return unique.map((categoryId) => ({
+      categoryId,
+      isPrimary: categoryId === primary,
+    }));
+  }
+
+  private resolveFreeCancellation(dto: {
+    freeCancellationValue?: number;
+    freeCancellationUnit?: DurationUnit;
+    freeCancellationHours?: number;
+  }): {
+    freeCancellationValue?: number;
+    freeCancellationUnit?: DurationUnit;
+    freeCancellationHours?: number;
+  } {
+    if (dto.freeCancellationValue != null && dto.freeCancellationUnit) {
+      return {
+        freeCancellationValue: dto.freeCancellationValue,
+        freeCancellationUnit: dto.freeCancellationUnit,
+        freeCancellationHours:
+          dto.freeCancellationUnit === 'DAY'
+            ? dto.freeCancellationValue * 24
+            : dto.freeCancellationValue,
+      };
+    }
+    if (dto.freeCancellationHours != null) {
+      const hours = dto.freeCancellationHours;
+      const useDays = hours > 0 && hours % 24 === 0;
+      return {
+        freeCancellationValue: useDays ? hours / 24 : hours,
+        freeCancellationUnit: useDays ? 'DAY' : 'HOUR',
+        freeCancellationHours: hours,
+      };
+    }
+    return {};
+  }
+
   async update(id: string, dto: UpdateTourDto) {
     const before = await this.findOne(id);
     if (dto.code && dto.code !== before.code) {
@@ -176,42 +278,76 @@ export class ToursService {
       });
       if (dup) throw new ConflictException('Tour code already exists');
     }
-    const { typePrices, ...rest } = dto;
+    const { typePrices, categoryIds, primaryCategoryId, ...rest } = dto;
+    const offeredTypePrices =
+      typePrices === undefined
+        ? undefined
+        : this.filterOfferedTypePrices(typePrices);
+    const categoryLinks =
+      categoryIds === undefined
+        ? undefined
+        : await this.resolveCategoryLinks(categoryIds, primaryCategoryId);
     const durationDays = this.resolveDurationDays(dto);
     await this.prisma.$transaction([
       this.prisma.tour.update({
         where: { id },
         data: {
           ...rest,
+          ...this.resolveFreeCancellation(dto),
           durationDays: durationDays ?? dto.durationDays,
           departureTimes: this.normalizeDepartureTimes(dto.departureTimes),
           // The slug stays stable across a rename — the indexed links keep
           // working. It is only filled in when it is still missing.
           slug:
-            before.slug ??
-            (await this.nextSlug(dto.name ?? before.name, id)),
+            before.slug ?? (await this.nextSlug(dto.name ?? before.name, id)),
         },
       }),
-      ...(typePrices && typePrices.length > 0
-        ? typePrices.map((tp) =>
-            this.prisma.tourTypePrice.upsert({
-              where: { tourId_type: { tourId: id, type: tp.type } },
-              update: {
-                adultPrice: tp.adultPrice ?? 0,
-                childPrice: tp.childPrice ?? 0,
-                infantPrice: tp.infantPrice ?? 0,
-                currency: tp.currency ?? dto.currency ?? 'USD',
-              },
-              create: {
+      ...(offeredTypePrices !== undefined
+        ? [
+            this.prisma.tourTypePrice.deleteMany({
+              where: {
                 tourId: id,
-                type: tp.type,
-                adultPrice: tp.adultPrice ?? 0,
-                childPrice: tp.childPrice ?? 0,
-                infantPrice: tp.infantPrice ?? 0,
-                currency: tp.currency ?? dto.currency ?? 'USD',
+                type: {
+                  notIn: offeredTypePrices.map((tp) => tp.type),
+                },
               },
             }),
-          )
+            ...offeredTypePrices.map((tp) =>
+              this.prisma.tourTypePrice.upsert({
+                where: { tourId_type: { tourId: id, type: tp.type } },
+                update: {
+                  adultPrice: tp.adultPrice ?? 0,
+                  childPrice: tp.childPrice ?? 0,
+                  infantPrice: tp.infantPrice ?? 0,
+                  currency: tp.currency ?? dto.currency ?? 'USD',
+                },
+                create: {
+                  tourId: id,
+                  type: tp.type,
+                  adultPrice: tp.adultPrice ?? 0,
+                  childPrice: tp.childPrice ?? 0,
+                  infantPrice: tp.infantPrice ?? 0,
+                  currency: tp.currency ?? dto.currency ?? 'USD',
+                },
+              }),
+            ),
+          ]
+        : []),
+      ...(categoryLinks !== undefined
+        ? [
+            this.prisma.tourCategoryLink.deleteMany({ where: { tourId: id } }),
+            ...(categoryLinks.length > 0
+              ? [
+                  this.prisma.tourCategoryLink.createMany({
+                    data: categoryLinks.map((link) => ({
+                      ...link,
+                      tourId: id,
+                    })),
+                    skipDuplicates: true,
+                  }),
+                ]
+              : []),
+          ]
         : []),
     ]);
     const tour = await this.findOne(id);
@@ -329,7 +465,10 @@ export class ToursService {
     const folder = this.galleryPrefix(tourId);
     const existing = await this.storage.list(folder);
     const padded = String(existing.length).padStart(3, '0');
-    const baseName = sanitizeFileName(file.originalname || 'photo').replace(/\.[^.]+$/, '');
+    const baseName = sanitizeFileName(file.originalname || 'photo').replace(
+      /\.[^.]+$/,
+      '',
+    );
     const storageKey = `${folder}/${padded}-${Date.now()}-${baseName}.webp`;
     await this.storage.save(storageKey, buffer, { contentType: 'image/webp' });
 

@@ -15,6 +15,7 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ToursModule } from './tours/tours.module';
+import { TourCategoriesModule } from './tour-categories/tour-categories.module';
 import { BookingModule } from './booking/booking.module';
 import { AssignmentsModule } from './assignments/assignments.module';
 import { CompanyProfileModule } from './company-profile/company-profile.module';
@@ -32,6 +33,7 @@ import { CoordinatesModule } from './coordinates/coordinates.module';
 import { RoutePricesModule } from './route-prices/route-prices.module';
 import { TransportationProvidersModule } from './transportation-providers/transportation-providers.module';
 import { AccountingModule } from './accounting/accounting.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -48,6 +50,7 @@ import { AccountingModule } from './accounting/accounting.module';
     RolesModule,
     PermissionsModule,
     ToursModule,
+    TourCategoriesModule,
     BookingModule,
     AssignmentsModule,
     CompanyProfileModule,
@@ -64,6 +67,7 @@ import { AccountingModule } from './accounting/accounting.module';
     RoutePricesModule,
     TransportationProvidersModule,
     AccountingModule,
+    PaymentModule,
     ServeStaticModule.forRoot({
       rootPath: uploadRootPath(),
       serveRoot: '/uploads',

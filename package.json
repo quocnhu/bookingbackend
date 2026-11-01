@@ -22,6 +22,7 @@
     "seed:users": "tsx prisma/seed-users.ts",
     "seed:current": "tsx prisma/seed-current.ts",
     "seed:tour-details": "tsx prisma/seed-tour-details.ts",
+    "seed:tour-categories": "tsx prisma/seed-tour-categories.ts",
     "seed:tour-images": "tsx prisma/seed-tour-images.ts",
     "reset:feed": "tsx prisma/reset-feed.ts",
     "prisma:migrate": "prisma migrate dev",

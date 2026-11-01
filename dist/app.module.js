@@ -24,6 +24,7 @@ const users_module_1 = require("./users/users.module");
 const roles_module_1 = require("./roles/roles.module");
 const permissions_module_1 = require("./permissions/permissions.module");
 const tours_module_1 = require("./tours/tours.module");
+const tour_categories_module_1 = require("./tour-categories/tour-categories.module");
 const booking_module_1 = require("./booking/booking.module");
 const assignments_module_1 = require("./assignments/assignments.module");
 const company_profile_module_1 = require("./company-profile/company-profile.module");
@@ -41,6 +42,7 @@ const coordinates_module_1 = require("./coordinates/coordinates.module");
 const route_prices_module_1 = require("./route-prices/route-prices.module");
 const transportation_providers_module_1 = require("./transportation-providers/transportation-providers.module");
 const accounting_module_1 = require("./accounting/accounting.module");
+const payment_module_1 = require("./payment/payment.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -60,6 +62,7 @@ exports.AppModule = AppModule = __decorate([
             roles_module_1.RolesModule,
             permissions_module_1.PermissionsModule,
             tours_module_1.ToursModule,
+            tour_categories_module_1.TourCategoriesModule,
             booking_module_1.BookingModule,
             assignments_module_1.AssignmentsModule,
             company_profile_module_1.CompanyProfileModule,
@@ -76,6 +79,7 @@ exports.AppModule = AppModule = __decorate([
             route_prices_module_1.RoutePricesModule,
             transportation_providers_module_1.TransportationProvidersModule,
             accounting_module_1.AccountingModule,
+            payment_module_1.PaymentModule,
             serve_static_1.ServeStaticModule.forRoot({
                 rootPath: (0, storage_1.uploadRootPath)(),
                 serveRoot: '/uploads',
