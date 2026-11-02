@@ -11,9 +11,11 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import {
   AssignBookingsDto,
+  ConfirmPartnerHandoffDto,
   CreateAssignmentDto,
   FinalizeAssignmentDto,
   QueryAssignmentDto,
+  ReturnPartnerHandoffDto,
   SubmitTourReportDto,
   UpdateAssignmentDto,
   UpdateAssignmentStatusDto,
@@ -21,15 +23,20 @@ import {
 } from './dto/assignment.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
 import {
+  AssignmentExecutionMode,
   AssignmentOrigin,
   AssignmentStatus,
   BookingStatus,
   FeeFlowType,
   GuideType,
   LeaveStatus,
+  MoneyPayeeType,
   NotificationType,
+  PartnerHandoffStatus,
+  PartnerMoneyFlow,
   Prisma,
   RoleType,
+  TourReportSource,
 } from '@prisma/client';
 import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 import { AssignmentBoardService } from '@/queues/assignment-board.service';
@@ -81,6 +88,16 @@ export class AssignmentsService {
     driver: { select: { id: true, name: true, email: true } },
     guide: { select: { id: true, name: true, email: true } },
     reportVerifier: { select: { id: true, name: true, email: true } },
+    partner: {
+      select: {
+        id: true,
+        name: true,
+        contactName: true,
+        phone: true,
+        email: true,
+        isActive: true,
+      },
+    },
     tourReport: true,
     // Accounting Watermark: the export periods that already contain this trip.
     // Only non-voided periods count as Paid — a voided period re-opens the
@@ -391,6 +408,8 @@ export class AssignmentsService {
         id: true,
         guideId: true,
         driverId: true,
+        executionMode: true,
+        partnerStatus: true,
         startDate: true,
         endDate: true,
       },
@@ -398,9 +417,15 @@ export class AssignmentsService {
     if (items.length === 0)
       return { dispatched: 0, skipped: 0, skippedOnLeave: 0 };
 
-    // Buses without crew cannot depart — they would get stuck at Accounting
-    // verification (the guide is the money payee).
-    const withCrew = items.filter((a) => a.guideId && a.driverId);
+    // Outsourced trips run by the partner and never depart through our board.
+    // Driver-only trips need a driver, company-guided trips need guide + driver.
+    const withCrew = items.filter((a) => {
+      if (this.isOutsourced(a)) return false;
+      if (a.executionMode === AssignmentExecutionMode.COMPANY_DRIVER_ONLY) {
+        return !!a.driverId;
+      }
+      return !!a.guideId && !!a.driverId;
+    });
     const skipped = items.length - withCrew.length;
 
     // Crew on leave on the trip dates cannot depart either.
@@ -750,7 +775,53 @@ export class AssignmentsService {
     );
   }
 
+  private isOutsourced(assignment: any) {
+    return (
+      assignment?.executionMode === AssignmentExecutionMode.OUTSOURCED_PARTNER ||
+      assignment?.partnerStatus === PartnerHandoffStatus.HANDED_OFF
+    );
+  }
+
+  private resolveReportPayee(assignment: any): {
+    payeeType: MoneyPayeeType;
+    userId: string | null;
+    partnerId: string | null;
+  } {
+    if (this.isOutsourced(assignment)) {
+      return {
+        payeeType: MoneyPayeeType.PARTNER,
+        userId: null,
+        partnerId: assignment.partnerId ?? null,
+      };
+    }
+    if (assignment.executionMode === AssignmentExecutionMode.COMPANY_DRIVER_ONLY) {
+      return {
+        payeeType: MoneyPayeeType.DRIVER,
+        userId: assignment.driverId ?? null,
+        partnerId: null,
+      };
+    }
+    return {
+      payeeType: MoneyPayeeType.GUIDE,
+      userId: assignment.guideId ?? null,
+      partnerId: null,
+    };
+  }
+
+  private assertPartnerLocked(assignment: any) {
+    if (assignment.partnerStatus === PartnerHandoffStatus.HANDED_OFF) {
+      throw new ConflictException(
+        `"${assignment.code ?? 'Trip'}" is already handed off to a partner. Return it before changing crew or dates.`,
+      );
+    }
+  }
+
   async create(dto: CreateAssignmentDto, actor?: AuthenticatedUser) {
+    if (dto.executionMode === AssignmentExecutionMode.OUTSOURCED_PARTNER) {
+      throw new BadRequestException(
+        'Use the partner handoff action to send a trip to a partner agency.',
+      );
+    }
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
     await this.assertCrewAvailableForDates(
@@ -773,6 +844,8 @@ export class AssignmentsService {
         providerId: dto.providerId,
         driverId: dto.driverId,
         guideId: dto.guideId,
+        executionMode:
+          dto.executionMode ?? AssignmentExecutionMode.COMPANY_GUIDED,
         status: dto.status,
         sequenceIndex: dto.sequenceIndex,
         priceOverride: await this.resolvePriceOverride(dto),
@@ -796,6 +869,12 @@ export class AssignmentsService {
   ) {
     const before = await this.findOne(id);
     this.assertDetailsUnlocked(before, actor);
+    this.assertPartnerLocked(before);
+    if (dto.executionMode === AssignmentExecutionMode.OUTSOURCED_PARTNER) {
+      throw new BadRequestException(
+        'Use the partner handoff action to send a trip to a partner agency.',
+      );
+    }
 
     const startDate = dto.startDate
       ? new Date(dto.startDate)
@@ -827,6 +906,7 @@ export class AssignmentsService {
         providerId: dto.providerId,
         driverId: dto.driverId,
         guideId: dto.guideId,
+        executionMode: dto.executionMode,
         status: dto.status,
         sequenceIndex: dto.sequenceIndex,
         priceOverride: await this.resolvePriceOverride({
@@ -877,8 +957,18 @@ export class AssignmentsService {
   /** A bus cannot depart without crew — the guide is the money payee and the
    *  driver drives. Without them the trip gets stuck at Accounting verification. */
   private assertCrewAssigned(assignment: any) {
+    if (this.isOutsourced(assignment)) {
+      throw new BadRequestException(
+        `Cannot dispatch "${assignment.code ?? 'Bus'}" — it is handled by the partner agency.`,
+      );
+    }
     const missing: string[] = [];
-    if (!assignment.guideId) missing.push('tour guide');
+    if (
+      assignment.executionMode !== AssignmentExecutionMode.COMPANY_DRIVER_ONLY &&
+      !assignment.guideId
+    ) {
+      missing.push('tour guide');
+    }
     if (!assignment.driverId) missing.push('driver');
     if (missing.length > 0) {
       throw new BadRequestException(
@@ -1357,6 +1447,11 @@ export class AssignmentsService {
     const durationDays = first?.tour?.durationDays ?? 1;
     const totalPax = bookings.reduce((sum, b) => sum + (b.totalPax ?? 0), 0);
 
+    if (bookings.length === 0) {
+      await this.board.cleanupAssignmentIfEmpty(assignmentId);
+      return;
+    }
+
     // Auto-cancel assignment if no active bookings remain
     const activeBookings = bookings.filter(
       (b) => b.status !== BookingStatus.CANCELED,
@@ -1424,6 +1519,204 @@ export class AssignmentsService {
     return this.findOne(assignmentId);
   }
 
+  async confirmPartnerHandoff(
+    id: string,
+    dto: ConfirmPartnerHandoffDto,
+    actor: AuthenticatedUser,
+  ) {
+    if (actor.role !== RoleType.ADMIN && actor.role !== RoleType.OFFICE) {
+      throw new ForbiddenException(
+        'Only management (ADMIN/OFFICE) can hand a trip to a partner agency',
+      );
+    }
+    const assignment = await this.findOne(id);
+    if (assignment.status === AssignmentStatus.COMPLETED) {
+      throw new BadRequestException('Tour already completed');
+    }
+    if (assignment.status === AssignmentStatus.CANCELED) {
+      throw new BadRequestException('Canceled assignment cannot be outsourced');
+    }
+    if (
+      assignment.status === AssignmentStatus.DISPATCHED ||
+      assignment.status === AssignmentStatus.VERIFYING
+    ) {
+      throw new ConflictException(
+        'A dispatched or submitted trip cannot be handed to a partner. Return/reopen it first.',
+      );
+    }
+    if (assignment.tourReport?.moneyVerifiedAt) {
+      throw new ConflictException('Money is already locked for this trip');
+    }
+    const amount = Number(dto.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Partner amount must be greater than 0');
+    }
+    const partner = await this.prisma.partnerAgency.findUnique({
+      where: { id: dto.partnerId },
+    });
+    if (!partner) throw new NotFoundException('Partner agency not found');
+    if (!partner.isActive) {
+      throw new BadRequestException('Partner agency is inactive');
+    }
+
+    const now = new Date();
+    const currency = (dto.currency ?? 'VND').trim().toUpperCase() || 'VND';
+    await this.prisma.$transaction(async (tx) => {
+      await tx.assignment.update({
+        where: { id },
+        data: {
+          executionMode: AssignmentExecutionMode.OUTSOURCED_PARTNER,
+          partnerId: partner.id,
+          partnerStatus: PartnerHandoffStatus.HANDED_OFF,
+          partnerContractRef: dto.contractRef?.trim() || null,
+          partnerAmount: new Prisma.Decimal(amount),
+          partnerCurrency: currency,
+          partnerMoneyFlow: dto.moneyFlow,
+          partnerConfirmedById: actor.id,
+          partnerConfirmedByName: actor.name ?? actor.email ?? null,
+          partnerConfirmedAt: now,
+          partnerReturnedAt: null,
+          partnerReturnNote: null,
+          guideId: null,
+          driverId: null,
+          vehicleId: null,
+          providerId: null,
+          reportVerifierId: null,
+          status: AssignmentStatus.VERIFYING,
+        },
+      });
+      await tx.tourReport.upsert({
+        where: { assignmentId: id },
+        update: {
+          submittedById: actor.id,
+          submittedByName: actor.name ?? actor.email ?? null,
+          submittedAt: now,
+          notes: dto.note?.trim() || null,
+          status: 'SUBMITTED',
+          sourceType: TourReportSource.OUTSOURCED_PARTNER,
+          verifiedById: null,
+          verifiedByName: null,
+          verifiedAt: null,
+          verificationNotes: null,
+          settlementFlow: null,
+          netAmount: null,
+          moneyVerifiedById: null,
+          moneyVerifiedByName: null,
+          moneyVerifiedAt: null,
+          moneyVerificationNote: null,
+          moneyPayableToId: null,
+          moneyPayeeType: MoneyPayeeType.PARTNER,
+          moneyPartnerId: partner.id,
+          moneyRejectedAt: null,
+          moneyRejectedById: null,
+          moneyRejectedByName: null,
+          moneyRejectionReason: null,
+          finalizedById: null,
+          finalizedByName: null,
+          finalizedAt: null,
+        },
+        create: {
+          assignmentId: id,
+          submittedById: actor.id,
+          submittedByName: actor.name ?? actor.email ?? null,
+          submittedAt: now,
+          notes: dto.note?.trim() || null,
+          status: 'SUBMITTED',
+          sourceType: TourReportSource.OUTSOURCED_PARTNER,
+          moneyPayeeType: MoneyPayeeType.PARTNER,
+          moneyPartnerId: partner.id,
+        },
+      });
+    });
+
+    await this.auditService.log({
+      entityType: 'Assignment',
+      entityId: id,
+      action: 'PARTNER_HANDOFF',
+      afterData: {
+        partnerId: partner.id,
+        partnerName: partner.name,
+        amount,
+        currency,
+        moneyFlow: dto.moneyFlow,
+        contractRef: dto.contractRef ?? null,
+      } as Prisma.InputJsonValue,
+      changedBy: actor.id,
+    });
+    this.gateway.notifyAll('board:refresh', {
+      assignmentId: id,
+      action: 'partner_handoff',
+    });
+    return this.findOne(id);
+  }
+
+  async returnPartnerHandoff(
+    id: string,
+    dto: ReturnPartnerHandoffDto,
+    actor: AuthenticatedUser,
+  ) {
+    if (actor.role !== RoleType.ADMIN && actor.role !== RoleType.OFFICE) {
+      throw new ForbiddenException(
+        'Only management (ADMIN/OFFICE) can return a partner trip',
+      );
+    }
+    const reason = dto.reason?.trim();
+    if (!reason || reason.length < 5) {
+      throw new BadRequestException('A return reason is required');
+    }
+    const assignment = await this.findOne(id);
+    if (assignment.partnerStatus !== PartnerHandoffStatus.HANDED_OFF) {
+      throw new BadRequestException('This trip is not handed off to a partner');
+    }
+    if (assignment.tourReport?.moneyVerifiedAt) {
+      throw new ConflictException(
+        'Money is already locked — the partner trip cannot be returned',
+      );
+    }
+
+    const booking = await this.prisma.booking.findFirst({
+      where: { assignmentId: id },
+      select: { tour: { select: { requiresGuide: true } } },
+    });
+    const nextMode =
+      booking?.tour?.requiresGuide === false
+        ? AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+        : AssignmentExecutionMode.COMPANY_GUIDED;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tourReport.deleteMany({ where: { assignmentId: id } });
+      await tx.assignment.update({
+        where: { id },
+        data: {
+          executionMode: nextMode,
+          partnerStatus: PartnerHandoffStatus.RETURNED,
+          partnerReturnedAt: new Date(),
+          partnerReturnNote: reason,
+          status: AssignmentStatus.PENDING,
+          guideId: null,
+          driverId: null,
+        },
+      });
+    });
+
+    await this.auditService.log({
+      entityType: 'Assignment',
+      entityId: id,
+      action: 'PARTNER_RETURN',
+      afterData: {
+        reason,
+        partnerId: assignment.partnerId,
+        partnerName: assignment.partner?.name ?? null,
+      } as Prisma.InputJsonValue,
+      changedBy: actor.id,
+    });
+    this.gateway.notifyAll('board:refresh', {
+      assignmentId: id,
+      action: 'partner_return',
+    });
+    return this.findOne(id);
+  }
+
   // ─── Tour Report: guide submits the report → accounting verifies → Tour COMPLETED ──
 
   /**
@@ -1436,6 +1729,11 @@ export class AssignmentsService {
     actor: AuthenticatedUser,
   ) {
     const assignment = await this.findOne(id);
+    if (this.isOutsourced(assignment)) {
+      throw new BadRequestException(
+        'This trip is handled by a partner agency — use the partner handoff accounting flow.',
+      );
+    }
     if (assignment.status === AssignmentStatus.COMPLETED) {
       throw new BadRequestException('Tour already completed');
     }
@@ -1482,6 +1780,11 @@ export class AssignmentsService {
         tollParking: dto.tollParking,
         notes: dto.notes,
         status: 'SUBMITTED',
+        sourceType:
+          assignment.executionMode ===
+          AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+            ? TourReportSource.DRIVER_ONLY_DIRECT
+            : TourReportSource.GUIDE_REPORT,
         evidenceImages: (dto.evidenceImages ??
           (Array.isArray(latest?.evidenceImages)
             ? latest.evidenceImages
@@ -1507,13 +1810,25 @@ export class AssignmentsService {
         tollParking: dto.tollParking,
         notes: dto.notes,
         status: 'SUBMITTED',
+        sourceType:
+          assignment.executionMode ===
+          AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+            ? TourReportSource.DRIVER_ONLY_DIRECT
+            : TourReportSource.GUIDE_REPORT,
         evidenceImages: (dto.evidenceImages ?? []) as any,
       },
     });
 
     // After the guide submits → move the trip to VERIFYING to show "awaiting Admin/Accounting verification".
     // (Fake progress: the UI displays the awaiting-verification status.)
-    if (assignment.status === AssignmentStatus.DISPATCHED) {
+    if (
+      assignment.status === AssignmentStatus.DISPATCHED ||
+      (assignment.executionMode ===
+        AssignmentExecutionMode.COMPANY_DRIVER_ONLY &&
+        (assignment.status === AssignmentStatus.PENDING ||
+          assignment.status === AssignmentStatus.DRAFT_ASSIGNED ||
+          assignment.status === AssignmentStatus.TRANSFERRED))
+    ) {
       await this.prisma.assignment.update({
         where: { id },
         data: { status: AssignmentStatus.VERIFYING },
@@ -1672,10 +1987,11 @@ export class AssignmentsService {
     } else if (
       dto.status === 'VERIFIED' &&
       !report.moneyVerifiedAt &&
-      !report.moneyRejectedAt
+      !report.moneyRejectedAt &&
+      !this.isOutsourced(assignment)
     ) {
       // Money still open — try to lock it right here so one Verify finishes
-      // everything (same rules as the Accounting queue: needs entries + guide).
+      // everything (same rules as the Accounting queue: needs entries + payee).
       const lines = await this.prisma.settlement.findMany({
         where: { assignmentId: id },
         include: { category: { select: { flowType: true } } },
@@ -1689,9 +2005,8 @@ export class AssignmentsService {
         else paid += amount;
       }
       const round2 = (v: number) => Math.round(v * 100) / 100;
-      // Guide is still required (the payee), and at least one entry must
-      // exist — the UI tells the user to add entries first.
-      if (lines.length > 0 && assignment.guideId) {
+      const payee = this.resolveReportPayee(assignment);
+      if (lines.length > 0 && payee.userId) {
         const net = round2(collected - paid);
         const flow =
           collected >= paid ? FeeFlowType.COLLECT_MONEY : FeeFlowType.PAY_MONEY;
@@ -1702,7 +2017,9 @@ export class AssignmentsService {
             data: {
               settlementFlow: flow,
               netAmount: new Prisma.Decimal(net),
-              moneyPayableToId: assignment.guideId,
+              moneyPayableToId: payee.userId,
+              moneyPayeeType: payee.payeeType,
+              moneyPartnerId: null,
               moneyVerifiedById: actor.id,
               moneyVerifiedByName: actor.name ?? null,
               moneyVerifiedAt: now,
@@ -1731,12 +2048,16 @@ export class AssignmentsService {
           afterData: {
             netAmount: net,
             flow,
-            payableToId: assignment.guideId,
+            payableToId: payee.userId,
+            payeeType: payee.payeeType,
             fromBoardVerify: true,
           },
           changedBy: actor.id,
         });
-        const payeeName = assignment.guide?.name ?? assignment.guideId;
+        const payeeName =
+          assignment.guide?.name ??
+          assignment.driver?.name ??
+          payee.userId;
         if (report.submittedById) {
           const notif = await this.notificationService.create(
             report.submittedById,
@@ -1748,7 +2069,7 @@ export class AssignmentsService {
           this.gateway.notifyUser(report.submittedById, 'notification', notif);
         }
       }
-      // else: no entries or no guide yet — stays VERIFYING; add entries /
+      // else: no entries or no payee yet — stays VERIFYING; add entries /
       // assign crew first, then verify (Accounting can finish in the queue).
     }
 

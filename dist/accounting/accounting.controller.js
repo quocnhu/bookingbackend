@@ -67,6 +67,9 @@ let AccountingController = class AccountingController {
     markPeriodPaid(id, dto, actor) {
         return this.accountingService.markPeriodPaid(actor, id, dto);
     }
+    markPartnerPaymentPaid(id, dto, actor) {
+        return this.accountingService.markPartnerPaymentPaid(actor, id, dto);
+    }
     periodHistory(personId, actor) {
         return this.accountingService.periodHistory(actor, personId);
     }
@@ -197,6 +200,15 @@ __decorate([
     __metadata("design:paramtypes", [String, accounting_dto_1.MarkPeriodPaidDto, Object]),
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "markPeriodPaid", null);
+__decorate([
+    (0, common_1.Post)('partner-payments/:id/mark-paid'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, accounting_dto_1.MarkPeriodPaidDto, Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "markPartnerPaymentPaid", null);
 __decorate([
     (0, common_1.Get)('period/history'),
     __param(0, (0, common_1.Query)('personId')),

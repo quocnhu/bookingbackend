@@ -41,6 +41,36 @@ export class AssignmentBoardService {
     return { unassigned: true, assignmentId };
   }
 
+  /**
+   * Remove an auto-created/manual empty bus. A bus with no passengers must not
+   * stay on the Dispatch Board or keep a crew/vehicle reserved.
+   */
+  async cleanupAssignmentIfEmpty(assignmentId: string) {
+    const [assignment, bookings] = await Promise.all([
+      this.prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        select: { id: true, status: true, code: true },
+      }),
+      this.prisma.booking.count({ where: { assignmentId } }),
+    ]);
+    if (!assignment || bookings > 0) return false;
+    if (
+      assignment.status !== AssignmentStatus.DRAFT_ASSIGNED &&
+      assignment.status !== AssignmentStatus.PENDING &&
+      assignment.status !== AssignmentStatus.TRANSFERRED
+    ) {
+      return false;
+    }
+    await this.prisma.assignment.delete({ where: { id: assignmentId } });
+    await this.auditService.log({
+      entityType: 'Assignment',
+      entityId: assignmentId,
+      action: 'DELETE_EMPTY_ASSIGNMENT',
+      afterData: { code: assignment.code },
+    });
+    return true;
+  }
+
   /** Re-sequence the passengers on a bus (per the order the admin dragged them into). */
   async reorder(assignmentId: string, bookingIds: string[]) {
     const assignment = await this.prisma.assignment.findUnique({
@@ -177,6 +207,10 @@ export class AssignmentBoardService {
       include: { tour: { select: { durationDays: true, type: true, name: true } } },
       orderBy: { paxSequence: 'asc' },
     });
+    if (bookings.length === 0) {
+      await this.cleanupAssignmentIfEmpty(assignmentId);
+      return;
+    }
 
     for (const b of bookings) {
       if (b.latitude != null && b.longitude != null) continue;

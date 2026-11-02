@@ -500,6 +500,10 @@ let BookingService = BookingService_1 = class BookingService {
                     where: { type: tourType },
                     select: { adultPrice: true, childPrice: true, infantPrice: true },
                 },
+                privatePaxPrices: {
+                    orderBy: { pax: 'asc' },
+                    select: { pax: true, pricePerPerson: true },
+                },
             },
         });
         if (!tour)
@@ -513,10 +517,22 @@ let BookingService = BookingService_1 = class BookingService {
                     infantPrice: tour.infantPrice,
                 }
                 : null);
-        const unit = Number(source?.adultPrice ?? 0) ||
+        const privateTier = tourType === client_1.TourType.PRIVATE_TOUR && tour.privatePaxPrices.length > 0
+            ? tour.privatePaxPrices.find((tier) => tier.pax === totalPax)
+            : undefined;
+        let unit = Number(source?.adultPrice ?? 0) ||
             Number(source?.childPrice ?? 0) ||
             Number(source?.infantPrice ?? 0);
-        if (!source || unit <= 0) {
+        if (privateTier) {
+            unit = Number(privateTier.pricePerPerson ?? 0);
+        }
+        const hasPrivateTiers = tourType === client_1.TourType.PRIVATE_TOUR && tour.privatePaxPrices.length > 0;
+        if (hasPrivateTiers) {
+            if (!privateTier || unit <= 0) {
+                throw new common_1.BadRequestException(`Private price for ${totalPax} people is not configured`);
+            }
+        }
+        else if (!source || unit <= 0) {
             throw new common_1.BadRequestException('This tour type is not available');
         }
         const now = Date.now();
@@ -546,6 +562,10 @@ let BookingService = BookingService_1 = class BookingService {
             discountPercent,
             totalAmount,
             currency: tour.currency || 'VND',
+            priceTierPax: privateTier?.pax ?? null,
+            privatePaxOptions: tour.privatePaxPrices
+                .filter((tier) => Number(tier.pricePerPerson) > 0)
+                .map((tier) => tier.pax),
         };
     }
     websiteQuote(dto) {
@@ -797,11 +817,31 @@ let BookingService = BookingService_1 = class BookingService {
                 throw new common_1.BadRequestException('This booking is locked because the tour report has been submitted for verification. Only an administrator can delete it; accounting can unlock it by rejecting the report.');
             }
         }
+        const assignmentId = booking.assignmentId;
         await this.prisma.booking.delete({ where: { id } });
+        if (assignmentId) {
+            await this.board.cleanupAssignmentIfEmpty(assignmentId);
+        }
         await this.auditService.log({
             entityType: 'Booking',
             entityId: id,
             action: 'DELETE',
+            beforeData: {
+                bookingRef: booking.bookingRef,
+                payments: (booking.payments ?? []).map((payment) => ({
+                    id: payment.id,
+                    method: payment.method,
+                    payerType: payment.payerType,
+                    status: payment.status,
+                    provider: payment.provider,
+                    providerOrderId: payment.providerOrderId,
+                    providerCaptureId: payment.providerCaptureId,
+                    amount: payment.amount,
+                    currency: payment.currency,
+                    paidAt: payment.paidAt,
+                    note: payment.note,
+                })),
+            },
         });
         return { message: 'Booking deleted' };
     }

@@ -34,6 +34,7 @@ import { RoutePricesModule } from './route-prices/route-prices.module';
 import { TransportationProvidersModule } from './transportation-providers/transportation-providers.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { PaymentModule } from './payment/payment.module';
+import { PartnersModule } from './partners/partners.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { PaymentModule } from './payment/payment.module';
     TransportationProvidersModule,
     AccountingModule,
     PaymentModule,
+    PartnersModule,
     ServeStaticModule.forRoot({
       rootPath: uploadRootPath(),
       serveRoot: '/uploads',

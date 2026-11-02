@@ -40,6 +40,8 @@ export declare class RoutePricesController {
             name: string;
             code: string;
             durationDays: number | null;
+            currency: string;
+            requiresGuide: boolean;
             thumbnailUrl: string | null;
             departureTimes: string[];
             durationValue: number | null;
@@ -51,7 +53,6 @@ export declare class RoutePricesController {
             adultPrice: import("@prisma/client/runtime/library").Decimal | null;
             childPrice: import("@prisma/client/runtime/library").Decimal | null;
             infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-            currency: string;
             privateDiscountPercent: number | null;
             groupDiscountPercent: number | null;
             promotionStartsAt: Date | null;
@@ -94,6 +95,8 @@ export declare class RoutePricesController {
             name: string;
             code: string;
             durationDays: number | null;
+            currency: string;
+            requiresGuide: boolean;
             thumbnailUrl: string | null;
             departureTimes: string[];
             durationValue: number | null;
@@ -105,7 +108,6 @@ export declare class RoutePricesController {
             adultPrice: import("@prisma/client/runtime/library").Decimal | null;
             childPrice: import("@prisma/client/runtime/library").Decimal | null;
             infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-            currency: string;
             privateDiscountPercent: number | null;
             groupDiscountPercent: number | null;
             promotionStartsAt: Date | null;
@@ -148,6 +150,8 @@ export declare class RoutePricesController {
             name: string;
             code: string;
             durationDays: number | null;
+            currency: string;
+            requiresGuide: boolean;
             thumbnailUrl: string | null;
             departureTimes: string[];
             durationValue: number | null;
@@ -159,7 +163,6 @@ export declare class RoutePricesController {
             adultPrice: import("@prisma/client/runtime/library").Decimal | null;
             childPrice: import("@prisma/client/runtime/library").Decimal | null;
             infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-            currency: string;
             privateDiscountPercent: number | null;
             groupDiscountPercent: number | null;
             promotionStartsAt: Date | null;

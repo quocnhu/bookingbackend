@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -16,6 +17,23 @@ import {
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { DurationUnit, TourType } from '@prisma/client';
 
+export class PrivatePaxPriceDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  pax: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  pricePerPerson: number;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
+}
+
 export class CreateTourDto {
   @IsString()
   name: string;
@@ -26,6 +44,10 @@ export class CreateTourDto {
 
   @IsEnum(TourType)
   type: TourType;
+
+  @IsOptional()
+  @IsBoolean()
+  requiresGuide?: boolean;
 
   @IsOptional()
   @IsString()
@@ -122,6 +144,12 @@ export class CreateTourDto {
 
   @IsOptional()
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PrivatePaxPriceDto)
+  privatePaxPrices?: PrivatePaxPriceDto[];
+
+  @IsOptional()
+  @IsArray()
   @IsString({ each: true })
   categoryIds?: string[];
 
@@ -166,6 +194,10 @@ export class UpdateTourDto {
   @IsOptional()
   @IsEnum(TourType)
   type?: TourType;
+
+  @IsOptional()
+  @IsBoolean()
+  requiresGuide?: boolean;
 
   @IsOptional()
   @IsString()
@@ -299,6 +331,12 @@ export class UpdateTourDto {
   @ValidateNested({ each: true })
   @Type(() => TourTypePriceDto)
   typePrices?: TourTypePriceDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PrivatePaxPriceDto)
+  privatePaxPrices?: PrivatePaxPriceDto[];
 
   @IsOptional()
   @IsArray()

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  AssignmentExecutionMode,
   AssignmentStatus,
   GuideType,
   RoleType,
@@ -38,17 +39,22 @@ export class AutoCrewService {
         guideId: true,
         driverId: true,
         providerId: true,
+        executionMode: true,
       },
     });
     if (!assignment) return { assigned: false };
-    if (assignment.guideId && assignment.driverId)
+    if (assignment.executionMode === AssignmentExecutionMode.OUTSOURCED_PARTNER)
+      return { assigned: false };
+    const needsGuide =
+      assignment.executionMode !== AssignmentExecutionMode.COMPANY_DRIVER_ONLY;
+    if ((!needsGuide || assignment.guideId) && assignment.driverId)
       return { assigned: false };
 
     const start = this.normalizeStart(assignment.startDate);
     const end = this.normalizeEnd(assignment.endDate);
 
     const updates: { guideId?: string; driverId?: string } = {};
-    if (!assignment.guideId) {
+    if (needsGuide && !assignment.guideId) {
       const guideId = await this.pickUserId(
         RoleType.TOUR_GUIDE,
         assignment.id,

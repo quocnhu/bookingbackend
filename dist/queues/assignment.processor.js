@@ -57,9 +57,12 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             };
         if (!booking.startingDate)
             return { skipped: true, reason: 'NO_START_DATE' };
-        const candidate = await this.findCandidate(booking);
+        const executionMode = booking.tour?.requiresGuide === false
+            ? client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+            : client_1.AssignmentExecutionMode.COMPANY_GUIDED;
+        const candidate = await this.findCandidate(booking, executionMode);
         if (!candidate) {
-            const bus = await this.createBusForBooking(booking);
+            const bus = await this.createBusForBooking(booking, executionMode);
             this.logger.log(`No open bus for booking ${booking.bookingRef} — created bus ${bus.code}`);
             const result = await this.board.attach(bus.id, bookingId);
             if (!result.assigned) {
@@ -117,7 +120,7 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             this.logger.warn(`Auto-crew skipped for bus ${assignmentId}: ${error.message}`);
         }
     }
-    async createBusForBooking(booking) {
+    async createBusForBooking(booking, executionMode) {
         const bookingDateKey = toDateKey(new Date(booking.startingDate));
         const startDate = new Date(bookingDateKey + 'T00:00:00.000Z');
         const durationDays = booking.tour?.durationDays ?? 1;
@@ -139,6 +142,7 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
                 endDate,
                 status: client_1.AssignmentStatus.PENDING,
                 origin: client_1.AssignmentOrigin.AUTO_ASSIGN,
+                executionMode,
                 tourType: booking.tourType ?? null,
                 tourName: booking.tour?.name ?? booking.tourName ?? undefined,
                 durationDays,
@@ -170,7 +174,7 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             select: { id: true, providerId: true, provider: { select: { isCompany: true } } },
         });
     }
-    async findCandidate(booking) {
+    async findCandidate(booking, executionMode) {
         const bookingTourName = booking.tour?.name ?? booking.tourName;
         const bookingTourType = booking.tour?.type ?? booking.tourType;
         const bookingDateKey = toDateKey(new Date(booking.startingDate));
@@ -199,6 +203,8 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
         const typeOk = (a) => {
             const aTourName = a.tourName ?? a.bookings[0]?.tour?.name;
             const aTourType = a.tourType ?? a.bookings[0]?.tour?.type;
+            if (a.executionMode !== executionMode)
+                return false;
             if (bookingTourType && aTourType && aTourType !== bookingTourType)
                 return false;
             if (bookingTourName && aTourName && aTourName !== bookingTourName)

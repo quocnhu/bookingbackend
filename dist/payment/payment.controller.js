@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentController = void 0;
 const common_1 = require("@nestjs/common");
 const public_decorator_1 = require("../common/decorators/public.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const payment_service_1 = require("./payment.service");
 const payment_dto_1 = require("./dto/payment.dto");
@@ -23,11 +24,17 @@ let PaymentController = class PaymentController {
     constructor(payments) {
         this.payments = payments;
     }
+    bookingPayments(query) {
+        return this.payments.listBookingPayments(query);
+    }
     paypalConfig() {
         return this.payments.publicConfig();
     }
     createOrder(dto, actor) {
         return this.payments.createPayPalOrder(dto.bookingId, actor);
+    }
+    cancelOrder(dto, actor) {
+        return this.payments.cancelPayPalOrder(dto.bookingId, actor);
     }
     captureOrder(dto, actor) {
         return this.payments.capturePayPalOrder(dto.bookingId, dto.orderId, actor, dto.note);
@@ -41,6 +48,14 @@ let PaymentController = class PaymentController {
     }
 };
 exports.PaymentController = PaymentController;
+__decorate([
+    (0, common_1.Get)('bookings'),
+    (0, permissions_decorator_1.Permissions)('accounting.read'),
+    __param(0, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [payment_dto_1.QueryBookingPaymentsDto]),
+    __metadata("design:returntype", void 0)
+], PaymentController.prototype, "bookingPayments", null);
 __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Get)('paypal/config'),
@@ -56,6 +71,14 @@ __decorate([
     __metadata("design:paramtypes", [payment_dto_1.CreatePayPalOrderDto, Object]),
     __metadata("design:returntype", void 0)
 ], PaymentController.prototype, "createOrder", null);
+__decorate([
+    (0, common_1.Post)('paypal/cancel'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [payment_dto_1.CancelPayPalOrderDto, Object]),
+    __metadata("design:returntype", void 0)
+], PaymentController.prototype, "cancelOrder", null);
 __decorate([
     (0, common_1.Post)('paypal/capture'),
     __param(0, (0, common_1.Body)()),

@@ -9,9 +9,11 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RecordOtaRemittanceDto = exports.CapturePayPalOrderDto = exports.CreatePayPalOrderDto = void 0;
+exports.QueryBookingPaymentsDto = exports.RecordOtaRemittanceDto = exports.CapturePayPalOrderDto = exports.CancelPayPalOrderDto = exports.CreatePayPalOrderDto = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+const client_1 = require("@prisma/client");
+const pagination_dto_1 = require("../../common/dto/pagination.dto");
 class CreatePayPalOrderDto {
     bookingId;
 }
@@ -21,6 +23,15 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreatePayPalOrderDto.prototype, "bookingId", void 0);
+class CancelPayPalOrderDto {
+    bookingId;
+}
+exports.CancelPayPalOrderDto = CancelPayPalOrderDto;
+__decorate([
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CancelPayPalOrderDto.prototype, "bookingId", void 0);
 class CapturePayPalOrderDto {
     bookingId;
     orderId;
@@ -95,4 +106,25 @@ __decorate([
     (0, class_validator_1.Length)(0, 2000),
     __metadata("design:type", String)
 ], RecordOtaRemittanceDto.prototype, "note", void 0);
+class QueryBookingPaymentsDto extends pagination_dto_1.PaginationDto {
+    payment;
+    channel;
+    search;
+}
+exports.QueryBookingPaymentsDto = QueryBookingPaymentsDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.PaymentStatus),
+    __metadata("design:type", String)
+], QueryBookingPaymentsDto.prototype, "payment", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.BookingProvider),
+    __metadata("design:type", String)
+], QueryBookingPaymentsDto.prototype, "channel", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], QueryBookingPaymentsDto.prototype, "search", void 0);
 //# sourceMappingURL=payment.dto.js.map

@@ -17,11 +17,13 @@ import { AccountingService } from '@/accounting/accounting.service';
 import { CreateSettlementDto } from '@/accounting/dto/accounting.dto';
 import {
   AssignBookingsDto,
+  ConfirmPartnerHandoffDto,
   CreateAssignmentDto,
   FinalizeAssignmentDto,
   MoveBookingDto,
   QueryAssignmentDto,
   ReorderBookingsDto,
+  ReturnPartnerHandoffDto,
   SetBoardOriginDto,
   SubmitTourReportDto,
   UpdateAssignmentDto,
@@ -107,6 +109,26 @@ export class AssignmentsController {
       year ? +year : undefined,
       month ? +month : undefined,
     );
+  }
+
+  @Post(':id/partner-confirm')
+  @Permissions('assignment.update')
+  confirmPartner(
+    @Param('id') id: string,
+    @Body() dto: ConfirmPartnerHandoffDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.confirmPartnerHandoff(id, dto, actor);
+  }
+
+  @Post(':id/partner-return')
+  @Permissions('assignment.update')
+  returnPartner(
+    @Param('id') id: string,
+    @Body() dto: ReturnPartnerHandoffDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.returnPartnerHandoff(id, dto, actor);
   }
 
   @Get(':id')

@@ -43,6 +43,7 @@ const route_prices_module_1 = require("./route-prices/route-prices.module");
 const transportation_providers_module_1 = require("./transportation-providers/transportation-providers.module");
 const accounting_module_1 = require("./accounting/accounting.module");
 const payment_module_1 = require("./payment/payment.module");
+const partners_module_1 = require("./partners/partners.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -80,6 +81,7 @@ exports.AppModule = AppModule = __decorate([
             transportation_providers_module_1.TransportationProvidersModule,
             accounting_module_1.AccountingModule,
             payment_module_1.PaymentModule,
+            partners_module_1.PartnersModule,
             serve_static_1.ServeStaticModule.forRoot({
                 rootPath: (0, storage_1.uploadRootPath)(),
                 serveRoot: '/uploads',

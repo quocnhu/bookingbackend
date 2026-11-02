@@ -105,6 +105,7 @@ export declare class AccountingController {
         tourType: import("@prisma/client").$Enums.TourType | null;
         submittedAt: Date | null;
         reportStatus: import("@prisma/client").$Enums.TourReportStatus | null;
+        sourceType: import("@prisma/client").$Enums.TourReportSource;
         moneyVerifiedAt: Date | null;
         guide: {
             id: string;
@@ -114,11 +115,25 @@ export declare class AccountingController {
             id: string;
             name: string | null;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+        } | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
         plateNumber: string | undefined;
         suggestedPayableTo: {
-            basis: "ASSIGNMENT_GUIDE";
+            basis: "ASSIGNMENT_GUIDE" | "ASSIGNMENT_DRIVER";
+            kind: string;
             id: string;
             name: string | null;
+        } | {
+            id: string;
+            name: string;
+            basis: string;
+            kind: string;
         } | null;
         net: number;
         flow: "COLLECT_MONEY" | "PAY_MONEY";
@@ -132,10 +147,12 @@ export declare class AccountingController {
             collected: number;
             paid: number;
             net: number;
-            flow: "COLLECT_MONEY" | "PAY_MONEY";
+            flow: import("@prisma/client").FeeFlowType;
             entryCount: number;
         };
-        payableToId: string;
+        payableToId: string | null;
+        payeeType: "DRIVER" | "GUIDE" | "PARTNER";
+        partnerId: string | null;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -150,6 +167,7 @@ export declare class AccountingController {
         fuelCost: import("@prisma/client/runtime/library").Decimal | null;
         tollParking: import("@prisma/client/runtime/library").Decimal | null;
         notes: string | null;
+        sourceType: import("@prisma/client").$Enums.TourReportSource;
         verifiedById: string | null;
         verifiedByName: string | null;
         verifiedAt: Date | null;
@@ -164,6 +182,8 @@ export declare class AccountingController {
         moneyVerifiedAt: Date | null;
         moneyVerificationNote: string | null;
         moneyPayableToId: string | null;
+        moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+        moneyPartnerId: string | null;
         moneyRejectedAt: Date | null;
         moneyRejectedById: string | null;
         moneyRejectedByName: string | null;
@@ -185,6 +205,7 @@ export declare class AccountingController {
         fuelCost: import("@prisma/client/runtime/library").Decimal | null;
         tollParking: import("@prisma/client/runtime/library").Decimal | null;
         notes: string | null;
+        sourceType: import("@prisma/client").$Enums.TourReportSource;
         verifiedById: string | null;
         verifiedByName: string | null;
         verifiedAt: Date | null;
@@ -199,6 +220,8 @@ export declare class AccountingController {
         moneyVerifiedAt: Date | null;
         moneyVerificationNote: string | null;
         moneyPayableToId: string | null;
+        moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+        moneyPartnerId: string | null;
         moneyRejectedAt: Date | null;
         moneyRejectedById: string | null;
         moneyRejectedByName: string | null;
@@ -667,7 +690,30 @@ export declare class AccountingController {
         voidedByName: string | null;
         voidReason: string | null;
     }>;
-    periodHistory(personId: string | undefined, actor: AuthenticatedUser): Promise<{
+    markPartnerPaymentPaid(id: string, dto: MarkPeriodPaidDto, actor: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        tourName: string | null;
+        partnerId: string;
+        status: import("@prisma/client").$Enums.PartnerPaymentStatus;
+        assignmentId: string;
+        currency: string;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+        note: string | null;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        paidAt: Date | null;
+        moneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow;
+        tourDate: Date;
+        paidById: string | null;
+        paidByName: string | null;
+        paymentReference: string | null;
+        lockedAt: Date;
+        lockedById: string | null;
+        lockedByName: string | null;
+    }>;
+    periodHistory(personId: string | undefined, actor: AuthenticatedUser): Promise<({
+        recordType: "CREW";
         id: string;
         person: {
             id: string;
@@ -688,6 +734,10 @@ export declare class AccountingController {
         note: string | null;
         createdByName: string | null;
         createdAt: Date;
+        paidAt: Date | null;
+        paidByName: string | null;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+        paymentReference: string | null;
         lines: {
             assignmentId: string;
             code: string | null;
@@ -701,5 +751,44 @@ export declare class AccountingController {
             flow: import("@prisma/client").$Enums.FeeFlowType;
             note: string | null;
         }[];
-    }[]>;
+    } | {
+        recordType: "PARTNER";
+        id: string;
+        person: {
+            id: string;
+            name: string;
+            role: string;
+        };
+        payeeType: "PARTNER";
+        voidedAt: null;
+        voidedByName: null;
+        voidReason: null;
+        fromDate: Date;
+        toDate: Date;
+        tourCount: number;
+        personReturnsToCompany: number;
+        companyReturnsToPerson: number;
+        totalNet: number;
+        direction: string;
+        note: string | null;
+        createdByName: string | null;
+        createdAt: Date;
+        paidAt: Date | null;
+        paidByName: string | null;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+        paymentReference: string | null;
+        lines: {
+            assignmentId: string;
+            code: string | null;
+            tourName: string | null;
+            tourDate: Date;
+            plateNumber: null;
+            vehicleCapacity: null;
+            providerName: string;
+            payableToName: string;
+            netAmount: number;
+            flow: "COLLECT_MONEY" | "PAY_MONEY";
+            note: string | null;
+        }[];
+    })[]>;
 }

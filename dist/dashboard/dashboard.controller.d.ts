@@ -118,6 +118,18 @@ export declare class DashboardController {
             driverId: string | null;
             guideId: string | null;
             reportVerifierId: string | null;
+            executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+            partnerId: string | null;
+            partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+            partnerContractRef: string | null;
+            partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+            partnerCurrency: string | null;
+            partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+            partnerConfirmedById: string | null;
+            partnerConfirmedByName: string | null;
+            partnerConfirmedAt: Date | null;
+            partnerReturnedAt: Date | null;
+            partnerReturnNote: string | null;
             status: import("@prisma/client").$Enums.AssignmentStatus;
             origin: import("@prisma/client").$Enums.AssignmentOrigin;
             sequenceIndex: number;

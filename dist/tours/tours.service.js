@@ -17,6 +17,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToursService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const storage_1 = require("../storage");
@@ -48,6 +49,7 @@ let ToursService = class ToursService {
                 where,
                 include: {
                     typePrices: true,
+                    privatePaxPrices: { orderBy: { pax: 'asc' } },
                     categories: { include: { category: true } },
                 },
                 orderBy: { name: 'asc' },
@@ -64,6 +66,7 @@ let ToursService = class ToursService {
             include: {
                 itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
                 typePrices: true,
+                privatePaxPrices: { orderBy: { pax: 'asc' } },
                 categories: { include: { category: true } },
                 prices: { include: { provider: true } },
             },
@@ -78,6 +81,7 @@ let ToursService = class ToursService {
             include: {
                 itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
                 typePrices: true,
+                privatePaxPrices: { orderBy: { pax: 'asc' } },
                 categories: { include: { category: true } },
                 prices: { include: { provider: true } },
             },
@@ -105,8 +109,9 @@ let ToursService = class ToursService {
         else {
             code = await this.generateTourCode(dto.name, dto.durationDays ?? 1);
         }
-        const { typePrices, categoryIds, primaryCategoryId, ...rest } = dto;
-        const offeredTypePrices = this.filterOfferedTypePrices(typePrices);
+        const { typePrices, privatePaxPrices, categoryIds, primaryCategoryId, ...rest } = dto;
+        const normalizedPrivatePaxPrices = this.normalizePrivatePaxPrices(privatePaxPrices);
+        const offeredTypePrices = this.filterOfferedTypePrices(this.withPrivatePaxMirror(typePrices, normalizedPrivatePaxPrices));
         const categoryLinks = await this.resolveCategoryLinks(categoryIds, primaryCategoryId);
         const durationDays = this.resolveDurationDays(dto);
         const tour = await this.prisma.tour.create({
@@ -125,6 +130,15 @@ let ToursService = class ToursService {
                             childPrice: tp.childPrice ?? 0,
                             infantPrice: tp.infantPrice ?? 0,
                             currency: tp.currency ?? dto.currency ?? 'USD',
+                        })),
+                    }
+                    : undefined,
+                privatePaxPrices: normalizedPrivatePaxPrices && normalizedPrivatePaxPrices.length > 0
+                    ? {
+                        create: normalizedPrivatePaxPrices.map((price) => ({
+                            pax: price.pax,
+                            pricePerPerson: price.pricePerPerson ?? 0,
+                            currency: price.currency ?? dto.currency ?? 'VND',
                         })),
                     }
                     : undefined,
@@ -170,6 +184,36 @@ let ToursService = class ToursService {
     }
     filterOfferedTypePrices(typePrices) {
         return (typePrices ?? []).filter((price) => [price.adultPrice, price.childPrice, price.infantPrice].some((value) => Number(value ?? 0) > 0));
+    }
+    normalizePrivatePaxPrices(prices) {
+        if (prices === undefined)
+            return undefined;
+        const byPax = new Map();
+        for (const price of prices) {
+            const pax = Number(price.pax);
+            if (!Number.isInteger(pax) || pax < 1 || pax > 12)
+                continue;
+            byPax.set(pax, { ...price, pax });
+        }
+        return [...byPax.values()].sort((a, b) => a.pax - b.pax);
+    }
+    withPrivatePaxMirror(typePrices, privatePaxPrices) {
+        if (privatePaxPrices === undefined)
+            return typePrices;
+        const base = (typePrices ?? []).filter((price) => price.type !== client_1.TourType.PRIVATE_TOUR);
+        const first = privatePaxPrices.find((price) => price.pax === 1) ?? privatePaxPrices[0];
+        if (!first || Number(first.pricePerPerson) <= 0)
+            return base;
+        return [
+            ...base,
+            {
+                type: client_1.TourType.PRIVATE_TOUR,
+                adultPrice: Number(first.pricePerPerson),
+                childPrice: 0,
+                infantPrice: 0,
+                currency: first.currency,
+            },
+        ];
     }
     async resolveCategoryLinks(categoryIds, primaryCategoryId) {
         if (categoryIds === undefined)
@@ -222,10 +266,21 @@ let ToursService = class ToursService {
             if (dup)
                 throw new common_1.ConflictException('Tour code already exists');
         }
-        const { typePrices, categoryIds, primaryCategoryId, ...rest } = dto;
-        const offeredTypePrices = typePrices === undefined
+        const { typePrices, privatePaxPrices, categoryIds, primaryCategoryId, ...rest } = dto;
+        const normalizedPrivatePaxPrices = this.normalizePrivatePaxPrices(privatePaxPrices);
+        const effectiveTypePrices = typePrices === undefined && normalizedPrivatePaxPrices !== undefined
+            ? before.typePrices.map((tp) => ({
+                type: tp.type,
+                adultPrice: Number(tp.adultPrice),
+                childPrice: Number(tp.childPrice),
+                infantPrice: Number(tp.infantPrice),
+                currency: tp.currency,
+            }))
+            : typePrices;
+        const mirroredTypePrices = this.withPrivatePaxMirror(effectiveTypePrices, normalizedPrivatePaxPrices);
+        const offeredTypePrices = mirroredTypePrices === undefined
             ? undefined
-            : this.filterOfferedTypePrices(typePrices);
+            : this.filterOfferedTypePrices(mirroredTypePrices);
         const categoryLinks = categoryIds === undefined
             ? undefined
             : await this.resolveCategoryLinks(categoryIds, primaryCategoryId);
@@ -268,6 +323,25 @@ let ToursService = class ToursService {
                             currency: tp.currency ?? dto.currency ?? 'USD',
                         },
                     })),
+                ]
+                : []),
+            ...(normalizedPrivatePaxPrices !== undefined
+                ? [
+                    this.prisma.tourPrivatePaxPrice.deleteMany({
+                        where: { tourId: id },
+                    }),
+                    ...(normalizedPrivatePaxPrices.length > 0
+                        ? [
+                            this.prisma.tourPrivatePaxPrice.createMany({
+                                data: normalizedPrivatePaxPrices.map((price) => ({
+                                    tourId: id,
+                                    pax: price.pax,
+                                    pricePerPerson: price.pricePerPerson ?? 0,
+                                    currency: price.currency ?? dto.currency ?? 'VND',
+                                })),
+                            }),
+                        ]
+                        : []),
                 ]
                 : []),
             ...(categoryLinks !== undefined

@@ -13,8 +13,10 @@ import {
 } from 'class-validator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import {
+  AssignmentExecutionMode,
   AssignmentOrigin,
   AssignmentStatus,
+  PartnerMoneyFlow,
   TourReportStatus,
 } from '@prisma/client';
 
@@ -48,6 +50,10 @@ export class CreateAssignmentDto {
   @IsOptional()
   @IsString()
   guideId?: string;
+
+  @IsOptional()
+  @IsEnum(AssignmentExecutionMode)
+  executionMode?: AssignmentExecutionMode;
 
   @IsOptional()
   @IsEnum(AssignmentStatus)
@@ -99,6 +105,10 @@ export class UpdateAssignmentDto {
   guideId?: string;
 
   @IsOptional()
+  @IsEnum(AssignmentExecutionMode)
+  executionMode?: AssignmentExecutionMode;
+
+  @IsOptional()
   @IsEnum(AssignmentStatus)
   status?: AssignmentStatus;
 
@@ -125,6 +135,35 @@ export class UpdateAssignmentStatusDto {
 export class SetBoardOriginDto {
   @IsEnum(AssignmentOrigin)
   origin: AssignmentOrigin;
+}
+
+export class ConfirmPartnerHandoffDto {
+  @IsString()
+  partnerId: string;
+
+  @IsOptional()
+  @IsString()
+  contractRef?: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  amount: number;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
+
+  @IsEnum(PartnerMoneyFlow)
+  moneyFlow: PartnerMoneyFlow;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class ReturnPartnerHandoffDto {
+  @IsString()
+  reason: string;
 }
 
 export class AssignBookingsDto {

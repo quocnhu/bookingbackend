@@ -9,15 +9,40 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QueryTourDto = exports.ReorderGalleryDto = exports.UpdateItineraryDto = exports.ItineraryItemDto = exports.UpdateTourDto = exports.TourTypePriceDto = exports.CreateTourDto = void 0;
+exports.QueryTourDto = exports.ReorderGalleryDto = exports.UpdateItineraryDto = exports.ItineraryItemDto = exports.UpdateTourDto = exports.TourTypePriceDto = exports.CreateTourDto = exports.PrivatePaxPriceDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const client_1 = require("@prisma/client");
+class PrivatePaxPriceDto {
+    pax;
+    pricePerPerson;
+    currency;
+}
+exports.PrivatePaxPriceDto = PrivatePaxPriceDto;
+__decorate([
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(12),
+    __metadata("design:type", Number)
+], PrivatePaxPriceDto.prototype, "pax", void 0);
+__decorate([
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], PrivatePaxPriceDto.prototype, "pricePerPerson", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], PrivatePaxPriceDto.prototype, "currency", void 0);
 class CreateTourDto {
     name;
     code;
     type;
+    requiresGuide;
     thumbnailUrl;
     departureTimes;
     durationDays;
@@ -36,6 +61,7 @@ class CreateTourDto {
     promotionStartsAt;
     promotionEndsAt;
     typePrices;
+    privatePaxPrices;
     categoryIds;
     primaryCategoryId;
 }
@@ -53,6 +79,11 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.TourType),
     __metadata("design:type", String)
 ], CreateTourDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateTourDto.prototype, "requiresGuide", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
@@ -167,6 +198,13 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => PrivatePaxPriceDto),
+    __metadata("design:type", Array)
+], CreateTourDto.prototype, "privatePaxPrices", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
     (0, class_validator_1.IsString)({ each: true }),
     __metadata("design:type", Array)
 ], CreateTourDto.prototype, "categoryIds", void 0);
@@ -214,6 +252,7 @@ class UpdateTourDto {
     name;
     code;
     type;
+    requiresGuide;
     thumbnailUrl;
     departureTimes;
     durationDays;
@@ -242,6 +281,7 @@ class UpdateTourDto {
     promotionStartsAt;
     promotionEndsAt;
     typePrices;
+    privatePaxPrices;
     categoryIds;
     primaryCategoryId;
 }
@@ -261,6 +301,11 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.TourType),
     __metadata("design:type", String)
 ], UpdateTourDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateTourDto.prototype, "requiresGuide", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
@@ -422,6 +467,13 @@ __decorate([
     (0, class_transformer_1.Type)(() => TourTypePriceDto),
     __metadata("design:type", Array)
 ], UpdateTourDto.prototype, "typePrices", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => PrivatePaxPriceDto),
+    __metadata("design:type", Array)
+], UpdateTourDto.prototype, "privatePaxPrices", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),

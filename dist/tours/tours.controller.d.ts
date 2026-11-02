@@ -18,9 +18,18 @@ export declare class ToursController {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: import("@prisma/client/runtime/library").Decimal;
             childPrice: import("@prisma/client/runtime/library").Decimal;
             infantPrice: import("@prisma/client/runtime/library").Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: import("@prisma/client/runtime/library").Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -72,6 +81,8 @@ export declare class ToursController {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -83,7 +94,6 @@ export declare class ToursController {
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
         childPrice: import("@prisma/client/runtime/library").Decimal | null;
         infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -111,9 +121,18 @@ export declare class ToursController {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: import("@prisma/client/runtime/library").Decimal;
             childPrice: import("@prisma/client/runtime/library").Decimal;
             infantPrice: import("@prisma/client/runtime/library").Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: import("@prisma/client/runtime/library").Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -165,6 +184,8 @@ export declare class ToursController {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -176,7 +197,6 @@ export declare class ToursController {
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
         childPrice: import("@prisma/client/runtime/library").Decimal | null;
         infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -199,6 +219,8 @@ export declare class ToursController {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -210,7 +232,6 @@ export declare class ToursController {
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
         childPrice: import("@prisma/client/runtime/library").Decimal | null;
         infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -239,9 +260,18 @@ export declare class ToursController {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: import("@prisma/client/runtime/library").Decimal;
             childPrice: import("@prisma/client/runtime/library").Decimal;
             infantPrice: import("@prisma/client/runtime/library").Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: import("@prisma/client/runtime/library").Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -293,6 +323,8 @@ export declare class ToursController {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -304,7 +336,6 @@ export declare class ToursController {
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
         childPrice: import("@prisma/client/runtime/library").Decimal | null;
         infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -333,9 +364,18 @@ export declare class ToursController {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: import("@prisma/client/runtime/library").Decimal;
             childPrice: import("@prisma/client/runtime/library").Decimal;
             infantPrice: import("@prisma/client/runtime/library").Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: import("@prisma/client/runtime/library").Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -387,6 +427,8 @@ export declare class ToursController {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -398,7 +440,6 @@ export declare class ToursController {
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
         childPrice: import("@prisma/client/runtime/library").Decimal | null;
         infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -427,9 +468,18 @@ export declare class ToursController {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: import("@prisma/client/runtime/library").Decimal;
             childPrice: import("@prisma/client/runtime/library").Decimal;
             infantPrice: import("@prisma/client/runtime/library").Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: import("@prisma/client/runtime/library").Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -481,6 +531,8 @@ export declare class ToursController {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -492,7 +544,6 @@ export declare class ToursController {
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
         childPrice: import("@prisma/client/runtime/library").Decimal | null;
         infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -521,9 +572,18 @@ export declare class ToursController {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: import("@prisma/client/runtime/library").Decimal;
             childPrice: import("@prisma/client/runtime/library").Decimal;
             infantPrice: import("@prisma/client/runtime/library").Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: import("@prisma/client/runtime/library").Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -575,6 +635,8 @@ export declare class ToursController {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -586,7 +648,6 @@ export declare class ToursController {
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
         childPrice: import("@prisma/client/runtime/library").Decimal | null;
         infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -615,9 +676,18 @@ export declare class ToursController {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: import("@prisma/client/runtime/library").Decimal;
             childPrice: import("@prisma/client/runtime/library").Decimal;
             infantPrice: import("@prisma/client/runtime/library").Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: import("@prisma/client/runtime/library").Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -669,6 +739,8 @@ export declare class ToursController {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -680,7 +752,6 @@ export declare class ToursController {
         adultPrice: import("@prisma/client/runtime/library").Decimal | null;
         childPrice: import("@prisma/client/runtime/library").Decimal | null;
         infantPrice: import("@prisma/client/runtime/library").Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;

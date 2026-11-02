@@ -56,6 +56,12 @@ let AssignmentsController = class AssignmentsController {
     findMyCalendar(actor, year, month) {
         return this.assignmentsService.findMyCalendar(actor, year ? +year : undefined, month ? +month : undefined);
     }
+    confirmPartner(id, dto, actor) {
+        return this.assignmentsService.confirmPartnerHandoff(id, dto, actor);
+    }
+    returnPartner(id, dto, actor) {
+        return this.assignmentsService.returnPartnerHandoff(id, dto, actor);
+    }
     findOne(id) {
         return this.assignmentsService.findOne(id);
     }
@@ -180,6 +186,26 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "findMyCalendar", null);
+__decorate([
+    (0, common_1.Post)(':id/partner-confirm'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, assignment_dto_1.ConfirmPartnerHandoffDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "confirmPartner", null);
+__decorate([
+    (0, common_1.Post)(':id/partner-return'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, assignment_dto_1.ReturnPartnerHandoffDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "returnPartner", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('assignment.read'),

@@ -3,6 +3,7 @@ import type { TemplateParser } from './parser.interface';
 import { AirbnbParser } from './airbnb.parser';
 import { BookingComParser } from './booking-com.parser';
 import { GetYourGuideParser } from './getyourguide.parser';
+import { AirportTransferParser } from './airport-transfer.parser';
 import { AdvancedViatorParser } from './advanced-viator.parser';
 import { ViatorParser } from './viator.parser';
 import { WebsiteParser } from './website.parser';
@@ -19,6 +20,7 @@ export class ParserRegistry {
     airbnb: AirbnbParser,
     bookingCom: BookingComParser,
     getYourGuide: GetYourGuideParser,
+    airportTransfer: AirportTransferParser,
     advancedViator: AdvancedViatorParser,
     viator: ViatorParser,
     website: WebsiteParser,
@@ -27,6 +29,9 @@ export class ParserRegistry {
       airbnb,
       bookingCom,
       getYourGuide,
+      // Airport transfers are a specialised form of the message-centre
+      // conversation template (always private) — try it before advancedViator.
+      airportTransfer,
       // Before viator: the conversation mails also match the regular Viator
       // template ("Booking Ref."), but they are a different template.
       advancedViator,
@@ -56,7 +61,16 @@ export class ParserRegistry {
     tag?: string | null,
   ): TemplateParser | undefined {
     const direct = this.get(tag);
-    if (direct && direct.canParse(payload)) return direct;
+    if (direct && direct.canParse(payload)) {
+      // A body-specific template may refine a generic header tag: an airport
+      // transfer conversation mail is tagged advancedViator by its sender, but
+      // it must be parsed by the private airportTransfer template.
+      const airport = this.parsers.get('airportTransfer');
+      if (airport && airport !== direct && airport.canParse(payload)) {
+        return airport;
+      }
+      return direct;
+    }
     for (const parser of this.parsers.values()) {
       if (parser.canParse(payload)) return parser;
     }

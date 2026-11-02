@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -8,8 +9,16 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { BookingProvider, PaymentStatus } from '@prisma/client';
+import { PaginationDto } from '@/common/dto/pagination.dto';
 
 export class CreatePayPalOrderDto {
+  @IsNotEmpty()
+  @IsString()
+  bookingId: string;
+}
+
+export class CancelPayPalOrderDto {
   @IsNotEmpty()
   @IsString()
   bookingId: string;
@@ -65,4 +74,19 @@ export class RecordOtaRemittanceDto {
   @IsString()
   @Length(0, 2000)
   note?: string;
+}
+
+
+export class QueryBookingPaymentsDto extends PaginationDto {
+  @IsOptional()
+  @IsEnum(PaymentStatus)
+  payment?: PaymentStatus;
+
+  @IsOptional()
+  @IsEnum(BookingProvider)
+  channel?: BookingProvider;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

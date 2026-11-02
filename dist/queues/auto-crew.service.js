@@ -37,16 +37,20 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
                 guideId: true,
                 driverId: true,
                 providerId: true,
+                executionMode: true,
             },
         });
         if (!assignment)
             return { assigned: false };
-        if (assignment.guideId && assignment.driverId)
+        if (assignment.executionMode === client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER)
+            return { assigned: false };
+        const needsGuide = assignment.executionMode !== client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY;
+        if ((!needsGuide || assignment.guideId) && assignment.driverId)
             return { assigned: false };
         const start = this.normalizeStart(assignment.startDate);
         const end = this.normalizeEnd(assignment.endDate);
         const updates = {};
-        if (!assignment.guideId) {
+        if (needsGuide && !assignment.guideId) {
             const guideId = await this.pickUserId(client_1.RoleType.TOUR_GUIDE, assignment.id, start, end, assignment.providerId);
             if (guideId)
                 updates.guideId = guideId;

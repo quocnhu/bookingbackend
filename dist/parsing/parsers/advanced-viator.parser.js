@@ -120,7 +120,9 @@ let AdvancedViatorParser = class AdvancedViatorParser {
             leadTraveler: leadTraveler ?? null,
             phoneNumber: phone ?? null,
             travelDatePax: travelLineStr ?? null,
-            pickupPoint: pickUp.hotel || pickUp.address ? [pickUp.hotel, pickUp.address].filter(Boolean).join(', ') : (labels.get('pickup point') ?? null),
+            pickupPoint: pickUp.hotel || pickUp.address
+                ? [pickUp.hotel, pickUp.address].filter(Boolean).join(', ')
+                : (labels.get('pickup point') ?? null),
             customerMessage: customerMessage || null,
             whatsapp: this.whatsapp(customerMessage) ?? null,
             customerEmail: mail.address ?? null,
@@ -288,12 +290,13 @@ let AdvancedViatorParser = class AdvancedViatorParser {
     time(raw) {
         if (!raw)
             return undefined;
-        const m = /(\d{1,2}):(\d{2})\s*(am|pm)?/i.exec(raw);
-        if (!m)
+        const withColon = /(\d{1,2}):(\d{2})\s*(am|pm)?/i.exec(raw);
+        const bare = /\b(\d{1,2})\s*(am|pm)\b/i.exec(raw);
+        if (!withColon && !bare)
             return undefined;
-        let hour = Number(m[1]);
-        const minute = Number(m[2]);
-        const meridiem = m[3]?.toLowerCase();
+        let hour = withColon ? Number(withColon[1]) : Number(bare[1]);
+        const minute = withColon ? Number(withColon[2]) : 0;
+        const meridiem = (withColon ? withColon[3] : bare[2])?.toLowerCase();
         if (meridiem === 'pm' && hour < 12)
             hour += 12;
         if (meridiem === 'am' && hour === 12)

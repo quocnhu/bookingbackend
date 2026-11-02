@@ -73,6 +73,7 @@ type SeedTour = {
   code: string;
   name: string;
   type: TourType;
+  requiresGuide?: boolean;
   thumbnailUrl: string | null;
   slug: string | null;
   adultPrice: number;
@@ -1413,6 +1414,7 @@ const TOURS: SeedTour[] = [
     "code": "TOUR-0003",
     "name": "Private Airport Transfer Service Ho Chi Minh City",
     "type": "PRIVATE_TOUR",
+    "requiresGuide": false,
     "thumbnailUrl": null,
     "slug": null,
     "adultPrice": 0,

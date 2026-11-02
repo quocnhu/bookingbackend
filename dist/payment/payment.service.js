@@ -15,6 +15,7 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
+const schedule_1 = require("@nestjs/schedule");
 let PaymentService = PaymentService_1 = class PaymentService {
     prisma;
     audit;
@@ -58,6 +59,106 @@ let PaymentService = PaymentService_1 = class PaymentService {
             currency: this.currency,
             vndPerUsd: this.vndPerUsd,
         };
+    }
+    pendingTtlMinutes() {
+        const value = Number(process.env.PAYPAL_PENDING_TTL_MINUTES ?? 180);
+        return Number.isFinite(value) && value >= 5 ? value : 180;
+    }
+    async expireStalePayPalPaymentsJob() {
+        try {
+            await this.expireStalePayPalPayments();
+        }
+        catch (e) {
+            this.logger.warn(`PayPal pending cleanup failed: ${e.message}`);
+        }
+    }
+    async expireStalePayPalPayments() {
+        const cutoff = new Date(Date.now() - this.pendingTtlMinutes() * 60 * 1000);
+        const stale = await this.prisma.bookingPayment.findMany({
+            where: {
+                provider: 'PAYPAL',
+                status: client_1.PaymentRecordStatus.PENDING,
+                createdAt: { lt: cutoff },
+            },
+            select: { id: true, bookingId: true, providerOrderId: true },
+        });
+        if (stale.length === 0)
+            return 0;
+        await this.prisma.bookingPayment.updateMany({
+            where: { id: { in: stale.map((p) => p.id) } },
+            data: {
+                status: client_1.PaymentRecordStatus.FAILED,
+                note: `PayPal order expired after ${this.pendingTtlMinutes()} minutes without approval`,
+            },
+        });
+        await this.audit.log({
+            entityType: 'BookingPayment',
+            entityId: stale.map((p) => p.id).join(','),
+            action: 'PAYPAL_ORDERS_EXPIRED',
+            afterData: {
+                count: stale.length,
+                orders: stale.map((p) => p.providerOrderId).filter(Boolean),
+            },
+            changedBy: null,
+        });
+        return stale.length;
+    }
+    async cancelPayPalOrder(bookingId, actor) {
+        const booking = await this.bookingForCustomer(bookingId, actor);
+        const result = await this.prisma.bookingPayment.updateMany({
+            where: {
+                bookingId: booking.id,
+                provider: 'PAYPAL',
+                status: client_1.PaymentRecordStatus.PENDING,
+            },
+            data: {
+                status: client_1.PaymentRecordStatus.FAILED,
+                note: 'PayPal checkout was cancelled before payment',
+            },
+        });
+        if (result.count > 0) {
+            await this.audit.log({
+                entityType: 'BookingPayment',
+                entityId: booking.id,
+                action: 'PAYPAL_ORDER_CANCELLED',
+                afterData: { bookingRef: booking.bookingRef, count: result.count },
+                changedBy: actor.id,
+            });
+        }
+        return { cancelled: result.count };
+    }
+    async listBookingPayments(query) {
+        await this.expireStalePayPalPayments();
+        const { page, limit, payment, channel, search } = query;
+        const where = {};
+        if (payment)
+            where.payment = payment;
+        if (channel)
+            where.channel = channel;
+        const q = search?.trim();
+        if (q) {
+            where.OR = [
+                { bookingRef: { contains: q, mode: 'insensitive' } },
+                { confirmationCode: { contains: q, mode: 'insensitive' } },
+                { customerName: { contains: q, mode: 'insensitive' } },
+                { mail: { contains: q, mode: 'insensitive' } },
+            ];
+        }
+        const [items, total] = await Promise.all([
+            this.prisma.booking.findMany({
+                where,
+                include: {
+                    tour: { select: { id: true, name: true, type: true } },
+                    customerUser: { select: { id: true, name: true, email: true } },
+                    payments: { orderBy: { createdAt: 'desc' } },
+                },
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
+            this.prisma.booking.count({ where }),
+        ]);
+        return { items, total, page, limit };
     }
     assertConfigured() {
         if (!this.isConfigured()) {
@@ -164,6 +265,7 @@ let PaymentService = PaymentService_1 = class PaymentService {
     }
     async createPayPalOrder(bookingId, actor) {
         this.assertConfigured();
+        await this.expireStalePayPalPayments();
         const booking = await this.bookingForCustomer(bookingId, actor);
         const reusable = booking.payments.find((p) => p.status === client_1.PaymentRecordStatus.PENDING &&
             p.providerOrderId &&
@@ -556,6 +658,12 @@ let PaymentService = PaymentService_1 = class PaymentService {
     }
 };
 exports.PaymentService = PaymentService;
+__decorate([
+    (0, schedule_1.Interval)(30 * 60 * 1000),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], PaymentService.prototype, "expireStalePayPalPaymentsJob", null);
 exports.PaymentService = PaymentService = PaymentService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,

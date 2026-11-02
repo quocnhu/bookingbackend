@@ -1,7 +1,7 @@
 import type { BookingFields } from '../validation/booking-fields.schema';
 import type { TemplateParser } from './parser.interface';
 export declare class AdvancedViatorParser implements TemplateParser {
-    readonly templateTag = "advancedViator";
+    readonly templateTag: string;
     canParse(payload: Record<string, unknown>): boolean;
     extract(payload: Record<string, unknown>): BookingFields | null;
     private isMessageCentre;

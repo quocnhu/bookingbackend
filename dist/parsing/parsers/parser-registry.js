@@ -14,16 +14,18 @@ const common_1 = require("@nestjs/common");
 const airbnb_parser_1 = require("./airbnb.parser");
 const booking_com_parser_1 = require("./booking-com.parser");
 const getyourguide_parser_1 = require("./getyourguide.parser");
+const airport_transfer_parser_1 = require("./airport-transfer.parser");
 const advanced_viator_parser_1 = require("./advanced-viator.parser");
 const viator_parser_1 = require("./viator.parser");
 const website_parser_1 = require("./website.parser");
 let ParserRegistry = class ParserRegistry {
     parsers = new Map();
-    constructor(airbnb, bookingCom, getYourGuide, advancedViator, viator, website) {
+    constructor(airbnb, bookingCom, getYourGuide, airportTransfer, advancedViator, viator, website) {
         for (const parser of [
             airbnb,
             bookingCom,
             getYourGuide,
+            airportTransfer,
             advancedViator,
             viator,
             website,
@@ -40,8 +42,13 @@ let ParserRegistry = class ParserRegistry {
     }
     resolve(payload, tag) {
         const direct = this.get(tag);
-        if (direct && direct.canParse(payload))
+        if (direct && direct.canParse(payload)) {
+            const airport = this.parsers.get('airportTransfer');
+            if (airport && airport !== direct && airport.canParse(payload)) {
+                return airport;
+            }
             return direct;
+        }
         for (const parser of this.parsers.values()) {
             if (parser.canParse(payload))
                 return parser;
@@ -58,6 +65,7 @@ exports.ParserRegistry = ParserRegistry = __decorate([
     __metadata("design:paramtypes", [airbnb_parser_1.AirbnbParser,
         booking_com_parser_1.BookingComParser,
         getyourguide_parser_1.GetYourGuideParser,
+        airport_transfer_parser_1.AirportTransferParser,
         advanced_viator_parser_1.AdvancedViatorParser,
         viator_parser_1.ViatorParser,
         website_parser_1.WebsiteParser])

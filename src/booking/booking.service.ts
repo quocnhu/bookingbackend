@@ -744,6 +744,10 @@ startingDate: data.startingDate
           where: { type: tourType },
           select: { adultPrice: true, childPrice: true, infantPrice: true },
         },
+        privatePaxPrices: {
+          orderBy: { pax: 'asc' },
+          select: { pax: true, pricePerPerson: true },
+        },
       },
     });
     if (!tour) throw new NotFoundException('Tour not found');
@@ -758,11 +762,26 @@ startingDate: data.startingDate
             infantPrice: tour.infantPrice,
           }
         : null);
-    const unit =
+    const privateTier =
+      tourType === TourType.PRIVATE_TOUR && tour.privatePaxPrices.length > 0
+        ? tour.privatePaxPrices.find((tier) => tier.pax === totalPax)
+        : undefined;
+    let unit =
       Number(source?.adultPrice ?? 0) ||
       Number(source?.childPrice ?? 0) ||
       Number(source?.infantPrice ?? 0);
-    if (!source || unit <= 0) {
+    if (privateTier) {
+      unit = Number(privateTier.pricePerPerson ?? 0);
+    }
+    const hasPrivateTiers =
+      tourType === TourType.PRIVATE_TOUR && tour.privatePaxPrices.length > 0;
+    if (hasPrivateTiers) {
+      if (!privateTier || unit <= 0) {
+        throw new BadRequestException(
+          `Private price for ${totalPax} people is not configured`,
+        );
+      }
+    } else if (!source || unit <= 0) {
       throw new BadRequestException('This tour type is not available');
     }
 
@@ -797,6 +816,10 @@ startingDate: data.startingDate
       discountPercent,
       totalAmount,
       currency: tour.currency || 'VND',
+      priceTierPax: privateTier?.pax ?? null,
+      privatePaxOptions: tour.privatePaxPrices
+        .filter((tier) => Number(tier.pricePerPerson) > 0)
+        .map((tier) => tier.pax),
     };
   }
 
@@ -1181,11 +1204,31 @@ startingDate: data.startingDate
         );
       }
     }
+    const assignmentId = booking.assignmentId;
     await this.prisma.booking.delete({ where: { id } });
+    if (assignmentId) {
+      await this.board.cleanupAssignmentIfEmpty(assignmentId);
+    }
     await this.auditService.log({
       entityType: 'Booking',
       entityId: id,
       action: 'DELETE',
+      beforeData: {
+        bookingRef: booking.bookingRef,
+        payments: (booking.payments ?? []).map((payment) => ({
+          id: payment.id,
+          method: payment.method,
+          payerType: payment.payerType,
+          status: payment.status,
+          provider: payment.provider,
+          providerOrderId: payment.providerOrderId,
+          providerCaptureId: payment.providerCaptureId,
+          amount: payment.amount,
+          currency: payment.currency,
+          paidAt: payment.paidAt,
+          note: payment.note,
+        })),
+      } as Prisma.InputJsonValue,
     });
     return { message: 'Booking deleted' };
   }

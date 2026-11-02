@@ -1,9 +1,15 @@
 import { PaginationDto } from "../../common/dto/pagination.dto";
 import { DurationUnit, TourType } from '@prisma/client';
+export declare class PrivatePaxPriceDto {
+    pax: number;
+    pricePerPerson: number;
+    currency?: string;
+}
 export declare class CreateTourDto {
     name: string;
     code?: string;
     type: TourType;
+    requiresGuide?: boolean;
     thumbnailUrl?: string;
     departureTimes?: string[];
     durationDays?: number;
@@ -22,6 +28,7 @@ export declare class CreateTourDto {
     promotionStartsAt?: string;
     promotionEndsAt?: string;
     typePrices?: TourTypePriceDto[];
+    privatePaxPrices?: PrivatePaxPriceDto[];
     categoryIds?: string[];
     primaryCategoryId?: string;
 }
@@ -36,6 +43,7 @@ export declare class UpdateTourDto {
     name?: string;
     code?: string;
     type?: TourType;
+    requiresGuide?: boolean;
     thumbnailUrl?: string;
     departureTimes?: string[];
     durationDays?: number;
@@ -64,6 +72,7 @@ export declare class UpdateTourDto {
     promotionStartsAt?: string;
     promotionEndsAt?: string;
     typePrices?: TourTypePriceDto[];
+    privatePaxPrices?: PrivatePaxPriceDto[];
     categoryIds?: string[];
     primaryCategoryId?: string;
 }

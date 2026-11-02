@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FinalizeAssignmentDto = exports.VerifyTourReportDto = exports.EvidenceImageDto = exports.SubmitTourReportDto = exports.QueryAssignmentDto = exports.MoveBookingDto = exports.ReorderBookingsDto = exports.AssignBookingsDto = exports.SetBoardOriginDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
+exports.FinalizeAssignmentDto = exports.VerifyTourReportDto = exports.EvidenceImageDto = exports.SubmitTourReportDto = exports.QueryAssignmentDto = exports.MoveBookingDto = exports.ReorderBookingsDto = exports.AssignBookingsDto = exports.ReturnPartnerHandoffDto = exports.ConfirmPartnerHandoffDto = exports.SetBoardOriginDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
@@ -23,6 +23,7 @@ class CreateAssignmentDto {
     providerId;
     driverId;
     guideId;
+    executionMode;
     status;
     sequenceIndex;
     priceOverride;
@@ -69,6 +70,11 @@ __decorate([
 ], CreateAssignmentDto.prototype, "guideId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.AssignmentExecutionMode),
+    __metadata("design:type", String)
+], CreateAssignmentDto.prototype, "executionMode", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.AssignmentStatus),
     __metadata("design:type", String)
 ], CreateAssignmentDto.prototype, "status", void 0);
@@ -97,6 +103,7 @@ class UpdateAssignmentDto {
     providerId;
     driverId;
     guideId;
+    executionMode;
     status;
     sequenceIndex;
     priceOverride;
@@ -143,6 +150,11 @@ __decorate([
 ], UpdateAssignmentDto.prototype, "guideId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.AssignmentExecutionMode),
+    __metadata("design:type", String)
+], UpdateAssignmentDto.prototype, "executionMode", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.AssignmentStatus),
     __metadata("design:type", String)
 ], UpdateAssignmentDto.prototype, "status", void 0);
@@ -178,6 +190,51 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.AssignmentOrigin),
     __metadata("design:type", String)
 ], SetBoardOriginDto.prototype, "origin", void 0);
+class ConfirmPartnerHandoffDto {
+    partnerId;
+    contractRef;
+    amount;
+    currency;
+    moneyFlow;
+    note;
+}
+exports.ConfirmPartnerHandoffDto = ConfirmPartnerHandoffDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ConfirmPartnerHandoffDto.prototype, "partnerId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ConfirmPartnerHandoffDto.prototype, "contractRef", void 0);
+__decorate([
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], ConfirmPartnerHandoffDto.prototype, "amount", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ConfirmPartnerHandoffDto.prototype, "currency", void 0);
+__decorate([
+    (0, class_validator_1.IsEnum)(client_1.PartnerMoneyFlow),
+    __metadata("design:type", String)
+], ConfirmPartnerHandoffDto.prototype, "moneyFlow", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ConfirmPartnerHandoffDto.prototype, "note", void 0);
+class ReturnPartnerHandoffDto {
+    reason;
+}
+exports.ReturnPartnerHandoffDto = ReturnPartnerHandoffDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ReturnPartnerHandoffDto.prototype, "reason", void 0);
 class AssignBookingsDto {
     bookingIds;
 }

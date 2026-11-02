@@ -1,5 +1,5 @@
 import { PaginationDto } from "../../common/dto/pagination.dto";
-import { AssignmentOrigin, AssignmentStatus } from '@prisma/client';
+import { AssignmentExecutionMode, AssignmentOrigin, AssignmentStatus, PartnerMoneyFlow } from '@prisma/client';
 export declare class CreateAssignmentDto {
     code?: string;
     tourName?: string;
@@ -9,6 +9,7 @@ export declare class CreateAssignmentDto {
     providerId?: string;
     driverId?: string;
     guideId?: string;
+    executionMode?: AssignmentExecutionMode;
     status?: AssignmentStatus;
     sequenceIndex?: number;
     priceOverride?: number;
@@ -23,6 +24,7 @@ export declare class UpdateAssignmentDto {
     providerId?: string;
     driverId?: string;
     guideId?: string;
+    executionMode?: AssignmentExecutionMode;
     status?: AssignmentStatus;
     sequenceIndex?: number;
     priceOverride?: number;
@@ -33,6 +35,17 @@ export declare class UpdateAssignmentStatusDto {
 }
 export declare class SetBoardOriginDto {
     origin: AssignmentOrigin;
+}
+export declare class ConfirmPartnerHandoffDto {
+    partnerId: string;
+    contractRef?: string;
+    amount: number;
+    currency?: string;
+    moneyFlow: PartnerMoneyFlow;
+    note?: string;
+}
+export declare class ReturnPartnerHandoffDto {
+    reason: string;
 }
 export declare class AssignBookingsDto {
     bookingIds: string[];

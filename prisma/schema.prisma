@@ -101,6 +101,41 @@ enum FeeFlowType {
   PAY_MONEY // Company pays — the company owes the trip creator
 }
 
+enum AssignmentExecutionMode {
+  COMPANY_GUIDED
+  COMPANY_DRIVER_ONLY
+  OUTSOURCED_PARTNER
+}
+
+enum PartnerHandoffStatus {
+  DRAFT
+  HANDED_OFF
+  RETURNED
+  CLOSED
+}
+
+enum PartnerMoneyFlow {
+  PARTNER_COLLECTS_AND_REMITS
+  COMPANY_PAYS_PARTNER
+}
+
+enum TourReportSource {
+  GUIDE_REPORT
+  DRIVER_ONLY_DIRECT
+  OUTSOURCED_PARTNER
+}
+
+enum MoneyPayeeType {
+  GUIDE
+  DRIVER
+  PARTNER
+}
+
+enum PartnerPaymentStatus {
+  LOCKED
+  PAID
+}
+
 enum BookingProvider {
   TRIPADVISOR // Automatic from TripAdvisor webhook / mail
   GETYOURGUIDE // Automatic from Gmail Pub/Sub for GetYourGuide bookings
@@ -313,11 +348,12 @@ model SystemSetting {
 
 // ─── TOUR & LOGISTICS ────────────────────────────────────────────────
 model Tour {
-  id           String   @id @default(uuid())
-  code         String   @unique // e.g. TOUR-0001
-  name         String   @unique
-  type         TourType
-  thumbnailUrl String? // e.g. cover image shown on cards
+  id            String   @id @default(uuid())
+  code          String   @unique // e.g. TOUR-0001
+  name          String   @unique
+  type          TourType
+  requiresGuide Boolean  @default(true) // false = driver-only trip (e.g. airport transfer)
+  thumbnailUrl  String? // e.g. cover image shown on cards
 
   // URL slug — the public address of the tour page
   // (/tour/ha-long-bay-full-day-cruise). Keyword-rich for search engines and
@@ -355,13 +391,14 @@ model Tour {
   insurancePolicy   String?  @db.Text // Insurance policy (HTML)
   mapQuery          String? // Google Maps embed map centre query
 
-  itineraries TourItinerary[]
-  gallery     TourGallery[]
-  departures  TourDeparture[]
-  typePrices  TourTypePrice[]
-  prices      RoutePrice[]
-  bookings    Booking[]
-  categories  TourCategoryLink[]
+  itineraries      TourItinerary[]
+  gallery          TourGallery[]
+  departures       TourDeparture[]
+  typePrices       TourTypePrice[]
+  privatePaxPrices TourPrivatePaxPrice[]
+  prices           RoutePrice[]
+  bookings         Booking[]
+  categories       TourCategoryLink[]
 }
 
 model TourCategory {
@@ -404,6 +441,22 @@ model TourTypePrice {
   updatedAt   DateTime @updatedAt
 
   @@unique([tourId, type])
+  @@index([tourId])
+}
+
+// Private tour: per-person price depends on the number of people in the group.
+// Example: 1 person = 2,000,000/person; 2 people = 1,500,000/person.
+model TourPrivatePaxPrice {
+  id             String   @id @default(uuid())
+  tourId         String
+  tour           Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  pax            Int
+  pricePerPerson Decimal  @default(0)
+  currency       String   @default("VND")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([tourId, pax])
   @@index([tourId])
 }
 
@@ -656,6 +709,20 @@ model Assignment {
   reportVerifierId String?
   reportVerifier   User?   @relation("ReportVerifier", fields: [reportVerifierId], references: [id])
 
+  executionMode          AssignmentExecutionMode @default(COMPANY_GUIDED)
+  partnerId              String?
+  partner                PartnerAgency?          @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  partnerStatus          PartnerHandoffStatus?
+  partnerContractRef     String?
+  partnerAmount          Decimal?                @db.Decimal(14, 2)
+  partnerCurrency        String?                 @default("VND")
+  partnerMoneyFlow       PartnerMoneyFlow?
+  partnerConfirmedById   String?
+  partnerConfirmedByName String?
+  partnerConfirmedAt     DateTime?
+  partnerReturnedAt      DateTime?
+  partnerReturnNote      String?                 @db.Text
+
   settlements  Settlement[]
   paymentLines PaymentPeriodLine[]
 
@@ -668,8 +735,9 @@ model Assignment {
 
   tourReport TourReport?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  PartnerPayment PartnerPayment?
 
   @@index([status, sequenceIndex])
   @@index([startDate, endDate]) // Optimises availability queries filtered by date range
@@ -694,7 +762,8 @@ model TourReport {
   tollParking Decimal?
   notes       String?  @db.Text
 
-  status TourReportStatus @default(SUBMITTED)
+  status     TourReportStatus @default(SUBMITTED)
+  sourceType TourReportSource @default(GUIDE_REPORT)
 
   // Verified by Admin / manager
   verifiedById      String?
@@ -722,7 +791,10 @@ model TourReport {
   // Required: one trip has only one net amount. Without storing it, both the guide
   // and the driver would see that amount and could both export a period → paid twice.
   moneyPayableToId String?
-  moneyPayableTo   User?   @relation("MoneyPayableTo", fields: [moneyPayableToId], references: [id])
+  moneyPayableTo   User?           @relation("MoneyPayableTo", fields: [moneyPayableToId], references: [id])
+  moneyPayeeType   MoneyPayeeType?
+  moneyPartnerId   String?
+  moneyPartner     PartnerAgency?  @relation("PartnerMoneyPayee", fields: [moneyPartnerId], references: [id], onDelete: SetNull)
 
   // Accounting reviews then clicks Verify or Reject. Reject → notify the submitter
   // to check again; the trip leaves the queue until it is resubmitted.
@@ -742,6 +814,55 @@ model TourReport {
   @@index([finalizedAt])
   @@index([moneyVerifiedAt])
   @@index([moneyPayableToId])
+  @@index([sourceType])
+}
+
+model PartnerAgency {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  contactName     String?
+  phone           String?
+  email           String?
+  address         String?
+  note            String?          @db.Text
+  isActive        Boolean          @default(true)
+  assignments     Assignment[]
+  tourReports     TourReport[]     @relation("PartnerMoneyPayee")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  partnerPayments PartnerPayment[]
+
+  @@index([isActive, name])
+}
+
+// Locked outsourced-partner payout. Created by Accounting when the partner
+// money is verified; it is separate from crew PaymentPeriod rows.
+model PartnerPayment {
+  id               String               @id @default(uuid())
+  assignmentId     String               @unique
+  assignment       Assignment           @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  partnerId        String
+  partner          PartnerAgency        @relation(fields: [partnerId], references: [id])
+  amount           Decimal              @db.Decimal(14, 2)
+  currency         String               @default("VND")
+  moneyFlow        PartnerMoneyFlow
+  tourName         String?
+  tourDate         DateTime
+  note             String?              @db.Text
+  status           PartnerPaymentStatus @default(LOCKED)
+  lockedAt         DateTime             @default(now())
+  lockedById       String?
+  lockedByName     String?
+  paidAt           DateTime?
+  paidById         String?
+  paidByName       String?
+  paymentMethod    PaymentMethod?
+  paymentReference String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([partnerId, paidAt])
+  @@index([status])
 }
 
 // ─── ACCOUNTING ROOM: settlements & payment periods ───────────────────

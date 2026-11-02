@@ -8,6 +8,7 @@ import { ParserRegistry } from './parsers/parser-registry';
 import { AirbnbParser } from './parsers/airbnb.parser';
 import { BookingComParser } from './parsers/booking-com.parser';
 import { GetYourGuideParser } from './parsers/getyourguide.parser';
+import { AirportTransferParser } from './parsers/airport-transfer.parser';
 import { AdvancedViatorParser } from './parsers/advanced-viator.parser';
 import { ViatorParser } from './parsers/viator.parser';
 import { WebsiteParser } from './parsers/website.parser';
@@ -21,6 +22,7 @@ import { WebsiteParser } from './parsers/website.parser';
     AirbnbParser,
     BookingComParser,
     GetYourGuideParser,
+    AirportTransferParser,
     AdvancedViatorParser,
     ViatorParser,
     WebsiteParser,

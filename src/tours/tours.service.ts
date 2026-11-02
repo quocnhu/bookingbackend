@@ -13,6 +13,7 @@ import type { FileStorage } from '@/storage';
 import {
   CreateTourDto,
   ItineraryItemDto,
+  PrivatePaxPriceDto,
   QueryTourDto,
   UpdateItineraryDto,
   UpdateTourDto,
@@ -51,6 +52,7 @@ export class ToursService {
         where,
         include: {
           typePrices: true,
+          privatePaxPrices: { orderBy: { pax: 'asc' } },
           categories: { include: { category: true } },
         },
         orderBy: { name: 'asc' },
@@ -68,6 +70,7 @@ export class ToursService {
       include: {
         itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
         typePrices: true,
+        privatePaxPrices: { orderBy: { pax: 'asc' } },
         categories: { include: { category: true } },
         prices: { include: { provider: true } },
       },
@@ -88,6 +91,7 @@ export class ToursService {
       include: {
         itineraries: { orderBy: [{ dayNumber: 'asc' }, { orderIndex: 'asc' }] },
         typePrices: true,
+        privatePaxPrices: { orderBy: { pax: 'asc' } },
         categories: { include: { category: true } },
         prices: { include: { provider: true } },
       },
@@ -112,8 +116,18 @@ export class ToursService {
     } else {
       code = await this.generateTourCode(dto.name, dto.durationDays ?? 1);
     }
-    const { typePrices, categoryIds, primaryCategoryId, ...rest } = dto;
-    const offeredTypePrices = this.filterOfferedTypePrices(typePrices);
+    const {
+      typePrices,
+      privatePaxPrices,
+      categoryIds,
+      primaryCategoryId,
+      ...rest
+    } = dto;
+    const normalizedPrivatePaxPrices =
+      this.normalizePrivatePaxPrices(privatePaxPrices);
+    const offeredTypePrices = this.filterOfferedTypePrices(
+      this.withPrivatePaxMirror(typePrices, normalizedPrivatePaxPrices),
+    );
     const categoryLinks = await this.resolveCategoryLinks(
       categoryIds,
       primaryCategoryId,
@@ -137,6 +151,16 @@ export class ToursService {
                   childPrice: tp.childPrice ?? 0,
                   infantPrice: tp.infantPrice ?? 0,
                   currency: tp.currency ?? dto.currency ?? 'USD',
+                })),
+              }
+            : undefined,
+        privatePaxPrices:
+          normalizedPrivatePaxPrices && normalizedPrivatePaxPrices.length > 0
+            ? {
+                create: normalizedPrivatePaxPrices.map((price) => ({
+                  pax: price.pax,
+                  pricePerPerson: price.pricePerPerson ?? 0,
+                  currency: price.currency ?? dto.currency ?? 'VND',
                 })),
               }
             : undefined,
@@ -209,6 +233,48 @@ export class ToursService {
     );
   }
 
+  private normalizePrivatePaxPrices(prices?: PrivatePaxPriceDto[]) {
+    if (prices === undefined) return undefined;
+    const byPax = new Map<number, PrivatePaxPriceDto>();
+    for (const price of prices) {
+      const pax = Number(price.pax);
+      if (!Number.isInteger(pax) || pax < 1 || pax > 12) continue;
+      byPax.set(pax, { ...price, pax });
+    }
+    return [...byPax.values()].sort((a, b) => a.pax - b.pax);
+  }
+
+  private withPrivatePaxMirror(
+    typePrices:
+      | {
+          type: TourType;
+          adultPrice?: number;
+          childPrice?: number;
+          infantPrice?: number;
+          currency?: string;
+        }[]
+      | undefined,
+    privatePaxPrices: PrivatePaxPriceDto[] | undefined,
+  ) {
+    if (privatePaxPrices === undefined) return typePrices;
+    const base = (typePrices ?? []).filter(
+      (price) => price.type !== TourType.PRIVATE_TOUR,
+    );
+    const first =
+      privatePaxPrices.find((price) => price.pax === 1) ?? privatePaxPrices[0];
+    if (!first || Number(first.pricePerPerson) <= 0) return base;
+    return [
+      ...base,
+      {
+        type: TourType.PRIVATE_TOUR,
+        adultPrice: Number(first.pricePerPerson),
+        childPrice: 0,
+        infantPrice: 0,
+        currency: first.currency,
+      },
+    ];
+  }
+
   private async resolveCategoryLinks(
     categoryIds?: string[],
     primaryCategoryId?: string,
@@ -278,11 +344,33 @@ export class ToursService {
       });
       if (dup) throw new ConflictException('Tour code already exists');
     }
-    const { typePrices, categoryIds, primaryCategoryId, ...rest } = dto;
+    const {
+      typePrices,
+      privatePaxPrices,
+      categoryIds,
+      primaryCategoryId,
+      ...rest
+    } = dto;
+    const normalizedPrivatePaxPrices =
+      this.normalizePrivatePaxPrices(privatePaxPrices);
+    const effectiveTypePrices =
+      typePrices === undefined && normalizedPrivatePaxPrices !== undefined
+        ? before.typePrices.map((tp) => ({
+            type: tp.type,
+            adultPrice: Number(tp.adultPrice),
+            childPrice: Number(tp.childPrice),
+            infantPrice: Number(tp.infantPrice),
+            currency: tp.currency,
+          }))
+        : typePrices;
+    const mirroredTypePrices = this.withPrivatePaxMirror(
+      effectiveTypePrices,
+      normalizedPrivatePaxPrices,
+    );
     const offeredTypePrices =
-      typePrices === undefined
+      mirroredTypePrices === undefined
         ? undefined
-        : this.filterOfferedTypePrices(typePrices);
+        : this.filterOfferedTypePrices(mirroredTypePrices);
     const categoryLinks =
       categoryIds === undefined
         ? undefined
@@ -331,6 +419,25 @@ export class ToursService {
                 },
               }),
             ),
+          ]
+        : []),
+      ...(normalizedPrivatePaxPrices !== undefined
+        ? [
+            this.prisma.tourPrivatePaxPrice.deleteMany({
+              where: { tourId: id },
+            }),
+            ...(normalizedPrivatePaxPrices.length > 0
+              ? [
+                  this.prisma.tourPrivatePaxPrice.createMany({
+                    data: normalizedPrivatePaxPrices.map((price) => ({
+                      tourId: id,
+                      pax: price.pax,
+                      pricePerPerson: price.pricePerPerson ?? 0,
+                      currency: price.currency ?? dto.currency ?? 'VND',
+                    })),
+                  }),
+                ]
+              : []),
           ]
         : []),
       ...(categoryLinks !== undefined

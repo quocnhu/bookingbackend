@@ -14,6 +14,7 @@ export declare class AssignmentBoardService {
         assignmentId: string;
         skipped?: undefined;
     }>;
+    cleanupAssignmentIfEmpty(assignmentId: string): Promise<boolean>;
     reorder(assignmentId: string, bookingIds: string[]): Promise<{
         error: string;
         reordered?: undefined;

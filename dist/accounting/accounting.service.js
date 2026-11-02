@@ -355,9 +355,31 @@ let AccountingService = class AccountingService {
         return this.sumRows(rows);
     }
     resolveDefaultPayee(a) {
+        if (a.executionMode === client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER) {
+            return null;
+        }
+        if (a.executionMode === client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY &&
+            a.driverId) {
+            return { id: a.driverId, basis: 'ASSIGNMENT_DRIVER' };
+        }
         if (a.guideId)
             return { id: a.guideId, basis: 'ASSIGNMENT_GUIDE' };
         return null;
+    }
+    isPartnerHandoff(a) {
+        return (a.executionMode === client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER ||
+            a.partnerStatus === client_1.PartnerHandoffStatus.HANDED_OFF);
+    }
+    partnerNet(a) {
+        const amount = num(a.partnerAmount);
+        const collect = a.partnerMoneyFlow === client_1.PartnerMoneyFlow.PARTNER_COLLECTS_AND_REMITS;
+        return {
+            collected: collect ? round2(amount) : 0,
+            paid: collect ? 0 : round2(amount),
+            net: collect ? round2(amount) : round2(-amount),
+            flow: collect ? client_1.FeeFlowType.COLLECT_MONEY : client_1.FeeFlowType.PAY_MONEY,
+            entryCount: 0,
+        };
     }
     async verificationQueue(actor) {
         this.assertAccounting(actor);
@@ -389,16 +411,38 @@ let AccountingService = class AccountingService {
                 vehicle: { select: { plateNumber: true } },
                 guide: { select: { id: true, name: true } },
                 driver: { select: { id: true, name: true } },
+                partner: { select: { id: true, name: true } },
                 _count: { select: { settlements: true } },
             },
             orderBy: [{ startDate: 'asc' }, { code: 'asc' }, { id: 'asc' }],
         });
         const now = Date.now();
         const items = await Promise.all(assignments.map(async (a) => {
-            const net = await this.computeNet(a.id);
+            const partnerHandoff = this.isPartnerHandoff(a);
+            const net = partnerHandoff
+                ? this.partnerNet(a)
+                : await this.computeNet(a.id);
             const ageDays = a.tourReport?.submittedAt
                 ? Math.floor((now - +a.tourReport.submittedAt) / 86_400_000)
                 : 0;
+            const suggestedPayableTo = partnerHandoff
+                ? a.partner
+                    ? {
+                        id: a.partner.id,
+                        name: a.partner.name,
+                        basis: 'PARTNER_HANDOFF',
+                        kind: 'PARTNER',
+                    }
+                    : null
+                : (() => {
+                    const d = this.resolveDefaultPayee(a);
+                    if (!d)
+                        return null;
+                    const person = a.guide?.id === d.id ? a.guide : a.driver;
+                    return person
+                        ? { ...person, basis: d.basis, kind: 'PERSON' }
+                        : null;
+                })();
             return {
                 assignmentId: a.id,
                 code: a.code,
@@ -406,17 +450,17 @@ let AccountingService = class AccountingService {
                 tourType: a.tourType,
                 submittedAt: a.tourReport?.submittedAt ?? null,
                 reportStatus: a.tourReport?.status ?? null,
+                sourceType: a.tourReport?.sourceType ?? client_1.TourReportSource.GUIDE_REPORT,
                 moneyVerifiedAt: a.tourReport?.moneyVerifiedAt ?? null,
                 guide: a.guide,
                 driver: a.driver,
+                partner: a.partner,
+                partnerStatus: a.partnerStatus,
+                partnerAmount: a.partnerAmount,
+                partnerCurrency: a.partnerCurrency,
+                partnerMoneyFlow: a.partnerMoneyFlow,
                 plateNumber: a.vehicle?.plateNumber,
-                suggestedPayableTo: (() => {
-                    const d = this.resolveDefaultPayee(a);
-                    if (!d)
-                        return null;
-                    const person = a.guide?.id === d.id ? a.guide : a.driver;
-                    return person ? { ...person, basis: d.basis } : null;
-                })(),
+                suggestedPayableTo,
                 net: net.net,
                 flow: net.flow,
                 collected: net.collected,
@@ -431,7 +475,7 @@ let AccountingService = class AccountingService {
         this.assertAccounting(actor, 'accounting.money.verify');
         const assignment = await this.prisma.assignment.findUnique({
             where: { id: assignmentId },
-            include: { tourReport: true },
+            include: { tourReport: true, partner: true },
         });
         if (!assignment)
             throw new common_1.NotFoundException('Assignment not found');
@@ -444,18 +488,46 @@ let AccountingService = class AccountingService {
         if (assignment.tourReport.moneyRejectedAt) {
             throw new common_1.ConflictException('Tour money was returned to the submitter — waiting for them to re-submit');
         }
-        const payableToId = this.resolveDefaultPayee(assignment)?.id ?? null;
-        if (!payableToId) {
-            throw new common_1.BadRequestException('This trip has no guide yet, so the payee cannot be determined');
+        const partnerHandoff = this.isPartnerHandoff(assignment);
+        let payableToId = null;
+        let partnerId = null;
+        let net;
+        if (partnerHandoff) {
+            if (assignment.partnerStatus !== client_1.PartnerHandoffStatus.HANDED_OFF) {
+                throw new common_1.ConflictException('This partner trip is not waiting for accounting');
+            }
+            if (!assignment.partnerId || num(assignment.partnerAmount) <= 0) {
+                throw new common_1.ConflictException('The partner amount is missing — return and confirm the handoff again');
+            }
+            if (dto.payableToId) {
+                throw new common_1.BadRequestException('A partner trip is paid to the partner agency, not to a person');
+            }
+            partnerId = assignment.partnerId;
+            net = this.partnerNet(assignment);
         }
-        if (dto.payableToId && dto.payableToId !== payableToId) {
-            throw new common_1.BadRequestException('The payee is the guide on the assignment and cannot be changed');
+        else {
+            payableToId = this.resolveDefaultPayee(assignment)?.id ?? null;
+            if (!payableToId) {
+                throw new common_1.BadRequestException(assignment.executionMode ===
+                    client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+                    ? 'This driver-only trip has no driver yet, so the payee cannot be determined'
+                    : 'This trip has no guide yet, so the payee cannot be determined');
+            }
+            if (dto.payableToId && dto.payableToId !== payableToId) {
+                throw new common_1.BadRequestException('The payee comes from the assignment and cannot be changed');
+            }
+            await this.assertPayable(payableToId);
+            net = await this.computeNet(assignmentId);
+            if (net.entryCount === 0) {
+                throw new common_1.ConflictException('Tour has no settlement entries — add at least one Collect/Expense entry before verifying');
+            }
         }
-        await this.assertPayable(payableToId);
-        const net = await this.computeNet(assignmentId);
-        if (net.entryCount === 0) {
-            throw new common_1.ConflictException('Tour has no settlement entries — add at least one Collect/Expense entry before verifying');
-        }
+        const payeeType = partnerHandoff
+            ? client_1.MoneyPayeeType.PARTNER
+            : assignment.executionMode ===
+                client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+                ? client_1.MoneyPayeeType.DRIVER
+                : client_1.MoneyPayeeType.GUIDE;
         const now = new Date();
         const updated = await this.prisma.$transaction(async (tx) => {
             const report = await tx.tourReport.update({
@@ -464,6 +536,8 @@ let AccountingService = class AccountingService {
                     settlementFlow: net.flow,
                     netAmount: new client_1.Prisma.Decimal(net.net),
                     moneyPayableToId: payableToId,
+                    moneyPayeeType: payeeType,
+                    moneyPartnerId: partnerId,
                     moneyVerifiedById: actor.id,
                     moneyVerifiedByName: actor.name ?? null,
                     moneyVerifiedAt: now,
@@ -482,18 +556,62 @@ let AccountingService = class AccountingService {
                 where: { id: assignmentId },
                 data: {
                     status: client_1.AssignmentStatus.COMPLETED,
+                    partnerStatus: partnerHandoff
+                        ? client_1.PartnerHandoffStatus.CLOSED
+                        : assignment.partnerStatus,
                     reportVerifierId: actor.id,
                 },
             });
+            if (partnerHandoff && partnerId) {
+                await tx.partnerPayment.upsert({
+                    where: { assignmentId },
+                    update: {
+                        partnerId,
+                        amount: new client_1.Prisma.Decimal(num(assignment.partnerAmount)),
+                        currency: assignment.partnerCurrency ?? 'VND',
+                        moneyFlow: assignment.partnerMoneyFlow ??
+                            client_1.PartnerMoneyFlow.PARTNER_COLLECTS_AND_REMITS,
+                        tourName: assignment.tourName ?? null,
+                        tourDate: assignment.startDate,
+                        note: dto.note ?? null,
+                        status: client_1.PartnerPaymentStatus.LOCKED,
+                        lockedAt: now,
+                        lockedById: actor.id,
+                        lockedByName: actor.name ?? null,
+                    },
+                    create: {
+                        assignmentId,
+                        partnerId,
+                        amount: new client_1.Prisma.Decimal(num(assignment.partnerAmount)),
+                        currency: assignment.partnerCurrency ?? 'VND',
+                        moneyFlow: assignment.partnerMoneyFlow ??
+                            client_1.PartnerMoneyFlow.PARTNER_COLLECTS_AND_REMITS,
+                        tourName: assignment.tourName ?? null,
+                        tourDate: assignment.startDate,
+                        note: dto.note ?? null,
+                        status: client_1.PartnerPaymentStatus.LOCKED,
+                        lockedAt: now,
+                        lockedById: actor.id,
+                        lockedByName: actor.name ?? null,
+                    },
+                });
+            }
             return report;
         });
-        await this.drive
-            .publishTourReportEvidence(assignmentId)
-            .catch(() => undefined);
+        if (!partnerHandoff) {
+            await this.drive
+                .publishTourReportEvidence(assignmentId)
+                .catch(() => undefined);
+        }
+        const payeeLabel = partnerHandoff && assignment.partner
+            ? assignment.partner.name
+            : payableToId
+                ? await this.payeeName(payableToId)
+                : 'the payee';
         await this.notifySubmitter(assignment, {
             type: client_2.NotificationType.MONEY_VERIFIED,
             title: `✅ Money sheet "${assignment.code}" has been confirmed`,
-            body: `Accounting has checked the money for trip ${assignment.tourName ?? ''} and locked the money for ${await this.payeeName(payableToId)}.`,
+            body: `Accounting has checked the money for trip ${assignment.tourName ?? ''} and locked the money for ${payeeLabel}.`,
         });
         await this.audit.log({
             entityType: 'TourReport',
@@ -503,6 +621,8 @@ let AccountingService = class AccountingService {
                 netAmount: net.net,
                 flow: net.flow,
                 payableToId,
+                payeeType,
+                partnerId,
                 note: dto.note ?? null,
             },
             changedBy: actor.id,
@@ -511,7 +631,7 @@ let AccountingService = class AccountingService {
             assignmentId,
             action: 'money_verified',
         });
-        return { ...updated, net, payableToId };
+        return { ...updated, net, payableToId, payeeType, partnerId };
     }
     async payeeName(userId) {
         const u = await this.prisma.user.findUnique({
@@ -1307,6 +1427,50 @@ let AccountingService = class AccountingService {
         });
         return paid;
     }
+    async markPartnerPaymentPaid(actor, paymentId, dto) {
+        this.assertAccounting(actor, 'accounting.period.export');
+        const payment = await this.prisma.partnerPayment.findUnique({
+            where: { id: paymentId },
+        });
+        if (!payment)
+            throw new common_1.NotFoundException('Partner payment not found');
+        if (payment.paidAt)
+            return payment;
+        const method = dto.method ?? client_1.PaymentMethod.BANK_TRANSFER;
+        if (method === client_1.PaymentMethod.PAYPAL) {
+            throw new common_1.BadRequestException('Partner payouts use cash or bank transfer here');
+        }
+        const now = new Date();
+        const paid = await this.prisma.partnerPayment.update({
+            where: { id: paymentId },
+            data: {
+                status: client_1.PartnerPaymentStatus.PAID,
+                paidAt: now,
+                paidById: actor.id,
+                paidByName: actor.name ?? actor.email ?? null,
+                paymentMethod: method,
+                paymentReference: dto.reference ?? null,
+            },
+        });
+        await this.audit.log({
+            entityType: 'PartnerPayment',
+            entityId: paid.id,
+            action: 'MARK_PAID',
+            beforeData: {
+                status: payment.status,
+                amount: payment.amount.toString(),
+            },
+            afterData: {
+                status: paid.status,
+                paidAt: paid.paidAt,
+                method,
+                reference: dto.reference ?? null,
+                paidByName: paid.paidByName,
+            },
+            changedBy: actor.id,
+        });
+        return paid;
+    }
     async periodHistory(actor, personId) {
         this.assertAccounting(actor);
         const periods = await this.prisma.paymentPeriod.findMany({
@@ -1347,7 +1511,17 @@ let AccountingService = class AccountingService {
                 { id: pr.id, name: pr.name, role: 'TRANSPORT_PROVIDER' },
             ]),
         ]);
-        return periods.map((p) => ({
+        const partnerPayments = await this.prisma.partnerPayment.findMany({
+            where: personId ? { partnerId: personId } : {},
+            include: {
+                partner: { select: { id: true, name: true } },
+                assignment: { select: { code: true } },
+            },
+            orderBy: { lockedAt: 'desc' },
+            take: 200,
+        });
+        const crewRows = periods.map((p) => ({
+            recordType: 'CREW',
             id: p.id,
             person: byId.get(p.personId) ?? {
                 id: p.personId,
@@ -1372,6 +1546,10 @@ let AccountingService = class AccountingService {
             note: p.note,
             createdByName: p.createdByName,
             createdAt: p.createdAt,
+            paidAt: p.paidAt,
+            paidByName: p.paidByName,
+            paymentMethod: p.paymentMethod,
+            paymentReference: p.paymentReference,
             lines: p.lines.map((l) => ({
                 assignmentId: l.assignmentId,
                 code: l.assignment?.code ?? null,
@@ -1386,6 +1564,59 @@ let AccountingService = class AccountingService {
                 note: l.note,
             })),
         }));
+        const partnerRows = partnerPayments.map((p) => {
+            const amount = num(p.amount);
+            const collect = p.moneyFlow === client_1.PartnerMoneyFlow.PARTNER_COLLECTS_AND_REMITS;
+            const totalNet = collect ? amount : -amount;
+            const flow = collect
+                ? client_1.FeeFlowType.COLLECT_MONEY
+                : client_1.FeeFlowType.PAY_MONEY;
+            return {
+                recordType: 'PARTNER',
+                id: p.id,
+                person: { id: p.partnerId, name: p.partner.name, role: 'PARTNER' },
+                payeeType: 'PARTNER',
+                voidedAt: null,
+                voidedByName: null,
+                voidReason: null,
+                fromDate: p.tourDate,
+                toDate: p.tourDate,
+                tourCount: 1,
+                personReturnsToCompany: collect ? amount : 0,
+                companyReturnsToPerson: collect ? 0 : amount,
+                totalNet,
+                direction: totalNet > 0
+                    ? 'PERSON_TO_COMPANY'
+                    : totalNet < 0
+                        ? 'COMPANY_TO_PERSON'
+                        : 'SETTLED',
+                note: p.note,
+                createdByName: p.lockedByName,
+                createdAt: p.lockedAt,
+                paidAt: p.paidAt,
+                paidByName: p.paidByName,
+                paymentMethod: p.paymentMethod,
+                paymentReference: p.paymentReference,
+                lines: [
+                    {
+                        assignmentId: p.assignmentId,
+                        code: p.assignment?.code ?? null,
+                        tourName: p.tourName,
+                        tourDate: p.tourDate,
+                        plateNumber: null,
+                        vehicleCapacity: null,
+                        providerName: p.partner.name,
+                        payableToName: p.partner.name,
+                        netAmount: amount,
+                        flow,
+                        note: p.note,
+                    },
+                ],
+            };
+        });
+        return [...crewRows, ...partnerRows]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 200);
     }
     async watermarkOverview(actor) {
         this.assertAccounting(actor);

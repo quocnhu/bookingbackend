@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import {
+  AssignmentExecutionMode,
   AssignmentOrigin,
   AssignmentStatus,
   BookingStatus,
@@ -76,12 +77,16 @@ export class AssignmentProcessor extends WorkerHost {
     // admin-approval before a new bus is created. Return
     // `{ skipped: true, reason: '<REASON>' }` to leave the booking PENDING.
 
-    const candidate = await this.findCandidate(booking);
+    const executionMode =
+      booking.tour?.requiresGuide === false
+        ? AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+        : AssignmentExecutionMode.COMPANY_GUIDED;
+    const candidate = await this.findCandidate(booking, executionMode);
     // No open trip (PENDING/DRAFT) on the same date → automatically create a new
     // bus for the booking's tour (bookingflow.md step 3) so the Dispatch Board
     // has data to work with.
     if (!candidate) {
-      const bus = await this.createBusForBooking(booking);
+      const bus = await this.createBusForBooking(booking, executionMode);
       this.logger.log(
         `No open bus for booking ${booking.bookingRef} — created bus ${bus.code}`,
       );
@@ -158,7 +163,10 @@ export class AssignmentProcessor extends WorkerHost {
    * The new bus starts in PENDING status so the admin can assign the guide/driver
    * on the Dispatch Board.
    */
-  private async createBusForBooking(booking: any) {
+  private async createBusForBooking(
+    booking: any,
+    executionMode: AssignmentExecutionMode,
+  ) {
     // Use date-only from booking to avoid timezone issues
     const bookingDateKey = toDateKey(new Date(booking.startingDate));
     const startDate = new Date(bookingDateKey + 'T00:00:00.000Z');
@@ -187,6 +195,7 @@ export class AssignmentProcessor extends WorkerHost {
         endDate,
         status: AssignmentStatus.PENDING,
         origin: AssignmentOrigin.AUTO_ASSIGN,
+        executionMode,
         tourType: booking.tourType ?? null,
         tourName: booking.tour?.name ?? booking.tourName ?? undefined,
         durationDays,
@@ -221,7 +230,10 @@ export class AssignmentProcessor extends WorkerHost {
     });
   }
 
-  private async findCandidate(booking: any) {
+  private async findCandidate(
+    booking: any,
+    executionMode: AssignmentExecutionMode,
+  ) {
     // Use tour name from booking.tour relation (already included in query)
     const bookingTourName = booking.tour?.name ?? booking.tourName;
     const bookingTourType = booking.tour?.type ?? booking.tourType;
@@ -254,7 +266,8 @@ export class AssignmentProcessor extends WorkerHost {
       // Get tour name from assignment's first booking's tour relation
       const aTourName = a.tourName ?? a.bookings[0]?.tour?.name;
       const aTourType = a.tourType ?? a.bookings[0]?.tour?.type;
-      
+
+      if (a.executionMode !== executionMode) return false;
       // Must have same tourType
       if (bookingTourType && aTourType && aTourType !== bookingTourType) return false;
       // Must have same tourName (when both have it)

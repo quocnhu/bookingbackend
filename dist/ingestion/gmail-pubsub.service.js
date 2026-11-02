@@ -24,6 +24,8 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const raw_data_service_1 = require("../raw-data/raw-data.service");
 const parsing_queue_1 = require("../parsing/parsing.queue");
 const template_util_1 = require("../parsing/template.util");
+const airport_transfer_util_1 = require("../parsing/airport-transfer.util");
+const response_mail_util_1 = require("./response-mail.util");
 const redis_constants_1 = require("../common/redis/redis.constants");
 const gmail_auth_provider_1 = require("./gmail-auth.provider");
 const booking_forward_constants_1 = require("../booking/booking-forward.constants");
@@ -77,8 +79,7 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
             }
             try {
                 const mail = await this.fetchMessage(gmail, messageId, emailAddress);
-                const noticeText = `${mail.body ?? ''}\n${mail.html ?? ''}`
-                    .toLowerCase();
+                const noticeText = `${mail.body ?? ''}\n${mail.html ?? ''}`.toLowerCase();
                 const isSystemNoticeBody = noticeText.includes(booking_forward_constants_1.BOOKING_SYNC_BODY_MARKER.toLowerCase()) ||
                     noticeText.includes(booking_forward_constants_1.BOOKING_SYNC_DUPLICATE_BODY_MARKER.toLowerCase());
                 if (mail.isBookingSync ||
@@ -89,6 +90,16 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
                         .startsWith(booking_forward_constants_1.BOOKING_SYNC_SUBJECT_PREFIX.toLowerCase())) {
                     ignored++;
                     this.logger.log(`Ignored system notice "${mail.subject}" — booking-sync loop guard`);
+                    continue;
+                }
+                if ((0, response_mail_util_1.isResponseEmail)(mail)) {
+                    ignored++;
+                    this.logger.log(`Ignored response email "${mail.subject}" from "${mail.from}" — mailbox only`);
+                    continue;
+                }
+                if ((0, response_mail_util_1.isSentMailOnly)(mail)) {
+                    ignored++;
+                    this.logger.log(`Ignored outgoing mail "${mail.subject}" — Sent folder only`);
                     continue;
                 }
                 if (!this.isAllowedSender(mail.from)) {
@@ -170,6 +181,11 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
             messageId,
             threadId: msg.data.threadId ?? undefined,
             rfcMessageId: header('message-id') || undefined,
+            autoSubmitted: header('auto-submitted') || undefined,
+            inReplyTo: header('in-reply-to') || undefined,
+            xAutoreply: header('x-autoreply') || undefined,
+            xAutorespond: header('x-autorespond') || undefined,
+            labelIds: msg.data.labelIds ?? undefined,
             isBookingSync: header(booking_forward_constants_1.BOOKING_SYNC_HEADER).trim() === booking_forward_constants_1.BOOKING_SYNC_HEADER_VALUE,
             emailAddress,
             subject: header('subject'),
@@ -238,7 +254,12 @@ let GmailPubSubService = GmailPubSubService_1 = class GmailPubSubService {
         if (rule) {
             this.logger.log(`Template rule matched "${rule}" for "${mail.subject}" (from ${mail.from})`);
         }
-        return (0, template_util_1.resolveTemplateTag)(headers, rules);
+        const tag = (0, template_util_1.resolveTemplateTag)(headers, rules);
+        const refined = (0, airport_transfer_util_1.refineTemplateTag)(tag, mail);
+        if (refined !== tag) {
+            this.logger.log(`Airport transfer product detected -> template ${refined} (${mail.subject})`);
+        }
+        return refined;
     }
 };
 exports.GmailPubSubService = GmailPubSubService;

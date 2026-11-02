@@ -1,4 +1,9 @@
+import { BookingProvider, PaymentStatus } from '@prisma/client';
+import { PaginationDto } from "../../common/dto/pagination.dto";
 export declare class CreatePayPalOrderDto {
+    bookingId: string;
+}
+export declare class CancelPayPalOrderDto {
     bookingId: string;
 }
 export declare class CapturePayPalOrderDto {
@@ -14,4 +19,9 @@ export declare class RecordOtaRemittanceDto {
     paidAt?: string;
     reference?: string;
     note?: string;
+}
+export declare class QueryBookingPaymentsDto extends PaginationDto {
+    payment?: PaymentStatus;
+    channel?: BookingProvider;
+    search?: string;
 }

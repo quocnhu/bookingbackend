@@ -1,7 +1,7 @@
 import { AssignmentsService } from './assignments.service';
 import { AccountingService } from "../accounting/accounting.service";
 import { CreateSettlementDto } from "../accounting/dto/accounting.dto";
-import { AssignBookingsDto, CreateAssignmentDto, FinalizeAssignmentDto, MoveBookingDto, QueryAssignmentDto, ReorderBookingsDto, SetBoardOriginDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, VerifyTourReportDto } from './dto/assignment.dto';
+import { AssignBookingsDto, ConfirmPartnerHandoffDto, CreateAssignmentDto, FinalizeAssignmentDto, MoveBookingDto, QueryAssignmentDto, ReorderBookingsDto, ReturnPartnerHandoffDto, SetBoardOriginDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, VerifyTourReportDto } from './dto/assignment.dto';
 import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 export declare class AssignmentsController {
     private readonly assignmentsService;
@@ -139,7 +139,7 @@ export declare class AssignmentsController {
             reason: string | null;
         }[];
     }>;
-    findOne(id: string): Promise<{
+    confirmPartner(id: string, dto: ConfirmPartnerHandoffDto, actor: AuthenticatedUser): Promise<{
         vehicle: {
             id: string;
             providerId: string;
@@ -162,6 +162,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -176,6 +177,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -260,6 +263,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -289,6 +300,378 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
+        status: import("@prisma/client").$Enums.AssignmentStatus;
+        origin: import("@prisma/client").$Enums.AssignmentOrigin;
+        sequenceIndex: number;
+        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        tripNotes: string | null;
+        createdWho: string | null;
+    }>;
+    returnPartner(id: string, dto: ReturnPartnerHandoffDto, actor: AuthenticatedUser): Promise<{
+        vehicle: {
+            id: string;
+            providerId: string;
+            plateNumber: string;
+            capacity: number | null;
+            brand: string | null;
+        } | null;
+        tourReport: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import("@prisma/client").$Enums.TourReportStatus;
+            assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
+            actualPax: number | null;
+            pickupNotes: string | null;
+            distanceKm: number | null;
+            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
+            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
+            verifiedById: string | null;
+            verifiedByName: string | null;
+            verifiedAt: Date | null;
+            verificationNotes: string | null;
+            finalizedById: string | null;
+            finalizedByName: string | null;
+            finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+        } | null;
+        provider: {
+            id: string;
+            name: string;
+            isCompany: boolean;
+        } | null;
+        bookings: ({
+            tour: {
+                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+            } | null;
+            movedFromBus: {
+                vehicle: {
+                    plateNumber: string;
+                } | null;
+                code: string | null;
+            } | null;
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            totalPax: number;
+            latitude: number | null;
+            longitude: number | null;
+            status: import("@prisma/client").$Enums.BookingStatus;
+            createdWho: string | null;
+            assignmentId: string | null;
+            notes: string | null;
+            currency: string;
+            tourId: string | null;
+            bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
+            channel: import("@prisma/client").$Enums.BookingProvider;
+            address: string | null;
+            startingDate: Date | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            paxDetail: string | null;
+            payment: import("@prisma/client").$Enums.PaymentStatus | null;
+            isNoShow: boolean;
+            noShowReason: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
+            departureTime: string | null;
+            rawDataId: string | null;
+            customerUserId: string | null;
+            paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+            payLater: boolean;
+            paymentDueAt: Date | null;
+            paymentNote: string | null;
+            totalAmount: import("@prisma/client/runtime/library").Decimal | null;
+            paymentCollectedAt: Date | null;
+            paymentCollectedById: string | null;
+            paymentCollectedByName: string | null;
+            paymentConfirmedAt: Date | null;
+            paymentConfirmedById: string | null;
+            paymentConfirmedByName: string | null;
+            paxSequence: number;
+            movedFromBusId: string | null;
+            emailDate: Date | null;
+        })[];
+        driver: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        guide: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        reportVerifier: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            payableToId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
+    } & {
+        id: string;
+        createdAt: Date;
+        providerId: string | null;
+        updatedAt: Date;
+        code: string | null;
+        startDate: Date;
+        endDate: Date;
+        tourName: string | null;
+        tourType: import("@prisma/client").$Enums.TourType | null;
+        durationDays: number | null;
+        totalPax: number;
+        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        latitude: number | null;
+        longitude: number | null;
+        vehicleId: string | null;
+        driverId: string | null;
+        guideId: string | null;
+        reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
+        status: import("@prisma/client").$Enums.AssignmentStatus;
+        origin: import("@prisma/client").$Enums.AssignmentOrigin;
+        sequenceIndex: number;
+        priceOverride: import("@prisma/client/runtime/library").Decimal | null;
+        tripNotes: string | null;
+        createdWho: string | null;
+    }>;
+    findOne(id: string): Promise<{
+        vehicle: {
+            id: string;
+            providerId: string;
+            plateNumber: string;
+            capacity: number | null;
+            brand: string | null;
+        } | null;
+        tourReport: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import("@prisma/client").$Enums.TourReportStatus;
+            assignmentId: string;
+            submittedById: string | null;
+            submittedByName: string | null;
+            submittedAt: Date;
+            actualPax: number | null;
+            pickupNotes: string | null;
+            distanceKm: number | null;
+            fuelCost: import("@prisma/client/runtime/library").Decimal | null;
+            tollParking: import("@prisma/client/runtime/library").Decimal | null;
+            notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
+            verifiedById: string | null;
+            verifiedByName: string | null;
+            verifiedAt: Date | null;
+            verificationNotes: string | null;
+            finalizedById: string | null;
+            finalizedByName: string | null;
+            finalizedAt: Date | null;
+            settlementFlow: import("@prisma/client").$Enums.FeeFlowType | null;
+            netAmount: import("@prisma/client/runtime/library").Decimal | null;
+            moneyVerifiedById: string | null;
+            moneyVerifiedByName: string | null;
+            moneyVerifiedAt: Date | null;
+            moneyVerificationNote: string | null;
+            moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
+            moneyRejectedAt: Date | null;
+            moneyRejectedById: string | null;
+            moneyRejectedByName: string | null;
+            moneyRejectionReason: string | null;
+            evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
+        } | null;
+        provider: {
+            id: string;
+            name: string;
+            isCompany: boolean;
+        } | null;
+        bookings: ({
+            tour: {
+                adultPrice: import("@prisma/client/runtime/library").Decimal | null;
+            } | null;
+            movedFromBus: {
+                vehicle: {
+                    plateNumber: string;
+                } | null;
+                code: string | null;
+            } | null;
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            tourName: string | null;
+            tourType: import("@prisma/client").$Enums.TourType | null;
+            totalPax: number;
+            latitude: number | null;
+            longitude: number | null;
+            status: import("@prisma/client").$Enums.BookingStatus;
+            createdWho: string | null;
+            assignmentId: string | null;
+            notes: string | null;
+            currency: string;
+            tourId: string | null;
+            bookingRef: string;
+            confirmationCode: string | null;
+            source: string | null;
+            channel: import("@prisma/client").$Enums.BookingProvider;
+            address: string | null;
+            startingDate: Date | null;
+            customerName: string | null;
+            hotelName: string;
+            phone: string;
+            mail: string | null;
+            paxDetail: string | null;
+            payment: import("@prisma/client").$Enums.PaymentStatus | null;
+            isNoShow: boolean;
+            noShowReason: string | null;
+            extra: import("@prisma/client/runtime/library").JsonValue | null;
+            departureTime: string | null;
+            rawDataId: string | null;
+            customerUserId: string | null;
+            paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+            payLater: boolean;
+            paymentDueAt: Date | null;
+            paymentNote: string | null;
+            totalAmount: import("@prisma/client/runtime/library").Decimal | null;
+            paymentCollectedAt: Date | null;
+            paymentCollectedById: string | null;
+            paymentCollectedByName: string | null;
+            paymentConfirmedAt: Date | null;
+            paymentConfirmedById: string | null;
+            paymentConfirmedByName: string | null;
+            paxSequence: number;
+            movedFromBusId: string | null;
+            emailDate: Date | null;
+        })[];
+        driver: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        guide: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        reportVerifier: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
+        paymentLines: {
+            id: string;
+            periodId: string;
+            payableToId: string;
+            tourDate: Date;
+            payableTo: {
+                id: string;
+                name: string | null;
+            };
+        }[];
+    } & {
+        id: string;
+        createdAt: Date;
+        providerId: string | null;
+        updatedAt: Date;
+        code: string | null;
+        startDate: Date;
+        endDate: Date;
+        tourName: string | null;
+        tourType: import("@prisma/client").$Enums.TourType | null;
+        durationDays: number | null;
+        totalPax: number;
+        pickupInfo: import("@prisma/client/runtime/library").JsonValue | null;
+        latitude: number | null;
+        longitude: number | null;
+        vehicleId: string | null;
+        driverId: string | null;
+        guideId: string | null;
+        reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -319,6 +702,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -333,6 +717,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -417,6 +803,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -446,6 +840,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -476,6 +882,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -490,6 +897,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -574,6 +983,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -603,6 +1020,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -633,6 +1062,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -647,6 +1077,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -731,6 +1163,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -760,6 +1200,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -790,6 +1242,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -804,6 +1257,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -888,6 +1343,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -917,6 +1380,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -947,6 +1422,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -961,6 +1437,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -1045,6 +1523,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -1074,6 +1560,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1104,6 +1602,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -1118,6 +1617,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -1202,6 +1703,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -1231,6 +1740,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1261,6 +1782,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -1275,6 +1797,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -1359,6 +1883,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -1388,6 +1920,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1418,6 +1962,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -1432,6 +1977,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -1516,6 +2063,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -1545,6 +2100,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1570,6 +2137,7 @@ export declare class AssignmentsController {
         fuelCost: import("@prisma/client/runtime/library").Decimal | null;
         tollParking: import("@prisma/client/runtime/library").Decimal | null;
         notes: string | null;
+        sourceType: import("@prisma/client").$Enums.TourReportSource;
         verifiedById: string | null;
         verifiedByName: string | null;
         verifiedAt: Date | null;
@@ -1584,6 +2152,8 @@ export declare class AssignmentsController {
         moneyVerifiedAt: Date | null;
         moneyVerificationNote: string | null;
         moneyPayableToId: string | null;
+        moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+        moneyPartnerId: string | null;
         moneyRejectedAt: Date | null;
         moneyRejectedById: string | null;
         moneyRejectedByName: string | null;
@@ -1623,6 +2193,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -1637,6 +2208,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -1721,6 +2294,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -1750,6 +2331,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1858,6 +2451,7 @@ export declare class AssignmentsController {
             fuelCost: import("@prisma/client/runtime/library").Decimal | null;
             tollParking: import("@prisma/client/runtime/library").Decimal | null;
             notes: string | null;
+            sourceType: import("@prisma/client").$Enums.TourReportSource;
             verifiedById: string | null;
             verifiedByName: string | null;
             verifiedAt: Date | null;
@@ -1872,6 +2466,8 @@ export declare class AssignmentsController {
             moneyVerifiedAt: Date | null;
             moneyVerificationNote: string | null;
             moneyPayableToId: string | null;
+            moneyPayeeType: import("@prisma/client").$Enums.MoneyPayeeType | null;
+            moneyPartnerId: string | null;
             moneyRejectedAt: Date | null;
             moneyRejectedById: string | null;
             moneyRejectedByName: string | null;
@@ -1956,6 +2552,14 @@ export declare class AssignmentsController {
             name: string | null;
             email: string;
         } | null;
+        partner: {
+            id: string;
+            name: string;
+            email: string | null;
+            isActive: boolean;
+            phone: string | null;
+            contactName: string | null;
+        } | null;
         paymentLines: {
             id: string;
             periodId: string;
@@ -1985,6 +2589,18 @@ export declare class AssignmentsController {
         driverId: string | null;
         guideId: string | null;
         reportVerifierId: string | null;
+        executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
+        partnerId: string | null;
+        partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
+        partnerContractRef: string | null;
+        partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
+        partnerCurrency: string | null;
+        partnerMoneyFlow: import("@prisma/client").$Enums.PartnerMoneyFlow | null;
+        partnerConfirmedById: string | null;
+        partnerConfirmedByName: string | null;
+        partnerConfirmedAt: Date | null;
+        partnerReturnedAt: Date | null;
+        partnerReturnNote: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;

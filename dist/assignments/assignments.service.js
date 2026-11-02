@@ -64,6 +64,16 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         driver: { select: { id: true, name: true, email: true } },
         guide: { select: { id: true, name: true, email: true } },
         reportVerifier: { select: { id: true, name: true, email: true } },
+        partner: {
+            select: {
+                id: true,
+                name: true,
+                contactName: true,
+                phone: true,
+                email: true,
+                isActive: true,
+            },
+        },
         tourReport: true,
         paymentLines: {
             where: { period: { voidedAt: null } },
@@ -312,13 +322,22 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 id: true,
                 guideId: true,
                 driverId: true,
+                executionMode: true,
+                partnerStatus: true,
                 startDate: true,
                 endDate: true,
             },
         });
         if (items.length === 0)
             return { dispatched: 0, skipped: 0, skippedOnLeave: 0 };
-        const withCrew = items.filter((a) => a.guideId && a.driverId);
+        const withCrew = items.filter((a) => {
+            if (this.isOutsourced(a))
+                return false;
+            if (a.executionMode === client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY) {
+                return !!a.driverId;
+            }
+            return !!a.guideId && !!a.driverId;
+        });
         const skipped = items.length - withCrew.length;
         const ready = [];
         let skippedOnLeave = 0;
@@ -569,7 +588,40 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             return;
         throw new common_1.ConflictException(`"${assignment.code ?? 'Trip'}" is locked because the tour report has been submitted. Only an administrator can change it; accounting can unlock it by rejecting the report.`);
     }
+    isOutsourced(assignment) {
+        return (assignment?.executionMode === client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER ||
+            assignment?.partnerStatus === client_1.PartnerHandoffStatus.HANDED_OFF);
+    }
+    resolveReportPayee(assignment) {
+        if (this.isOutsourced(assignment)) {
+            return {
+                payeeType: client_1.MoneyPayeeType.PARTNER,
+                userId: null,
+                partnerId: assignment.partnerId ?? null,
+            };
+        }
+        if (assignment.executionMode === client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY) {
+            return {
+                payeeType: client_1.MoneyPayeeType.DRIVER,
+                userId: assignment.driverId ?? null,
+                partnerId: null,
+            };
+        }
+        return {
+            payeeType: client_1.MoneyPayeeType.GUIDE,
+            userId: assignment.guideId ?? null,
+            partnerId: null,
+        };
+    }
+    assertPartnerLocked(assignment) {
+        if (assignment.partnerStatus === client_1.PartnerHandoffStatus.HANDED_OFF) {
+            throw new common_1.ConflictException(`"${assignment.code ?? 'Trip'}" is already handed off to a partner. Return it before changing crew or dates.`);
+        }
+    }
     async create(dto, actor) {
+        if (dto.executionMode === client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER) {
+            throw new common_1.BadRequestException('Use the partner handoff action to send a trip to a partner agency.');
+        }
         const startDate = new Date(dto.startDate);
         const endDate = new Date(dto.endDate);
         await this.assertCrewAvailableForDates(dto.guideId, dto.driverId, startDate, endDate);
@@ -586,6 +638,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 providerId: dto.providerId,
                 driverId: dto.driverId,
                 guideId: dto.guideId,
+                executionMode: dto.executionMode ?? client_1.AssignmentExecutionMode.COMPANY_GUIDED,
                 status: dto.status,
                 sequenceIndex: dto.sequenceIndex,
                 priceOverride: await this.resolvePriceOverride(dto),
@@ -604,6 +657,10 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
     async update(id, dto, actor) {
         const before = await this.findOne(id);
         this.assertDetailsUnlocked(before, actor);
+        this.assertPartnerLocked(before);
+        if (dto.executionMode === client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER) {
+            throw new common_1.BadRequestException('Use the partner handoff action to send a trip to a partner agency.');
+        }
         const startDate = dto.startDate
             ? new Date(dto.startDate)
             : before.startDate;
@@ -625,6 +682,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 providerId: dto.providerId,
                 driverId: dto.driverId,
                 guideId: dto.guideId,
+                executionMode: dto.executionMode,
                 status: dto.status,
                 sequenceIndex: dto.sequenceIndex,
                 priceOverride: await this.resolvePriceOverride({
@@ -662,9 +720,14 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         }
     }
     assertCrewAssigned(assignment) {
+        if (this.isOutsourced(assignment)) {
+            throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" — it is handled by the partner agency.`);
+        }
         const missing = [];
-        if (!assignment.guideId)
+        if (assignment.executionMode !== client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY &&
+            !assignment.guideId) {
             missing.push('tour guide');
+        }
         if (!assignment.driverId)
             missing.push('driver');
         if (missing.length > 0) {
@@ -1005,6 +1068,10 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             undefined;
         const durationDays = first?.tour?.durationDays ?? 1;
         const totalPax = bookings.reduce((sum, b) => sum + (b.totalPax ?? 0), 0);
+        if (bookings.length === 0) {
+            await this.board.cleanupAssignmentIfEmpty(assignmentId);
+            return;
+        }
         const activeBookings = bookings.filter((b) => b.status !== client_1.BookingStatus.CANCELED);
         if (activeBookings.length === 0 && bookings.length > 0) {
             await this.prisma.assignment.update({
@@ -1046,8 +1113,184 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         await this.board.syncDatesFromBookings(assignmentId);
         return this.findOne(assignmentId);
     }
+    async confirmPartnerHandoff(id, dto, actor) {
+        if (actor.role !== client_1.RoleType.ADMIN && actor.role !== client_1.RoleType.OFFICE) {
+            throw new common_1.ForbiddenException('Only management (ADMIN/OFFICE) can hand a trip to a partner agency');
+        }
+        const assignment = await this.findOne(id);
+        if (assignment.status === client_1.AssignmentStatus.COMPLETED) {
+            throw new common_1.BadRequestException('Tour already completed');
+        }
+        if (assignment.status === client_1.AssignmentStatus.CANCELED) {
+            throw new common_1.BadRequestException('Canceled assignment cannot be outsourced');
+        }
+        if (assignment.status === client_1.AssignmentStatus.DISPATCHED ||
+            assignment.status === client_1.AssignmentStatus.VERIFYING) {
+            throw new common_1.ConflictException('A dispatched or submitted trip cannot be handed to a partner. Return/reopen it first.');
+        }
+        if (assignment.tourReport?.moneyVerifiedAt) {
+            throw new common_1.ConflictException('Money is already locked for this trip');
+        }
+        const amount = Number(dto.amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            throw new common_1.BadRequestException('Partner amount must be greater than 0');
+        }
+        const partner = await this.prisma.partnerAgency.findUnique({
+            where: { id: dto.partnerId },
+        });
+        if (!partner)
+            throw new common_1.NotFoundException('Partner agency not found');
+        if (!partner.isActive) {
+            throw new common_1.BadRequestException('Partner agency is inactive');
+        }
+        const now = new Date();
+        const currency = (dto.currency ?? 'VND').trim().toUpperCase() || 'VND';
+        await this.prisma.$transaction(async (tx) => {
+            await tx.assignment.update({
+                where: { id },
+                data: {
+                    executionMode: client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER,
+                    partnerId: partner.id,
+                    partnerStatus: client_1.PartnerHandoffStatus.HANDED_OFF,
+                    partnerContractRef: dto.contractRef?.trim() || null,
+                    partnerAmount: new client_1.Prisma.Decimal(amount),
+                    partnerCurrency: currency,
+                    partnerMoneyFlow: dto.moneyFlow,
+                    partnerConfirmedById: actor.id,
+                    partnerConfirmedByName: actor.name ?? actor.email ?? null,
+                    partnerConfirmedAt: now,
+                    partnerReturnedAt: null,
+                    partnerReturnNote: null,
+                    guideId: null,
+                    driverId: null,
+                    vehicleId: null,
+                    providerId: null,
+                    reportVerifierId: null,
+                    status: client_1.AssignmentStatus.VERIFYING,
+                },
+            });
+            await tx.tourReport.upsert({
+                where: { assignmentId: id },
+                update: {
+                    submittedById: actor.id,
+                    submittedByName: actor.name ?? actor.email ?? null,
+                    submittedAt: now,
+                    notes: dto.note?.trim() || null,
+                    status: 'SUBMITTED',
+                    sourceType: client_1.TourReportSource.OUTSOURCED_PARTNER,
+                    verifiedById: null,
+                    verifiedByName: null,
+                    verifiedAt: null,
+                    verificationNotes: null,
+                    settlementFlow: null,
+                    netAmount: null,
+                    moneyVerifiedById: null,
+                    moneyVerifiedByName: null,
+                    moneyVerifiedAt: null,
+                    moneyVerificationNote: null,
+                    moneyPayableToId: null,
+                    moneyPayeeType: client_1.MoneyPayeeType.PARTNER,
+                    moneyPartnerId: partner.id,
+                    moneyRejectedAt: null,
+                    moneyRejectedById: null,
+                    moneyRejectedByName: null,
+                    moneyRejectionReason: null,
+                    finalizedById: null,
+                    finalizedByName: null,
+                    finalizedAt: null,
+                },
+                create: {
+                    assignmentId: id,
+                    submittedById: actor.id,
+                    submittedByName: actor.name ?? actor.email ?? null,
+                    submittedAt: now,
+                    notes: dto.note?.trim() || null,
+                    status: 'SUBMITTED',
+                    sourceType: client_1.TourReportSource.OUTSOURCED_PARTNER,
+                    moneyPayeeType: client_1.MoneyPayeeType.PARTNER,
+                    moneyPartnerId: partner.id,
+                },
+            });
+        });
+        await this.auditService.log({
+            entityType: 'Assignment',
+            entityId: id,
+            action: 'PARTNER_HANDOFF',
+            afterData: {
+                partnerId: partner.id,
+                partnerName: partner.name,
+                amount,
+                currency,
+                moneyFlow: dto.moneyFlow,
+                contractRef: dto.contractRef ?? null,
+            },
+            changedBy: actor.id,
+        });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId: id,
+            action: 'partner_handoff',
+        });
+        return this.findOne(id);
+    }
+    async returnPartnerHandoff(id, dto, actor) {
+        if (actor.role !== client_1.RoleType.ADMIN && actor.role !== client_1.RoleType.OFFICE) {
+            throw new common_1.ForbiddenException('Only management (ADMIN/OFFICE) can return a partner trip');
+        }
+        const reason = dto.reason?.trim();
+        if (!reason || reason.length < 5) {
+            throw new common_1.BadRequestException('A return reason is required');
+        }
+        const assignment = await this.findOne(id);
+        if (assignment.partnerStatus !== client_1.PartnerHandoffStatus.HANDED_OFF) {
+            throw new common_1.BadRequestException('This trip is not handed off to a partner');
+        }
+        if (assignment.tourReport?.moneyVerifiedAt) {
+            throw new common_1.ConflictException('Money is already locked — the partner trip cannot be returned');
+        }
+        const booking = await this.prisma.booking.findFirst({
+            where: { assignmentId: id },
+            select: { tour: { select: { requiresGuide: true } } },
+        });
+        const nextMode = booking?.tour?.requiresGuide === false
+            ? client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+            : client_1.AssignmentExecutionMode.COMPANY_GUIDED;
+        await this.prisma.$transaction(async (tx) => {
+            await tx.tourReport.deleteMany({ where: { assignmentId: id } });
+            await tx.assignment.update({
+                where: { id },
+                data: {
+                    executionMode: nextMode,
+                    partnerStatus: client_1.PartnerHandoffStatus.RETURNED,
+                    partnerReturnedAt: new Date(),
+                    partnerReturnNote: reason,
+                    status: client_1.AssignmentStatus.PENDING,
+                    guideId: null,
+                    driverId: null,
+                },
+            });
+        });
+        await this.auditService.log({
+            entityType: 'Assignment',
+            entityId: id,
+            action: 'PARTNER_RETURN',
+            afterData: {
+                reason,
+                partnerId: assignment.partnerId,
+                partnerName: assignment.partner?.name ?? null,
+            },
+            changedBy: actor.id,
+        });
+        this.gateway.notifyAll('board:refresh', {
+            assignmentId: id,
+            action: 'partner_return',
+        });
+        return this.findOne(id);
+    }
     async submitTourReport(id, dto, actor) {
         const assignment = await this.findOne(id);
+        if (this.isOutsourced(assignment)) {
+            throw new common_1.BadRequestException('This trip is handled by a partner agency — use the partner handoff accounting flow.');
+        }
         if (assignment.status === client_1.AssignmentStatus.COMPLETED) {
             throw new common_1.BadRequestException('Tour already completed');
         }
@@ -1081,6 +1324,10 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 tollParking: dto.tollParking,
                 notes: dto.notes,
                 status: 'SUBMITTED',
+                sourceType: assignment.executionMode ===
+                    client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+                    ? client_1.TourReportSource.DRIVER_ONLY_DIRECT
+                    : client_1.TourReportSource.GUIDE_REPORT,
                 evidenceImages: (dto.evidenceImages ??
                     (Array.isArray(latest?.evidenceImages)
                         ? latest.evidenceImages
@@ -1105,10 +1352,19 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 tollParking: dto.tollParking,
                 notes: dto.notes,
                 status: 'SUBMITTED',
+                sourceType: assignment.executionMode ===
+                    client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+                    ? client_1.TourReportSource.DRIVER_ONLY_DIRECT
+                    : client_1.TourReportSource.GUIDE_REPORT,
                 evidenceImages: (dto.evidenceImages ?? []),
             },
         });
-        if (assignment.status === client_1.AssignmentStatus.DISPATCHED) {
+        if (assignment.status === client_1.AssignmentStatus.DISPATCHED ||
+            (assignment.executionMode ===
+                client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY &&
+                (assignment.status === client_1.AssignmentStatus.PENDING ||
+                    assignment.status === client_1.AssignmentStatus.DRAFT_ASSIGNED ||
+                    assignment.status === client_1.AssignmentStatus.TRANSFERRED))) {
             await this.prisma.assignment.update({
                 where: { id },
                 data: { status: client_1.AssignmentStatus.VERIFYING },
@@ -1207,7 +1463,8 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         }
         else if (dto.status === 'VERIFIED' &&
             !report.moneyVerifiedAt &&
-            !report.moneyRejectedAt) {
+            !report.moneyRejectedAt &&
+            !this.isOutsourced(assignment)) {
             const lines = await this.prisma.settlement.findMany({
                 where: { assignmentId: id },
                 include: { category: { select: { flowType: true } } },
@@ -1222,7 +1479,8 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                     paid += amount;
             }
             const round2 = (v) => Math.round(v * 100) / 100;
-            if (lines.length > 0 && assignment.guideId) {
+            const payee = this.resolveReportPayee(assignment);
+            if (lines.length > 0 && payee.userId) {
                 const net = round2(collected - paid);
                 const flow = collected >= paid ? client_1.FeeFlowType.COLLECT_MONEY : client_1.FeeFlowType.PAY_MONEY;
                 const now = new Date();
@@ -1232,7 +1490,9 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                         data: {
                             settlementFlow: flow,
                             netAmount: new client_1.Prisma.Decimal(net),
-                            moneyPayableToId: assignment.guideId,
+                            moneyPayableToId: payee.userId,
+                            moneyPayeeType: payee.payeeType,
+                            moneyPartnerId: null,
                             moneyVerifiedById: actor.id,
                             moneyVerifiedByName: actor.name ?? null,
                             moneyVerifiedAt: now,
@@ -1261,12 +1521,15 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                     afterData: {
                         netAmount: net,
                         flow,
-                        payableToId: assignment.guideId,
+                        payableToId: payee.userId,
+                        payeeType: payee.payeeType,
                         fromBoardVerify: true,
                     },
                     changedBy: actor.id,
                 });
-                const payeeName = assignment.guide?.name ?? assignment.guideId;
+                const payeeName = assignment.guide?.name ??
+                    assignment.driver?.name ??
+                    payee.userId;
                 if (report.submittedById) {
                     const notif = await this.notificationService.create(report.submittedById, client_1.NotificationType.MONEY_VERIFIED, `✅ Money sheet "${assignment.code}" has been confirmed`, `Accounting has checked the money for trip ${assignment.tourName ?? ''} and locked the money for ${payeeName}.`, { assignmentId: id });
                     this.gateway.notifyUser(report.submittedById, 'notification', notif);

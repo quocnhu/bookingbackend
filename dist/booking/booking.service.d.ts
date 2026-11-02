@@ -142,6 +142,8 @@ export declare class BookingService {
             name: string;
             code: string;
             durationDays: number | null;
+            currency: string;
+            requiresGuide: boolean;
             thumbnailUrl: string | null;
             departureTimes: string[];
             durationValue: number | null;
@@ -153,7 +155,6 @@ export declare class BookingService {
             adultPrice: Prisma.Decimal | null;
             childPrice: Prisma.Decimal | null;
             infantPrice: Prisma.Decimal | null;
-            currency: string;
             privateDiscountPercent: number | null;
             groupDiscountPercent: number | null;
             promotionStartsAt: Date | null;
@@ -262,6 +263,8 @@ export declare class BookingService {
         discountPercent: number;
         totalAmount: number;
         currency: string;
+        priceTierPax: number | null;
+        privatePaxOptions: number[];
     }>;
     createWebsite(dto: CreateWebsiteBookingDto, actor?: AuthenticatedUser): Promise<{
         booking: {
@@ -322,6 +325,8 @@ export declare class BookingService {
             discountPercent: number;
             totalAmount: number;
             currency: string;
+            priceTierPax: number | null;
+            privatePaxOptions: number[];
         };
     }>;
     create(dto: CreateBookingDto, actor?: AuthenticatedUser): Promise<{

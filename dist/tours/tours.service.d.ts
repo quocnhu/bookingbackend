@@ -22,9 +22,18 @@ export declare class ToursService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: Prisma.Decimal;
             childPrice: Prisma.Decimal;
             infantPrice: Prisma.Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: Prisma.Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -76,6 +85,8 @@ export declare class ToursService {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -87,7 +98,6 @@ export declare class ToursService {
         adultPrice: Prisma.Decimal | null;
         childPrice: Prisma.Decimal | null;
         infantPrice: Prisma.Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -117,9 +127,18 @@ export declare class ToursService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: Prisma.Decimal;
             childPrice: Prisma.Decimal;
             infantPrice: Prisma.Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: Prisma.Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -171,6 +190,8 @@ export declare class ToursService {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -182,7 +203,6 @@ export declare class ToursService {
         adultPrice: Prisma.Decimal | null;
         childPrice: Prisma.Decimal | null;
         infantPrice: Prisma.Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -204,6 +224,8 @@ export declare class ToursService {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -215,7 +237,6 @@ export declare class ToursService {
         adultPrice: Prisma.Decimal | null;
         childPrice: Prisma.Decimal | null;
         infantPrice: Prisma.Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -236,6 +257,8 @@ export declare class ToursService {
     private normalizeDepartureTimes;
     private resolveDurationDays;
     private filterOfferedTypePrices;
+    private normalizePrivatePaxPrices;
+    private withPrivatePaxMirror;
     private resolveCategoryLinks;
     private resolveFreeCancellation;
     update(id: string, dto: UpdateTourDto): Promise<{
@@ -250,9 +273,18 @@ export declare class ToursService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: Prisma.Decimal;
             childPrice: Prisma.Decimal;
             infantPrice: Prisma.Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: Prisma.Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -304,6 +336,8 @@ export declare class ToursService {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -315,7 +349,6 @@ export declare class ToursService {
         adultPrice: Prisma.Decimal | null;
         childPrice: Prisma.Decimal | null;
         infantPrice: Prisma.Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -345,9 +378,18 @@ export declare class ToursService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: Prisma.Decimal;
             childPrice: Prisma.Decimal;
             infantPrice: Prisma.Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: Prisma.Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -399,6 +441,8 @@ export declare class ToursService {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -410,7 +454,6 @@ export declare class ToursService {
         adultPrice: Prisma.Decimal | null;
         childPrice: Prisma.Decimal | null;
         infantPrice: Prisma.Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -441,9 +484,18 @@ export declare class ToursService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: Prisma.Decimal;
             childPrice: Prisma.Decimal;
             infantPrice: Prisma.Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: Prisma.Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -495,6 +547,8 @@ export declare class ToursService {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -506,7 +560,6 @@ export declare class ToursService {
         adultPrice: Prisma.Decimal | null;
         childPrice: Prisma.Decimal | null;
         infantPrice: Prisma.Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -535,9 +588,18 @@ export declare class ToursService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: Prisma.Decimal;
             childPrice: Prisma.Decimal;
             infantPrice: Prisma.Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: Prisma.Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -589,6 +651,8 @@ export declare class ToursService {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -600,7 +664,6 @@ export declare class ToursService {
         adultPrice: Prisma.Decimal | null;
         childPrice: Prisma.Decimal | null;
         infantPrice: Prisma.Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;
@@ -629,9 +692,18 @@ export declare class ToursService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            currency: string;
             adultPrice: Prisma.Decimal;
             childPrice: Prisma.Decimal;
             infantPrice: Prisma.Decimal;
+            tourId: string;
+        }[];
+        privatePaxPrices: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            pax: number;
+            pricePerPerson: Prisma.Decimal;
             currency: string;
             tourId: string;
         }[];
@@ -683,6 +755,8 @@ export declare class ToursService {
         name: string;
         code: string;
         durationDays: number | null;
+        currency: string;
+        requiresGuide: boolean;
         thumbnailUrl: string | null;
         departureTimes: string[];
         durationValue: number | null;
@@ -694,7 +768,6 @@ export declare class ToursService {
         adultPrice: Prisma.Decimal | null;
         childPrice: Prisma.Decimal | null;
         infantPrice: Prisma.Decimal | null;
-        currency: string;
         privateDiscountPercent: number | null;
         groupDiscountPercent: number | null;
         promotionStartsAt: Date | null;

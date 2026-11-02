@@ -4,23 +4,33 @@ import {
   Get,
   Headers,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import type { RawBodyRequest } from '@nestjs/common';
 import { Public } from '@/common/decorators/public.decorator';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 import { PaymentService } from './payment.service';
 import {
+  CancelPayPalOrderDto,
   CapturePayPalOrderDto,
   CreatePayPalOrderDto,
+  QueryBookingPaymentsDto,
   RecordOtaRemittanceDto,
 } from './dto/payment.dto';
 
 @Controller('payments')
 export class PaymentController {
   constructor(private readonly payments: PaymentService) {}
+
+  @Get('bookings')
+  @Permissions('accounting.read')
+  bookingPayments(@Query() query: QueryBookingPaymentsDto) {
+    return this.payments.listBookingPayments(query);
+  }
 
   @Public()
   @Get('paypal/config')
@@ -34,6 +44,14 @@ export class PaymentController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.payments.createPayPalOrder(dto.bookingId, actor);
+  }
+
+  @Post('paypal/cancel')
+  cancelOrder(
+    @Body() dto: CancelPayPalOrderDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.payments.cancelPayPalOrder(dto.bookingId, actor);
   }
 
   @Post('paypal/capture')

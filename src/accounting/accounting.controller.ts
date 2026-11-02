@@ -154,6 +154,15 @@ export class AccountingController {
     return this.accountingService.markPeriodPaid(actor, id, dto);
   }
 
+  @Post('partner-payments/:id/mark-paid')
+  markPartnerPaymentPaid(
+    @Param('id') id: string,
+    @Body() dto: MarkPeriodPaidDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.accountingService.markPartnerPaymentPaid(actor, id, dto);
+  }
+
   @Get('period/history')
   periodHistory(
     @Query('personId') personId: string | undefined,

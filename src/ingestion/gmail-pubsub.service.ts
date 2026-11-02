@@ -9,6 +9,8 @@ import {
   parseTemplateRules,
   resolveTemplateTag,
 } from '@/parsing/template.util';
+import { refineTemplateTag } from '@/parsing/airport-transfer.util';
+import { isResponseEmail, isSentMailOnly } from './response-mail.util';
 import {
   DEDUP_TTL_SECONDS,
   REDIS_CLIENT,
@@ -30,6 +32,12 @@ interface ParsedMail {
   threadId?: string;
   /** RFC 5322 Message-ID header — the confirmation is threaded onto it. */
   rfcMessageId?: string;
+  /** Response/thread headers — OTA replies must stay in the mailbox only. */
+  autoSubmitted?: string;
+  inReplyTo?: string;
+  xAutoreply?: string;
+  xAutorespond?: string;
+  labelIds?: string[];
   /** True when this is our own "pushed to Booking table" notice. */
   isBookingSync?: boolean;
   emailAddress: string;
@@ -123,13 +131,11 @@ export class GmailPubSubService {
         // very mailbox. It is a system notice, never a booking mail. The custom
         // header is lost when the operator forwards the notice again, so the
         // body markers are checked too.
-        const noticeText = `${mail.body ?? ''}\n${mail.html ?? ''}`
-          .toLowerCase();
+        const noticeText =
+          `${mail.body ?? ''}\n${mail.html ?? ''}`.toLowerCase();
         const isSystemNoticeBody =
           noticeText.includes(BOOKING_SYNC_BODY_MARKER.toLowerCase()) ||
-          noticeText.includes(
-            BOOKING_SYNC_DUPLICATE_BODY_MARKER.toLowerCase(),
-          );
+          noticeText.includes(BOOKING_SYNC_DUPLICATE_BODY_MARKER.toLowerCase());
         if (
           mail.isBookingSync ||
           isSystemNoticeBody ||
@@ -141,6 +147,26 @@ export class GmailPubSubService {
           ignored++;
           this.logger.log(
             `Ignored system notice "${mail.subject}" — booking-sync loop guard`,
+          );
+          continue;
+        }
+
+        // OTA response/reply emails belong to the mailbox only. They are not
+        // new booking notifications and must never reach RawData/parsing.
+        if (isResponseEmail(mail)) {
+          ignored++;
+          this.logger.log(
+            `Ignored response email "${mail.subject}" from "${mail.from}" — mailbox only`,
+          );
+          continue;
+        }
+
+        // Our own outbound replies live only in Sent. They are not incoming
+        // booking mail and must stay in the mailbox without creating RawData.
+        if (isSentMailOnly(mail)) {
+          ignored++;
+          this.logger.log(
+            `Ignored outgoing mail "${mail.subject}" — Sent folder only`,
           );
           continue;
         }
@@ -249,6 +275,11 @@ export class GmailPubSubService {
       messageId,
       threadId: msg.data.threadId ?? undefined,
       rfcMessageId: header('message-id') || undefined,
+      autoSubmitted: header('auto-submitted') || undefined,
+      inReplyTo: header('in-reply-to') || undefined,
+      xAutoreply: header('x-autoreply') || undefined,
+      xAutorespond: header('x-autorespond') || undefined,
+      labelIds: msg.data.labelIds ?? undefined,
       isBookingSync:
         header(BOOKING_SYNC_HEADER).trim() === BOOKING_SYNC_HEADER_VALUE,
       emailAddress,
@@ -343,6 +374,18 @@ export class GmailPubSubService {
       );
     }
 
-    return resolveTemplateTag(headers, rules);
+    const tag = resolveTemplateTag(headers, rules);
+
+    // The message centre is also used for airport transfers. Those mails carry
+    // the airport-transfer product in the "Booking details" block, not in the
+    // headers, so refine the header tag from the body (always private).
+    const refined = refineTemplateTag(tag, mail);
+    if (refined !== tag) {
+      this.logger.log(
+        `Airport transfer product detected -> template ${refined} (${mail.subject})`,
+      );
+    }
+
+    return refined;
   }
 }
