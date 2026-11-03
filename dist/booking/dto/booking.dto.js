@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BatchUpdateBookingsDto = exports.BookingPatchDto = exports.QueryBookingDto = exports.UpdateBookingDto = exports.ConfirmBookingPaymentDto = exports.CollectBookingPaymentDto = exports.CreateWebsiteBookingDto = exports.WebsiteQuoteDto = exports.CreateBookingDto = void 0;
+exports.BatchUpdateBookingsDto = exports.BookingPatchDto = exports.QueryBookingDto = exports.CreatePrivateGroupDto = exports.PrivateGroupBusDto = exports.UpdateBookingDto = exports.ConfirmBookingPaymentDto = exports.CollectBookingPaymentDto = exports.CreateWebsiteBookingDto = exports.WebsiteQuoteDto = exports.CreateBookingDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
@@ -136,7 +136,7 @@ __decorate([
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(12),
+    (0, class_validator_1.Max)(45),
     __metadata("design:type", Number)
 ], CreateBookingDto.prototype, "totalPax", void 0);
 __decorate([
@@ -458,7 +458,7 @@ __decorate([
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(12),
+    (0, class_validator_1.Max)(45),
     __metadata("design:type", Number)
 ], UpdateBookingDto.prototype, "totalPax", void 0);
 __decorate([
@@ -494,6 +494,58 @@ __decorate([
     (0, class_validator_1.Length)(0, 1000),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "notes", void 0);
+class PrivateGroupBusDto {
+    pax;
+    driverId;
+    guideId;
+    vehicleId;
+    providerId;
+    note;
+}
+exports.PrivateGroupBusDto = PrivateGroupBusDto;
+__decorate([
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(45),
+    __metadata("design:type", Number)
+], PrivateGroupBusDto.prototype, "pax", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], PrivateGroupBusDto.prototype, "driverId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], PrivateGroupBusDto.prototype, "guideId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], PrivateGroupBusDto.prototype, "vehicleId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], PrivateGroupBusDto.prototype, "providerId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Length)(0, 500),
+    __metadata("design:type", String)
+], PrivateGroupBusDto.prototype, "note", void 0);
+class CreatePrivateGroupDto {
+    buses;
+}
+exports.CreatePrivateGroupDto = CreatePrivateGroupDto;
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => PrivateGroupBusDto),
+    __metadata("design:type", Array)
+], CreatePrivateGroupDto.prototype, "buses", void 0);
 class QueryBookingDto extends pagination_dto_1.PaginationDto {
     status;
     channel;

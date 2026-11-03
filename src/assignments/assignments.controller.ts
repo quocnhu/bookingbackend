@@ -13,6 +13,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AssignmentsService } from './assignments.service';
+import { AutoDispatchCron } from './auto-dispatch.cron';
 import { AccountingService } from '@/accounting/accounting.service';
 import { CreateSettlementDto } from '@/accounting/dto/accounting.dto';
 import {
@@ -28,6 +29,8 @@ import {
   SubmitTourReportDto,
   UpdateAssignmentDto,
   UpdateAssignmentStatusDto,
+  UpdateAutoDispatchDto,
+  UpdateRecallCutoffDto,
   VerifyTourReportDto,
 } from './dto/assignment.dto';
 import {
@@ -42,6 +45,7 @@ import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.i
 export class AssignmentsController {
   constructor(
     private readonly assignmentsService: AssignmentsService,
+    private readonly autoDispatchCron: AutoDispatchCron,
     private readonly accountingService: AccountingService,
   ) {}
 
@@ -76,6 +80,36 @@ export class AssignmentsController {
   @Permissions('assignment.update')
   dispatchAllBoard() {
     return this.assignmentsService.dispatchAllBoard();
+  }
+
+  @Get('board/auto-dispatch')
+  @Permissions('assignment.read')
+  getAutoDispatchSettings() {
+    return this.autoDispatchCron.getSettings();
+  }
+
+  @Put('board/auto-dispatch')
+  @Permissions('assignment.update')
+  updateAutoDispatchSettings(
+    @Body() dto: UpdateAutoDispatchDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.autoDispatchCron.updateSettings(dto, actor.id);
+  }
+
+  @Get('board/recall-cutoff')
+  @Permissions('assignment.read')
+  getRecallCutoff() {
+    return this.assignmentsService.getRecallCutoff();
+  }
+
+  @Put('board/recall-cutoff')
+  @Permissions('assignment.update')
+  updateRecallCutoff(
+    @Body() dto: UpdateRecallCutoffDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.updateRecallCutoff(dto, actor.id);
   }
 
   @Get('board/crew')

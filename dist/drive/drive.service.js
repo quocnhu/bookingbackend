@@ -121,12 +121,18 @@ let DriveService = DriveService_1 = class DriveService {
             where: { id: assignmentId },
             include: {
                 guide: { select: { id: true, email: true, name: true } },
+                driver: { select: { id: true, email: true, name: true } },
                 tourReport: true,
             },
         });
-        if (!assignment?.guideId || !assignment.tourReport) {
+        if (!assignment?.tourReport) {
             return { moved: 0 };
         }
+        const owner = assignment.guide ?? assignment.driver;
+        if (!owner) {
+            return { moved: 0 };
+        }
+        const ownerId = owner.id;
         const report = assignment.tourReport;
         if (report.status !== 'VERIFIED') {
             return { moved: 0 };
@@ -134,13 +140,13 @@ let DriveService = DriveService_1 = class DriveService {
         const images = Array.isArray(report.evidenceImages)
             ? report.evidenceImages
             : [];
-        const dir = (0, storage_key_util_1.userStorageDir)(assignment.guideId, assignment.guide?.email, assignment.guide?.name);
+        const dir = (0, storage_key_util_1.userStorageDir)(ownerId, owner.email, owner.name);
         const prefix = (0, storage_key_util_1.pendingEvidencePrefix)(dir, assignment.id);
         const pending = images.filter((img) => typeof img.storageKey === 'string' && img.storageKey.startsWith(prefix));
         if (pending.length === 0) {
             return { moved: 0 };
         }
-        const folder = await this.getOrCreateTourFolder(assignment.guideId, assignment.tourName || assignment.code || 'tour', assignment.startDate);
+        const folder = await this.getOrCreateTourFolder(ownerId, assignment.tourName || assignment.code || 'tour', assignment.startDate);
         let moved = 0;
         const updated = [];
         for (let i = 0; i < images.length; i += 1) {
@@ -151,12 +157,12 @@ let DriveService = DriveService_1 = class DriveService {
                 continue;
             }
             const safeName = (0, file_validation_util_1.sanitizeFileName)(img.name || key.split('/').pop() || 'evidence');
-            const newKey = await this.storageKeyFor(assignment.guideId, folder, `${Date.now()}-${i}-${safeName}`);
+            const newKey = await this.storageKeyFor(ownerId, folder, `${Date.now()}-${i}-${safeName}`);
             try {
                 await this.storage.rename(key, newKey);
                 await this.prisma.driveFile.create({
                     data: {
-                        userId: assignment.guideId,
+                        userId: ownerId,
                         folderId: folder.id,
                         name: safeName,
                         mimeType: img.mimeType ?? null,

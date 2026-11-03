@@ -21,7 +21,7 @@ export class PrivatePaxPriceDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(12)
+  @Max(45)
   pax: number;
 
   @Type(() => Number)

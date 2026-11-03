@@ -90,6 +90,7 @@ export declare class DashboardController {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -130,6 +131,7 @@ export declare class DashboardController {
             partnerConfirmedAt: Date | null;
             partnerReturnedAt: Date | null;
             partnerReturnNote: string | null;
+            groupRef: string | null;
             status: import("@prisma/client").$Enums.AssignmentStatus;
             origin: import("@prisma/client").$Enums.AssignmentOrigin;
             sequenceIndex: number;

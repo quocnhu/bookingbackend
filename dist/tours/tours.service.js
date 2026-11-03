@@ -191,7 +191,7 @@ let ToursService = class ToursService {
         const byPax = new Map();
         for (const price of prices) {
             const pax = Number(price.pax);
-            if (!Number.isInteger(pax) || pax < 1 || pax > 12)
+            if (!Number.isInteger(pax) || pax < 1 || pax > 45)
                 continue;
             byPax.set(pax, { ...price, pax });
         }

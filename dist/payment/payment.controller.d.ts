@@ -88,6 +88,7 @@ export declare class PaymentController {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];

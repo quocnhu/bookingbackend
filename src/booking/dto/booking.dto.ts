@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEmail,
@@ -119,7 +120,7 @@ export class CreateBookingDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(12)
+  @Max(45)
   totalPax: number;
 
   @IsOptional()
@@ -355,7 +356,7 @@ export class UpdateBookingDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(12)
+  @Max(45)
   totalPax?: number;
 
   @IsOptional()
@@ -384,6 +385,42 @@ export class UpdateBookingDto {
   @IsString()
   @Length(0, 1000)
   notes?: string;
+}
+
+export class PrivateGroupBusDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(45)
+  pax: number;
+
+  @IsOptional()
+  @IsString()
+  driverId?: string;
+
+  @IsOptional()
+  @IsString()
+  guideId?: string;
+
+  @IsOptional()
+  @IsString()
+  vehicleId?: string;
+
+  @IsOptional()
+  @IsString()
+  providerId?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  note?: string;
+}
+
+export class CreatePrivateGroupDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PrivateGroupBusDto)
+  buses: PrivateGroupBusDto[];
 }
 
 export class QueryBookingDto extends PaginationDto {

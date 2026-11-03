@@ -14,6 +14,7 @@ import {
   CollectBookingPaymentDto,
   ConfirmBookingPaymentDto,
   CreateBookingDto,
+  CreatePrivateGroupDto,
   CreateWebsiteBookingDto,
   QueryBookingDto,
   UpdateBookingDto,
@@ -92,6 +93,16 @@ export class BookingController {
           ? TourType.GROUP_TOUR
           : undefined;
     return this.bookingService.previewBookingRef(type);
+  }
+
+  @Post(':id/private-group')
+  @Permissions('booking.create')
+  createPrivateGroup(
+    @Param('id') id: string,
+    @Body() dto: CreatePrivateGroupDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.bookingService.createPrivateGroup(id, dto, actor);
   }
 
   @Get(':id')

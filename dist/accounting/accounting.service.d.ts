@@ -221,6 +221,7 @@ export declare class AccountingService {
         submittedAt: Date | null;
         reportStatus: import("@prisma/client").$Enums.TourReportStatus | null;
         sourceType: import("@prisma/client").$Enums.TourReportSource;
+        groupRef: string | null;
         moneyVerifiedAt: Date | null;
         guide: {
             id: string;

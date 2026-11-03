@@ -130,7 +130,7 @@ let PaymentService = PaymentService_1 = class PaymentService {
     async listBookingPayments(query) {
         await this.expireStalePayPalPayments();
         const { page, limit, payment, channel, search } = query;
-        const where = {};
+        const where = { parentBookingId: null };
         if (payment)
             where.payment = payment;
         if (channel)

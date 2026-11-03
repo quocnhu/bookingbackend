@@ -628,6 +628,7 @@ export class AccountingService {
           submittedAt: a.tourReport?.submittedAt ?? null,
           reportStatus: a.tourReport?.status ?? null,
           sourceType: a.tourReport?.sourceType ?? TourReportSource.GUIDE_REPORT,
+          groupRef: a.groupRef ?? null,
           moneyVerifiedAt: a.tourReport?.moneyVerifiedAt ?? null,
           guide: a.guide,
           driver: a.driver,
@@ -729,7 +730,7 @@ export class AccountingService {
       // A report needs at least one money entry — the notice is shown to the
       // user on the submit/verify screens; this guard is the final backstop.
       net = await this.computeNet(assignmentId);
-      if (net.entryCount === 0) {
+      if (net.entryCount === 0 && !assignment.groupRef) {
         throw new ConflictException(
           'Tour has no settlement entries — add at least one Collect/Expense entry before verifying',
         );

@@ -451,6 +451,7 @@ let AccountingService = class AccountingService {
                 submittedAt: a.tourReport?.submittedAt ?? null,
                 reportStatus: a.tourReport?.status ?? null,
                 sourceType: a.tourReport?.sourceType ?? client_1.TourReportSource.GUIDE_REPORT,
+                groupRef: a.groupRef ?? null,
                 moneyVerifiedAt: a.tourReport?.moneyVerifiedAt ?? null,
                 guide: a.guide,
                 driver: a.driver,
@@ -518,7 +519,7 @@ let AccountingService = class AccountingService {
             }
             await this.assertPayable(payableToId);
             net = await this.computeNet(assignmentId);
-            if (net.entryCount === 0) {
+            if (net.entryCount === 0 && !assignment.groupRef) {
                 throw new common_1.ConflictException('Tour has no settlement entries — add at least one Collect/Expense entry before verifying');
             }
         }

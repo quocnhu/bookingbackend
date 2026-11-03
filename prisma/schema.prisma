@@ -615,6 +615,11 @@ model Booking {
   assignment   Assignment? @relation(fields: [assignmentId], references: [id])
   paxSequence  Int         @default(0) // Used for drag-and-drop passenger ordering on the bus
 
+  // Private group: one representative parent booking + one child booking per bus.
+  parentBookingId String?
+  parentBooking   Booking?  @relation("BookingGroup", fields: [parentBookingId], references: [id], onDelete: Cascade)
+  childBookings   Booking[] @relation("BookingGroup")
+
   settlements Settlement[]
 
   // Provenance record when a passenger is dragged onto another bus (keeps the red colour / "MOVED from" tag)
@@ -634,6 +639,7 @@ model Booking {
   @@index([assignmentId, paxSequence])
   @@index([customerUserId])
   @@index([payment, payLater])
+  @@index([parentBookingId])
 }
 
 model BookingPayment {
@@ -726,6 +732,9 @@ model Assignment {
   settlements  Settlement[]
   paymentLines PaymentPeriodLine[]
 
+  // Private group ref (parent booking ref) for board/queue grouping.
+  groupRef String?
+
   status        AssignmentStatus @default(PENDING)
   origin        AssignmentOrigin @default(MANUAL)
   sequenceIndex Int              @default(0)
@@ -741,6 +750,7 @@ model Assignment {
 
   @@index([status, sequenceIndex])
   @@index([startDate, endDate]) // Optimises availability queries filtered by date range
+  @@index([groupRef])
 }
 
 // ─── TOUR REPORT (guide reports after the tour finishes) ──────────────────

@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const platform_express_1 = require("@nestjs/platform-express");
 const multer_1 = require("multer");
 const assignments_service_1 = require("./assignments.service");
+const auto_dispatch_cron_1 = require("./auto-dispatch.cron");
 const accounting_service_1 = require("../accounting/accounting.service");
 const accounting_dto_1 = require("../accounting/dto/accounting.dto");
 const assignment_dto_1 = require("./dto/assignment.dto");
@@ -24,9 +25,11 @@ const permissions_decorator_1 = require("../common/decorators/permissions.decora
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let AssignmentsController = class AssignmentsController {
     assignmentsService;
+    autoDispatchCron;
     accountingService;
-    constructor(assignmentsService, accountingService) {
+    constructor(assignmentsService, autoDispatchCron, accountingService) {
         this.assignmentsService = assignmentsService;
+        this.autoDispatchCron = autoDispatchCron;
         this.accountingService = accountingService;
     }
     findAll(query, actor) {
@@ -43,6 +46,18 @@ let AssignmentsController = class AssignmentsController {
     }
     dispatchAllBoard() {
         return this.assignmentsService.dispatchAllBoard();
+    }
+    getAutoDispatchSettings() {
+        return this.autoDispatchCron.getSettings();
+    }
+    updateAutoDispatchSettings(dto, actor) {
+        return this.autoDispatchCron.updateSettings(dto, actor.id);
+    }
+    getRecallCutoff() {
+        return this.assignmentsService.getRecallCutoff();
+    }
+    updateRecallCutoff(dto, actor) {
+        return this.assignmentsService.updateRecallCutoff(dto, actor.id);
     }
     getBoardCrew() {
         return this.assignmentsService.getBoardCrew();
@@ -154,6 +169,38 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "dispatchAllBoard", null);
+__decorate([
+    (0, common_1.Get)('board/auto-dispatch'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "getAutoDispatchSettings", null);
+__decorate([
+    (0, common_1.Put)('board/auto-dispatch'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [assignment_dto_1.UpdateAutoDispatchDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "updateAutoDispatchSettings", null);
+__decorate([
+    (0, common_1.Get)('board/recall-cutoff'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "getRecallCutoff", null);
+__decorate([
+    (0, common_1.Put)('board/recall-cutoff'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [assignment_dto_1.UpdateRecallCutoffDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "updateRecallCutoff", null);
 __decorate([
     (0, common_1.Get)('board/crew'),
     (0, permissions_decorator_1.Permissions)('assignment.read'),
@@ -373,6 +420,7 @@ __decorate([
 exports.AssignmentsController = AssignmentsController = __decorate([
     (0, common_1.Controller)('assignments'),
     __metadata("design:paramtypes", [assignments_service_1.AssignmentsService,
+        auto_dispatch_cron_1.AutoDispatchCron,
         accounting_service_1.AccountingService])
 ], AssignmentsController);
 //# sourceMappingURL=assignments.controller.js.map

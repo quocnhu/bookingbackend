@@ -112,6 +112,7 @@ export declare class PaymentService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];

@@ -26,6 +26,9 @@ const storage_1 = require("../storage");
 const drive_service_1 = require("../drive/drive.service");
 const storage_key_util_1 = require("../common/utils/storage-key.util");
 const BOARD_LOOKBACK_DAYS = 30;
+const RECALL_CUTOFF_KEY = 'recallCutoffTime';
+const DEFAULT_RECALL_CUTOFF = '06:30';
+const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
     prisma;
     auditService;
@@ -383,6 +386,40 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 : client_1.AssignmentOrigin.AUTO_ASSIGN,
         };
     }
+    async getRecallCutoff() {
+        const row = await this.prisma.systemSetting.upsert({
+            where: { key: RECALL_CUTOFF_KEY },
+            update: {},
+            create: { key: RECALL_CUTOFF_KEY, value: DEFAULT_RECALL_CUTOFF },
+        });
+        return {
+            time: HHMM_PATTERN.test(row.value) ? row.value : DEFAULT_RECALL_CUTOFF,
+        };
+    }
+    async updateRecallCutoff(dto, actorId) {
+        const time = (dto.time ?? '').trim();
+        if (!HHMM_PATTERN.test(time)) {
+            throw new common_1.BadRequestException(`Invalid recall cutoff "${dto.time}". Use HH:mm (e.g. "06:30").`);
+        }
+        const before = await this.getRecallCutoff();
+        const row = await this.prisma.systemSetting.upsert({
+            where: { key: RECALL_CUTOFF_KEY },
+            update: { value: time },
+            create: { key: RECALL_CUTOFF_KEY, value: time },
+        });
+        const after = {
+            time: HHMM_PATTERN.test(row.value) ? row.value : DEFAULT_RECALL_CUTOFF,
+        };
+        await this.auditService.log({
+            entityType: 'SystemSetting',
+            entityId: RECALL_CUTOFF_KEY,
+            action: 'UPDATE_RECALL_CUTOFF',
+            beforeData: before,
+            afterData: after,
+            changedBy: actorId ?? null,
+        });
+        return after;
+    }
     async setBoardOrigin(origin) {
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
@@ -734,11 +771,13 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" — assign a ${missing.join(' and ')} first.`);
         }
     }
-    assertRecallAllowed(assignment) {
+    async assertRecallAllowed(assignment) {
+        const { time } = await this.getRecallCutoff();
+        const [hours, minutes] = time.split(':').map(Number);
         const cutoff = new Date(assignment.startDate);
-        cutoff.setHours(6, 30, 0, 0);
+        cutoff.setHours(hours, minutes, 0, 0);
         if (Date.now() > cutoff.getTime()) {
-            throw new common_1.BadRequestException(`Recall locked — the 06:30 cutoff has passed for "${assignment.code ?? 'Bus'}". The tour is considered departed; cancel it instead if needed.`);
+            throw new common_1.BadRequestException(`Recall locked — the ${time} cutoff has passed for "${assignment.code ?? 'Bus'}". The tour is considered departed; cancel it instead if needed.`);
         }
     }
     async updateStatus(id, dto) {
@@ -752,7 +791,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         }
         if (before.status === client_1.AssignmentStatus.DISPATCHED &&
             dto.status === client_1.AssignmentStatus.PENDING) {
-            this.assertRecallAllowed(before);
+            await this.assertRecallAllowed(before);
         }
         if (dto.status === client_1.AssignmentStatus.COMPLETED) {
             const report = await this.prisma.tourReport.findUnique({
@@ -1308,7 +1347,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         const entryCount = await this.prisma.settlement.count({
             where: { assignmentId: id },
         });
-        if (entryCount === 0) {
+        if (entryCount === 0 && !assignment.groupRef) {
             throw new common_1.BadRequestException('Add at least one Collect/Expense entry before submitting the report to Accounting.');
         }
         const report = await this.prisma.tourReport.upsert({
@@ -1395,10 +1434,12 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             assignment.guideId !== actor.id) {
             throw new common_1.BadRequestException('Only the assigned tour guide or office staff can upload evidence');
         }
-        const guideDir = (0, storage_key_util_1.userStorageDir)(assignment.guideId ?? actor.id, assignment.guide?.email, assignment.guide?.name);
+        const owner = assignment.guide ??
+            assignment.driver ?? { id: actor.id, email: null, name: null };
+        const ownerDir = (0, storage_key_util_1.userStorageDir)(owner.id, owner.email, owner.name);
         const ext = (file.originalname.split('.').pop() || '').toLowerCase();
         const safeName = (file.originalname.split('/').pop() || 'file').replace(/[^\w.\- ]/g, '_');
-        const storageKey = (0, storage_key_util_1.pendingEvidenceKey)(guideDir, assignment.id, file.originalname);
+        const storageKey = (0, storage_key_util_1.pendingEvidenceKey)(ownerDir, assignment.id, file.originalname);
         const { url } = await this.storage.save(storageKey, file.buffer, {
             contentType: file.mimetype || undefined,
         });

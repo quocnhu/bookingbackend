@@ -36,6 +36,13 @@ export declare class UpdateAssignmentStatusDto {
 export declare class SetBoardOriginDto {
     origin: AssignmentOrigin;
 }
+export declare class UpdateAutoDispatchDto {
+    enabled?: boolean;
+    cron?: string;
+}
+export declare class UpdateRecallCutoffDto {
+    time: string;
+}
 export declare class ConfirmPartnerHandoffDto {
     partnerId: string;
     contractRef?: string;

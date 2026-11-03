@@ -43,7 +43,10 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
         const { bookingId } = job.data;
         const booking = await this.prisma.booking.findUnique({
             where: { id: bookingId },
-            include: { tour: true },
+            include: {
+                tour: true,
+                _count: { select: { childBookings: true } },
+            },
         });
         if (!booking)
             return { skipped: true, reason: 'BOOKING_NOT_FOUND' };
@@ -55,6 +58,8 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
                 reason: 'ALREADY_ASSIGNED',
                 assignmentId: booking.assignmentId,
             };
+        if ((booking._count?.childBookings ?? 0) > 0)
+            return { skipped: true, reason: 'GROUP_PARENT' };
         if (!booking.startingDate)
             return { skipped: true, reason: 'NO_START_DATE' };
         const executionMode = booking.tour?.requiresGuide === false

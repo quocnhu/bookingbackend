@@ -162,7 +162,7 @@ export class PaymentService {
   async listBookingPayments(query: QueryBookingPaymentsDto) {
     await this.expireStalePayPalPayments();
     const { page, limit, payment, channel, search } = query;
-    const where: Prisma.BookingWhereInput = {};
+    const where: Prisma.BookingWhereInput = { parentBookingId: null };
     if (payment) where.payment = payment;
     if (channel) where.channel = channel;
     const q = search?.trim();

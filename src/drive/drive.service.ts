@@ -197,12 +197,18 @@ export class DriveService {
       where: { id: assignmentId },
       include: {
         guide: { select: { id: true, email: true, name: true } },
+        driver: { select: { id: true, email: true, name: true } },
         tourReport: true,
       },
     });
-    if (!assignment?.guideId || !assignment.tourReport) {
+    if (!assignment?.tourReport) {
       return { moved: 0 };
     }
+    const owner = assignment.guide ?? assignment.driver;
+    if (!owner) {
+      return { moved: 0 };
+    }
+    const ownerId = owner.id;
     const report = assignment.tourReport;
     if (report.status !== 'VERIFIED') {
       return { moved: 0 };
@@ -211,11 +217,7 @@ export class DriveService {
     const images: ReportEvidenceImage[] = Array.isArray(report.evidenceImages)
       ? (report.evidenceImages as unknown as ReportEvidenceImage[])
       : [];
-    const dir = userStorageDir(
-      assignment.guideId,
-      assignment.guide?.email,
-      assignment.guide?.name,
-    );
+    const dir = userStorageDir(ownerId, owner.email, owner.name);
     const prefix = pendingEvidencePrefix(dir, assignment.id);
     const pending = images.filter(
       (img) =>
@@ -226,7 +228,7 @@ export class DriveService {
     }
 
     const folder = await this.getOrCreateTourFolder(
-      assignment.guideId,
+      ownerId,
       assignment.tourName || assignment.code || 'tour',
       assignment.startDate,
     );
@@ -244,7 +246,7 @@ export class DriveService {
         img.name || key.split('/').pop() || 'evidence',
       );
       const newKey = await this.storageKeyFor(
-        assignment.guideId,
+        ownerId,
         folder,
         `${Date.now()}-${i}-${safeName}`,
       );
@@ -252,7 +254,7 @@ export class DriveService {
         await this.storage.rename(key, newKey);
         await this.prisma.driveFile.create({
           data: {
-            userId: assignment.guideId,
+            userId: ownerId,
             folderId: folder.id,
             name: safeName,
             mimeType: img.mimeType ?? null,

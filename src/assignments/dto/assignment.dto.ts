@@ -137,6 +137,23 @@ export class SetBoardOriginDto {
   origin: AssignmentOrigin;
 }
 
+/** Scheduled auto-dispatch: toggle and cron expression (e.g. "0 4 * * *"). */
+export class UpdateAutoDispatchDto {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  cron?: string;
+}
+
+/** Recall cutoff time (HH:mm) on the departure day. */
+export class UpdateRecallCutoffDto {
+  @IsString()
+  time: string;
+}
+
 export class ConfirmPartnerHandoffDto {
   @IsString()
   partnerId: string;

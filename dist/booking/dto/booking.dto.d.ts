@@ -80,6 +80,17 @@ export declare class UpdateBookingDto {
     noShowReason?: string;
     notes?: string;
 }
+export declare class PrivateGroupBusDto {
+    pax: number;
+    driverId?: string;
+    guideId?: string;
+    vehicleId?: string;
+    providerId?: string;
+    note?: string;
+}
+export declare class CreatePrivateGroupDto {
+    buses: PrivateGroupBusDto[];
+}
 export declare class QueryBookingDto extends PaginationDto {
     status?: BookingStatus;
     channel?: BookingProvider;

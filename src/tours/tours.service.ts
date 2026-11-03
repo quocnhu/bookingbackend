@@ -238,7 +238,7 @@ export class ToursService {
     const byPax = new Map<number, PrivatePaxPriceDto>();
     for (const price of prices) {
       const pax = Number(price.pax);
-      if (!Number.isInteger(pax) || pax < 1 || pax > 12) continue;
+      if (!Number.isInteger(pax) || pax < 1 || pax > 45) continue;
       byPax.set(pax, { ...price, pax });
     }
     return [...byPax.values()].sort((a, b) => a.pax - b.pax);

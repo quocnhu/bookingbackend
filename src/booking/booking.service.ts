@@ -8,6 +8,9 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
+  AssignmentExecutionMode,
+  AssignmentOrigin,
+  AssignmentStatus,
   Booking,
   BookingProvider,
   BookingStatus,
@@ -29,6 +32,7 @@ import { AssignmentBoardService } from '@/queues/assignment-board.service';
 import { AssignmentQueue } from '@/queues/assignment.queue';
 import {
   CreateBookingDto,
+  CreatePrivateGroupDto,
   CreateWebsiteBookingDto,
   BookingPatchDto,
   CollectBookingPaymentDto,
@@ -530,6 +534,15 @@ startingDate: data.startingDate
           tour: {
             select: { id: true, name: true, type: true, durationDays: true },
           },
+          parentBooking: { select: { id: true, bookingRef: true } },
+          childBookings: {
+            select: {
+              id: true,
+              bookingRef: true,
+              totalPax: true,
+              assignment: { select: { id: true, code: true, status: true } },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -711,6 +724,26 @@ startingDate: data.startingDate
         rawData: { select: { payload: true } },
         customerUser: { select: { id: true, name: true, email: true } },
         payments: { orderBy: { createdAt: 'desc' } },
+        assignment: {
+          select: {
+            id: true,
+            code: true,
+            status: true,
+            _count: { select: { bookings: true } },
+          },
+        },
+        parentBooking: { select: { id: true, bookingRef: true } },
+        childBookings: {
+          select: {
+            id: true,
+            bookingRef: true,
+            totalPax: true,
+            assignment: {
+              select: { id: true, code: true, status: true, groupRef: true },
+            },
+          },
+          orderBy: { bookingRef: 'asc' },
+        },
       },
     });
     if (!booking) throw new NotFoundException('Booking not found');
@@ -870,6 +903,7 @@ startingDate: data.startingDate
   async create(dto: CreateBookingDto, actor?: AuthenticatedUser) {
     this.assertBookingContactFields(dto);
     await this.assertTourTypeOffered(dto.tourId, dto.tourType);
+    await this.assertTotalPaxAllowed(dto.tourId, dto.tourType, dto.totalPax);
     // Guard invalid state: ASSIGNED requires a bus. The bookings-table
     // status dropdown used to allow ASSIGNED with assignmentId=null,
     // which hides the row from both Assignments (no bus) and the
@@ -1000,6 +1034,34 @@ startingDate: data.startingDate
     }
   }
 
+  private async assertTotalPaxAllowed(
+    tourId: string | null | undefined,
+    tourType: TourType | null | undefined,
+    totalPax: number | null | undefined,
+  ): Promise<void> {
+    const pax = Number(totalPax ?? 0);
+    if (!pax || !tourType) return;
+    let max = 12;
+    if (tourType === TourType.PRIVATE_TOUR && tourId) {
+      const tour = await this.prisma.tour.findUnique({
+        where: { id: tourId },
+        select: {
+          privatePaxPrices: {
+            where: { pricePerPerson: { gt: 0 } },
+            select: { pax: true },
+          },
+        },
+      });
+      const tiers = tour?.privatePaxPrices ?? [];
+      if (tiers.length) max = Math.max(...tiers.map((t) => t.pax));
+    }
+    if (pax > max) {
+      throw new BadRequestException(
+        `This booking is limited to ${max} people for the selected tour`,
+      );
+    }
+  }
+
   private assertBookingContactFields(dto: CreateBookingDto): void {
     if (!dto.mail?.trim()) {
       throw new BadRequestException('Email is required');
@@ -1009,8 +1071,223 @@ startingDate: data.startingDate
     }
   }
 
+  async createPrivateGroup(
+    id: string,
+    dto: CreatePrivateGroupDto,
+    actor?: AuthenticatedUser,
+  ) {
+    const parent = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        tour: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            durationDays: true,
+            requiresGuide: true,
+          },
+        },
+        childBookings: { select: { id: true } },
+        assignment: {
+          select: {
+            id: true,
+            code: true,
+            status: true,
+            _count: { select: { bookings: true } },
+          },
+        },
+      },
+    });
+    if (!parent) throw new NotFoundException('Booking not found');
+    const type = parent.tourType ?? parent.tour?.type ?? null;
+    if (type !== TourType.PRIVATE_TOUR) {
+      throw new BadRequestException(
+        'Only private tour bookings can be split into buses',
+      );
+    }
+    if (parent.parentBookingId) {
+      throw new BadRequestException('This booking is already a group child');
+    }
+    if (parent.childBookings.length > 0) {
+      throw new ConflictException('This booking is already split into buses');
+    }
+    if (!parent.startingDate) {
+      throw new BadRequestException('Start date is required before splitting');
+    }
+    const totalPax = Number(parent.totalPax ?? 0);
+    if (totalPax <= 0) {
+      throw new BadRequestException('Booking total pax must be greater than 0');
+    }
+    const buses = dto.buses ?? [];
+    if (buses.length === 0) {
+      throw new BadRequestException('Add at least one bus');
+    }
+    const busPaxTotal = buses.reduce((sum, bus) => sum + Number(bus.pax ?? 0), 0);
+    if (busPaxTotal !== totalPax) {
+      throw new BadRequestException(
+        `Bus pax total (${busPaxTotal}) must equal the booking total pax (${totalPax})`,
+      );
+    }
+
+    let detachAssignmentId: string | null = null;
+    if (parent.assignmentId) {
+      const assignment = parent.assignment;
+      const removableStatuses: AssignmentStatus[] = [
+        AssignmentStatus.PENDING,
+        AssignmentStatus.DRAFT_ASSIGNED,
+        AssignmentStatus.TRANSFERRED,
+      ];
+      if (
+        !assignment ||
+        !removableStatuses.includes(assignment.status) ||
+        (assignment._count?.bookings ?? 0) > 1
+      ) {
+        throw new BadRequestException(
+          'This booking is already on a dispatched/shared bus — remove it from that bus first',
+        );
+      }
+      detachAssignmentId = assignment.id;
+    }
+
+    const userIds = [
+      ...new Set(
+        buses
+          .flatMap((bus) => [bus.driverId, bus.guideId])
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ];
+    if (userIds.length > 0) {
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, role: true },
+      });
+      const roleById = new Map(users.map((user) => [user.id, user.role]));
+      for (const bus of buses) {
+        if (bus.driverId && roleById.get(bus.driverId) !== RoleType.DRIVER) {
+          throw new BadRequestException('The selected driver is not a driver');
+        }
+        if (bus.guideId && roleById.get(bus.guideId) !== RoleType.TOUR_GUIDE) {
+          throw new BadRequestException('The selected guide is not a tour guide');
+        }
+      }
+    }
+
+    const durationDays = parent.tour?.durationDays ?? 1;
+    const startDate = new Date(parent.startingDate);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + Math.max(0, durationDays - 1));
+    const executionMode =
+      parent.tour?.requiresGuide === false
+        ? AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+        : AssignmentExecutionMode.COMPANY_GUIDED;
+    const existing = await this.prisma.assignment.findMany({
+      where: { code: { startsWith: 'Priv Bus -' } },
+      select: { code: true },
+    });
+    const numbers = existing
+      .map((row) => parseInt((row.code ?? '').split('-')[1]?.trim() ?? '0', 10))
+      .filter((value) => !Number.isNaN(value));
+    let nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
+    const actorName = actor?.name ?? actor?.email ?? 'Operator';
+    const tourName = parent.tourName ?? parent.tour?.name ?? null;
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      if (detachAssignmentId) {
+        await tx.booking.update({
+          where: { id: parent.id },
+          data: {
+            assignmentId: null,
+            paxSequence: 0,
+            status: BookingStatus.PENDING,
+          },
+        });
+        await tx.assignment.delete({ where: { id: detachAssignmentId } });
+      }
+      const rows: Array<{ assignmentId: string; bookingRef: string }> = [];
+      for (let index = 0; index < buses.length; index += 1) {
+        const bus = buses[index];
+        const busPax = Number(bus.pax ?? 0);
+        const code = `Priv Bus - ${nextNumber++}`;
+        const bookingRef = `${parent.bookingRef}-B${index + 1}`;
+        const assignment = await tx.assignment.create({
+          data: {
+            code,
+            startDate,
+            endDate,
+            status: AssignmentStatus.PENDING,
+            origin: AssignmentOrigin.MANUAL,
+            executionMode,
+            groupRef: parent.bookingRef,
+            tourType: type,
+            tourName,
+            durationDays,
+            totalPax: busPax,
+            driverId: bus.driverId ?? null,
+            guideId:
+              executionMode === AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+                ? null
+                : (bus.guideId ?? null),
+            vehicleId: bus.vehicleId ?? null,
+            providerId: bus.providerId ?? null,
+            createdWho: actorName,
+            tripNotes:
+              bus.note?.trim() || `Private group bus for ${parent.bookingRef}`,
+          },
+        });
+        const child = await tx.booking.create({
+          data: {
+            bookingRef,
+            channel: parent.channel,
+            status: BookingStatus.ASSIGNED,
+            tourId: parent.tourId,
+            source: 'private-group',
+            startingDate: parent.startingDate,
+            departureTime: parent.departureTime,
+            customerName: parent.customerName,
+            hotelName: parent.hotelName,
+            phone: parent.phone,
+            mail: parent.mail,
+            address: parent.address,
+            latitude: parent.latitude,
+            longitude: parent.longitude,
+            totalPax: busPax,
+            paxDetail: parent.paxDetail,
+            tourType: type,
+            tourName,
+            payment: PaymentStatus.PAID,
+            totalAmount: new Prisma.Decimal(0),
+            currency: parent.currency,
+            notes: `Group child of ${parent.bookingRef}${bus.note ? ` — ${bus.note}` : ''}`,
+            createdWho: actorName,
+            assignmentId: assignment.id,
+            paxSequence: 1,
+            parentBookingId: parent.id,
+          },
+        });
+        rows.push({ assignmentId: assignment.id, bookingRef: child.bookingRef });
+      }
+      return rows;
+    });
+
+    await this.auditService.log({
+      entityType: 'Booking',
+      entityId: id,
+      action: 'SPLIT_PRIVATE_GROUP',
+      afterData: { parentRef: parent.bookingRef, buses: created },
+      changedBy: actor?.id,
+    });
+
+    return this.findOne(id);
+  }
+
   async update(id: string, dto: UpdateBookingDto, actor?: AuthenticatedUser) {
     const before = await this.findOne(id);
+    await this.assertTotalPaxAllowed(
+      dto.tourId ?? before.tourId,
+      dto.tourType ?? before.tourType,
+      dto.totalPax ?? before.totalPax,
+    );
 
     // Check if booking is locked due to tour report submission
     if (before.assignmentId) {

@@ -19,6 +19,7 @@ import {
   SubmitTourReportDto,
   UpdateAssignmentDto,
   UpdateAssignmentStatusDto,
+  UpdateRecallCutoffDto,
   VerifyTourReportDto,
 } from './dto/assignment.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
@@ -54,6 +55,11 @@ import {
 /** Dispatch Board: allows looking back N days. Must match
  *  isOutsideLoadedWindow in frontend/components/dispatch-board/index.tsx. */
 const BOARD_LOOKBACK_DAYS = 30;
+
+/** Recall (DISPATCHED → PENDING) is locked after this time on the departure day. */
+const RECALL_CUTOFF_KEY = 'recallCutoffTime';
+const DEFAULT_RECALL_CUTOFF = '06:30';
+const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 @Injectable()
 export class AssignmentsService {
@@ -481,6 +487,48 @@ export class AssignmentsService {
           ? AssignmentOrigin.MANUAL
           : AssignmentOrigin.AUTO_ASSIGN,
     };
+  }
+
+  /** Recall cutoff time (HH:mm) persisted in SystemSetting. */
+  async getRecallCutoff(): Promise<{ time: string }> {
+    const row = await this.prisma.systemSetting.upsert({
+      where: { key: RECALL_CUTOFF_KEY },
+      update: {},
+      create: { key: RECALL_CUTOFF_KEY, value: DEFAULT_RECALL_CUTOFF },
+    });
+    return {
+      time: HHMM_PATTERN.test(row.value) ? row.value : DEFAULT_RECALL_CUTOFF,
+    };
+  }
+
+  async updateRecallCutoff(
+    dto: UpdateRecallCutoffDto,
+    actorId?: string | null,
+  ): Promise<{ time: string }> {
+    const time = (dto.time ?? '').trim();
+    if (!HHMM_PATTERN.test(time)) {
+      throw new BadRequestException(
+        `Invalid recall cutoff "${dto.time}". Use HH:mm (e.g. "06:30").`,
+      );
+    }
+    const before = await this.getRecallCutoff();
+    const row = await this.prisma.systemSetting.upsert({
+      where: { key: RECALL_CUTOFF_KEY },
+      update: { value: time },
+      create: { key: RECALL_CUTOFF_KEY, value: time },
+    });
+    const after = {
+      time: HHMM_PATTERN.test(row.value) ? row.value : DEFAULT_RECALL_CUTOFF,
+    };
+    await this.auditService.log({
+      entityType: 'SystemSetting',
+      entityId: RECALL_CUTOFF_KEY,
+      action: 'UPDATE_RECALL_CUTOFF',
+      beforeData: before,
+      afterData: after,
+      changedBy: actorId ?? null,
+    });
+    return after;
   }
 
   /** Changes the creation source (Manual/Auto) for all trips currently on the
@@ -977,15 +1025,17 @@ export class AssignmentsService {
     }
   }
 
-  /** Recall (DISPATCHED → PENDING) is locked after 06:30 on the departure day —
-   *  by then the guide may already have seen the assignment.
-   *  Before that the backend lets the operator pull a trip back to reassign it. */
-  private assertRecallAllowed(assignment: any) {
+  /** Recall (DISPATCHED → PENDING) is locked after the configured cutoff time
+   *  on the departure day — by then the guide may already have seen the
+   *  assignment. Before that the operator can pull the trip back to reassign. */
+  private async assertRecallAllowed(assignment: any) {
+    const { time } = await this.getRecallCutoff();
+    const [hours, minutes] = time.split(':').map(Number);
     const cutoff = new Date(assignment.startDate);
-    cutoff.setHours(6, 30, 0, 0);
+    cutoff.setHours(hours, minutes, 0, 0);
     if (Date.now() > cutoff.getTime()) {
       throw new BadRequestException(
-        `Recall locked — the 06:30 cutoff has passed for "${assignment.code ?? 'Bus'}". The tour is considered departed; cancel it instead if needed.`,
+        `Recall locked — the ${time} cutoff has passed for "${assignment.code ?? 'Bus'}". The tour is considered departed; cancel it instead if needed.`,
       );
     }
   }
@@ -1009,13 +1059,13 @@ export class AssignmentsService {
         id,
       );
     }
-    // ── Guard: Recall (DISPATCHED → PENDING) is locked after 06:30 on the
-    // departure day — the bus is considered en route. ──
+    // ── Guard: Recall (DISPATCHED → PENDING) is locked after the configured
+    // recall cutoff on the departure day — the bus is considered en route. ──
     if (
       before.status === AssignmentStatus.DISPATCHED &&
       dto.status === AssignmentStatus.PENDING
     ) {
-      this.assertRecallAllowed(before);
+      await this.assertRecallAllowed(before);
     }
 
     // ── Guard: COMPLETED requires a verified TourReport AND locked money.
@@ -1761,7 +1811,7 @@ export class AssignmentsService {
     const entryCount = await this.prisma.settlement.count({
       where: { assignmentId: id },
     });
-    if (entryCount === 0) {
+    if (entryCount === 0 && !assignment.groupRef) {
       throw new BadRequestException(
         'Add at least one Collect/Expense entry before submitting the report to Accounting.',
       );
@@ -1878,18 +1928,17 @@ export class AssignmentsService {
       );
     }
 
-    const guideDir = userStorageDir(
-      assignment.guideId ?? actor.id,
-      assignment.guide?.email,
-      assignment.guide?.name,
-    );
+    const owner =
+      assignment.guide ??
+      assignment.driver ?? { id: actor.id, email: null, name: null };
+    const ownerDir = userStorageDir(owner.id, owner.email, owner.name);
     const ext = (file.originalname.split('.').pop() || '').toLowerCase();
     const safeName = (file.originalname.split('/').pop() || 'file').replace(
       /[^\w.\- ]/g,
       '_',
     );
     const storageKey = pendingEvidenceKey(
-      guideDir,
+      ownerDir,
       assignment.id,
       file.originalname,
     );

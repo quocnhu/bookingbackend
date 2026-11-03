@@ -1,6 +1,6 @@
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
-import { AssignBookingsDto, ConfirmPartnerHandoffDto, CreateAssignmentDto, FinalizeAssignmentDto, QueryAssignmentDto, ReturnPartnerHandoffDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, VerifyTourReportDto } from './dto/assignment.dto';
+import { AssignBookingsDto, ConfirmPartnerHandoffDto, CreateAssignmentDto, FinalizeAssignmentDto, QueryAssignmentDto, ReturnPartnerHandoffDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, UpdateRecallCutoffDto, VerifyTourReportDto } from './dto/assignment.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
 import { AssignmentOrigin, Prisma } from '@prisma/client';
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
@@ -127,6 +127,12 @@ export declare class AssignmentsService {
     getBoardMode(): Promise<{
         mode: AssignmentOrigin;
     }>;
+    getRecallCutoff(): Promise<{
+        time: string;
+    }>;
+    updateRecallCutoff(dto: UpdateRecallCutoffDto, actorId?: string | null): Promise<{
+        time: string;
+    }>;
     setBoardOrigin(origin: AssignmentOrigin): Promise<{
         updated: number;
         mode: import("@prisma/client").$Enums.AssignmentOrigin;
@@ -243,6 +249,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -310,6 +317,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -427,6 +435,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -494,6 +503,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -607,6 +617,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -674,6 +685,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -790,6 +802,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -857,6 +870,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -971,6 +985,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -1038,6 +1053,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1151,6 +1167,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -1218,6 +1235,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1331,6 +1349,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -1398,6 +1417,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1511,6 +1531,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -1578,6 +1599,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1693,6 +1715,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -1760,6 +1783,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1873,6 +1897,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -1940,6 +1965,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -2053,6 +2079,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -2120,6 +2147,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -2281,6 +2309,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -2348,6 +2377,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -2461,6 +2491,7 @@ export declare class AssignmentsService {
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
             paxSequence: number;
+            parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
@@ -2528,6 +2559,7 @@ export declare class AssignmentsService {
         partnerConfirmedAt: Date | null;
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
+        groupRef: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
