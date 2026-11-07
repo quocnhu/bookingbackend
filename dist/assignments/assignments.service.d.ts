@@ -143,7 +143,7 @@ export declare class AssignmentsService {
     private resolvePriceOverride;
     private decorateBoardCard;
     findAll(query: QueryAssignmentDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
-    findOne(id: string): Promise<{
+    findOne(id: string, actor?: AuthenticatedUser): Promise<{
         vehicle: {
             id: string;
             providerId: string;
@@ -193,6 +193,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -318,6 +319,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -327,6 +338,7 @@ export declare class AssignmentsService {
     }>;
     private assertDetailsUnlocked;
     private isOutsourced;
+    private canVerifyMoney;
     private resolveReportPayee;
     private assertPartnerLocked;
     create(dto: CreateAssignmentDto, actor?: AuthenticatedUser): Promise<{
@@ -379,6 +391,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -504,6 +517,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -561,6 +584,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -686,6 +710,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -696,6 +730,10 @@ export declare class AssignmentsService {
     private assertDispatchableToday;
     private assertCrewAssigned;
     private assertRecallAllowed;
+    private assertDispatchedUpdateAllowed;
+    private notifyAssignmentUpdated;
+    private notifyUserIds;
+    private buildAssignmentSummary;
     updateStatus(id: string, dto: UpdateAssignmentStatusDto): Promise<{
         vehicle: {
             id: string;
@@ -746,6 +784,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -871,6 +910,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -929,6 +978,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -1054,6 +1104,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1111,6 +1171,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -1236,6 +1297,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1293,6 +1364,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -1418,6 +1490,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1475,6 +1557,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -1600,6 +1683,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1659,6 +1752,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -1784,6 +1878,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -1841,6 +1945,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -1966,6 +2071,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -2023,6 +2138,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -2148,6 +2264,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -2253,6 +2379,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -2378,6 +2505,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;
@@ -2435,6 +2572,7 @@ export declare class AssignmentsService {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         bookings: ({
             tour: {
@@ -2560,6 +2698,16 @@ export declare class AssignmentsService {
         partnerReturnedAt: Date | null;
         partnerReturnNote: string | null;
         groupRef: string | null;
+        providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+        providerRequestedAt: Date | null;
+        providerViewedAt: Date | null;
+        providerRespondedAt: Date | null;
+        providerDeadline: Date | null;
+        providerRequestNote: string | null;
+        providerResponseNote: string | null;
+        providerDeclineReason: string | null;
+        providerRequestedById: string | null;
+        providerAssignedById: string | null;
         status: import("@prisma/client").$Enums.AssignmentStatus;
         origin: import("@prisma/client").$Enums.AssignmentOrigin;
         sequenceIndex: number;

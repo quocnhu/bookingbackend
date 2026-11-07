@@ -1351,6 +1351,9 @@ let AccountingService = class AccountingService {
         if (period.voidedAt) {
             throw new common_1.ConflictException('This period was already voided');
         }
+        if (period.paidAt) {
+            throw new common_1.ConflictException('This period is already marked paid — record a reversal instead of voiding it.');
+        }
         const voided = await this.prisma.paymentPeriod.update({
             where: { id: periodId },
             data: {

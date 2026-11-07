@@ -3,7 +3,7 @@ import type { RangeKey } from './dashboard.service';
 export declare class DashboardController {
     private readonly dashboardService;
     constructor(dashboardService: DashboardService);
-    stats(): Promise<{
+    stats(fromDate?: string, toDate?: string): Promise<{
         totalBookings: number;
         todayBookings: number;
         pendingBookings: number;
@@ -15,6 +15,17 @@ export declare class DashboardController {
         totalAssignments: number;
         todayLogins: number;
         lockedAccounts: number;
+        totalRevenue: number;
+        revenueToday: number;
+        pendingRevenue: number;
+        localUsers: number;
+        googleUsers: number;
+        customerUsers: number;
+        googleCustomers: number;
+        settledToCompany: number;
+        settledToGuide: number;
+        revenueFrom: string | null;
+        revenueTo: string | null;
     }>;
     charts(range?: RangeKey): Promise<{
         range: RangeKey;
@@ -25,6 +36,10 @@ export declare class DashboardController {
         loginsByBucket: {
             label: string;
             count: number;
+        }[];
+        revenueByBucket: {
+            label: string;
+            amount: number;
         }[];
         paymentStatusDistribution: {
             status: import("@prisma/client").$Enums.PaymentStatus;
@@ -132,6 +147,16 @@ export declare class DashboardController {
             partnerReturnedAt: Date | null;
             partnerReturnNote: string | null;
             groupRef: string | null;
+            providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
+            providerRequestedAt: Date | null;
+            providerViewedAt: Date | null;
+            providerRespondedAt: Date | null;
+            providerDeadline: Date | null;
+            providerRequestNote: string | null;
+            providerResponseNote: string | null;
+            providerDeclineReason: string | null;
+            providerRequestedById: string | null;
+            providerAssignedById: string | null;
             status: import("@prisma/client").$Enums.AssignmentStatus;
             origin: import("@prisma/client").$Enums.AssignmentOrigin;
             sequenceIndex: number;

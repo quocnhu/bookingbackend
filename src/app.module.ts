@@ -32,6 +32,7 @@ import { LeavesModule } from './leaves/leaves.module';
 import { CoordinatesModule } from './coordinates/coordinates.module';
 import { RoutePricesModule } from './route-prices/route-prices.module';
 import { TransportationProvidersModule } from './transportation-providers/transportation-providers.module';
+import { TransportRequestsModule } from './transport-requests/transport-requests.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { PaymentModule } from './payment/payment.module';
 import { PartnersModule } from './partners/partners.module';
@@ -67,6 +68,7 @@ import { PartnersModule } from './partners/partners.module';
     CoordinatesModule,
     RoutePricesModule,
     TransportationProvidersModule,
+    TransportRequestsModule,
     AccountingModule,
     PaymentModule,
     PartnersModule,

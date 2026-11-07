@@ -37,6 +37,7 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
                 guideId: true,
                 driverId: true,
                 providerId: true,
+                provider: { select: { isCompany: true } },
                 executionMode: true,
             },
         });
@@ -56,9 +57,12 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
                 updates.guideId = guideId;
         }
         if (!assignment.driverId) {
-            const driverId = await this.pickUserId(client_1.RoleType.DRIVER, assignment.id, start, end, assignment.providerId);
-            if (driverId)
-                updates.driverId = driverId;
+            const thirdPartyProvider = !!assignment.providerId && assignment.provider?.isCompany === false;
+            if (!thirdPartyProvider) {
+                const driverId = await this.pickUserId(client_1.RoleType.DRIVER, assignment.id, start, end, assignment.providerId);
+                if (driverId)
+                    updates.driverId = driverId;
+            }
         }
         if (updates.guideId || updates.driverId) {
             await this.prisma.assignment.update({
@@ -159,7 +163,9 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
                 : (u.guideProfile?.rating ?? 0);
             candidates.push({ id: u.id, company, rating, name: u.name ?? '' });
         }
-        candidates.sort((a, b) => b.company - a.company || b.rating - a.rating || a.name.localeCompare(b.name));
+        candidates.sort((a, b) => b.company - a.company ||
+            b.rating - a.rating ||
+            a.name.localeCompare(b.name));
         return candidates[0]?.id ?? null;
     }
     async busyUserIds(role, start, end, excludeAssignmentId) {

@@ -80,6 +80,22 @@ enum AssignmentOrigin {
   AUTO_ASSIGN // Created by the Auto-Assign engine / queue
 }
 
+enum TransportRequestStatus {
+  NOT_REQUIRED // Company fleet / outsourced partner — no provider request
+  REQUESTED // Sent to the transportation provider
+  VIEWED // Provider opened the request
+  ASSIGNED // Provider (or admin override) set driver + vehicle
+  DECLINED // Provider refused the request
+  EXPIRED // Deadline passed without an assignment
+  CANCELLED // Admin cancelled the request
+}
+
+enum ProviderAssignmentMode {
+  MANUAL // Provider admin picks driver + vehicle
+  AUTO_SUGGEST // System suggests, provider confirms
+  FULLY_AUTO // System assigns automatically
+}
+
 enum GuideType {
   OFFICIAL // In-house guide (paid on a period basis)
   FREELANCE // Freelance guide (settled per tour)
@@ -515,6 +531,7 @@ model TransportationProvider {
   // internal resources, always priced at 0 VND and preferred by auto-assign
   // ahead of third-party providers.
   isCompany   Boolean      @default(false)
+  assignmentMode ProviderAssignmentMode @default(MANUAL)
   users       User[]
   vehicles    Vehicle[]
   routePrices RoutePrice[]
@@ -735,6 +752,18 @@ model Assignment {
   // Private group ref (parent booking ref) for board/queue grouping.
   groupRef String?
 
+  // ─── Transportation provider request (third-party driver + vehicle) ──
+  providerRequestStatus TransportRequestStatus @default(NOT_REQUIRED)
+  providerRequestedAt   DateTime?
+  providerViewedAt      DateTime?
+  providerRespondedAt   DateTime?
+  providerDeadline      DateTime?
+  providerRequestNote   String?                @db.Text
+  providerResponseNote  String?                @db.Text
+  providerDeclineReason String?                @db.Text
+  providerRequestedById String?
+  providerAssignedById  String?
+
   status        AssignmentStatus @default(PENDING)
   origin        AssignmentOrigin @default(MANUAL)
   sequenceIndex Int              @default(0)
@@ -751,6 +780,8 @@ model Assignment {
   @@index([status, sequenceIndex])
   @@index([startDate, endDate]) // Optimises availability queries filtered by date range
   @@index([groupRef])
+  @@index([providerId, providerRequestStatus])
+  @@index([providerRequestStatus, providerDeadline])
 }
 
 // ─── TOUR REPORT (guide reports after the tour finishes) ──────────────────

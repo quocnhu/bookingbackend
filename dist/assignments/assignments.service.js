@@ -27,7 +27,7 @@ const drive_service_1 = require("../drive/drive.service");
 const storage_key_util_1 = require("../common/utils/storage-key.util");
 const BOARD_LOOKBACK_DAYS = 30;
 const RECALL_CUTOFF_KEY = 'recallCutoffTime';
-const DEFAULT_RECALL_CUTOFF = '06:30';
+const DEFAULT_RECALL_CUTOFF = '06:00';
 const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
     prisma;
@@ -399,7 +399,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
     async updateRecallCutoff(dto, actorId) {
         const time = (dto.time ?? '').trim();
         if (!HHMM_PATTERN.test(time)) {
-            throw new common_1.BadRequestException(`Invalid recall cutoff "${dto.time}". Use HH:mm (e.g. "06:30").`);
+            throw new common_1.BadRequestException(`Invalid recall cutoff "${dto.time}". Use HH:mm (e.g. "06:00").`);
         }
         const before = await this.getRecallCutoff();
         const row = await this.prisma.systemSetting.upsert({
@@ -608,13 +608,26 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         ]);
         return { items, total, page, limit };
     }
-    async findOne(id) {
+    async findOne(id, actor) {
         const assignment = await this.prisma.assignment.findUnique({
             where: { id },
             include: this.include,
         });
         if (!assignment)
             throw new common_1.NotFoundException('Assignment not found');
+        if (actor &&
+            actor.role !== client_1.RoleType.ADMIN &&
+            actor.role !== client_1.RoleType.OFFICE) {
+            if (actor.role === client_1.RoleType.TRANSPORT_PROVIDER) {
+                if (!actor.providerId || assignment.providerId !== actor.providerId) {
+                    throw new common_1.ForbiddenException('You can only view trips assigned to your fleet');
+                }
+            }
+            else if (actor.id !== assignment.guideId &&
+                actor.id !== assignment.driverId) {
+                throw new common_1.ForbiddenException('You can only view your own trips');
+            }
+        }
         return assignment;
     }
     assertDetailsUnlocked(assignment, actor) {
@@ -628,6 +641,13 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
     isOutsourced(assignment) {
         return (assignment?.executionMode === client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER ||
             assignment?.partnerStatus === client_1.PartnerHandoffStatus.HANDED_OFF);
+    }
+    canVerifyMoney(actor) {
+        if (!actor)
+            return false;
+        if (actor.role === client_1.RoleType.ADMIN)
+            return true;
+        return (actor.permissions ?? []).includes('accounting.money.verify');
     }
     resolveReportPayee(assignment) {
         if (this.isOutsourced(assignment)) {
@@ -665,6 +685,11 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         if (actor?.role === client_1.RoleType.TRANSPORT_PROVIDER) {
             await this.assertProviderOwnsAssignment(actor, dto);
         }
+        if (dto.status !== undefined &&
+            dto.status !== client_1.AssignmentStatus.PENDING &&
+            dto.status !== client_1.AssignmentStatus.DRAFT_ASSIGNED) {
+            throw new common_1.BadRequestException('New assignments can only start as PENDING or DRAFT_ASSIGNED. Use PUT /assignments/:id/status to dispatch or complete.');
+        }
         const assignment = await this.prisma.assignment.create({
             data: {
                 code: dto.code,
@@ -676,7 +701,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 driverId: dto.driverId,
                 guideId: dto.guideId,
                 executionMode: dto.executionMode ?? client_1.AssignmentExecutionMode.COMPANY_GUIDED,
-                status: dto.status,
+                status: dto.status ?? client_1.AssignmentStatus.PENDING,
                 sequenceIndex: dto.sequenceIndex,
                 priceOverride: await this.resolvePriceOverride(dto),
                 tripNotes: dto.tripNotes,
@@ -695,6 +720,14 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         const before = await this.findOne(id);
         this.assertDetailsUnlocked(before, actor);
         this.assertPartnerLocked(before);
+        if (dto.guideId !== undefined ||
+            dto.driverId !== undefined ||
+            dto.providerId !== undefined ||
+            dto.vehicleId !== undefined ||
+            dto.startDate !== undefined ||
+            dto.endDate !== undefined) {
+            await this.assertDispatchedUpdateAllowed(before, actor);
+        }
         if (dto.executionMode === client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER) {
             throw new common_1.BadRequestException('Use the partner handoff action to send a trip to a partner agency.');
         }
@@ -708,6 +741,9 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             dto.endDate !== undefined) {
             await this.assertCrewAvailableForDates(dto.guideId !== undefined ? dto.guideId : before.guideId, dto.driverId !== undefined ? dto.driverId : before.driverId, startDate, endDate, id);
         }
+        if (dto.status !== undefined && dto.status !== before.status) {
+            throw new common_1.BadRequestException('Change assignment status through PUT /assignments/:id/status so dispatch, recall and completion rules are enforced.');
+        }
         const assignment = await this.prisma.assignment.update({
             where: { id },
             data: {
@@ -720,7 +756,6 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 driverId: dto.driverId,
                 guideId: dto.guideId,
                 executionMode: dto.executionMode,
-                status: dto.status,
                 sequenceIndex: dto.sequenceIndex,
                 priceOverride: await this.resolvePriceOverride({
                     providerId: dto.providerId !== undefined ? dto.providerId : before.providerId,
@@ -741,7 +776,9 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             assignmentId: id,
             action: 'update',
         });
-        return this.findOne(id);
+        const updated = await this.findOne(id);
+        await this.notifyAssignmentUpdated(before, updated, actor);
+        return updated;
     }
     assertDispatchableToday(assignment) {
         const startOfToday = new Date();
@@ -779,6 +816,106 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         if (Date.now() > cutoff.getTime()) {
             throw new common_1.BadRequestException(`Recall locked — the ${time} cutoff has passed for "${assignment.code ?? 'Bus'}". The tour is considered departed; cancel it instead if needed.`);
         }
+    }
+    async assertDispatchedUpdateAllowed(assignment, actor) {
+        if (assignment.status !== client_1.AssignmentStatus.DISPATCHED)
+            return;
+        if (actor?.role === client_1.RoleType.ADMIN)
+            return;
+        const { time } = await this.getRecallCutoff();
+        const [hours, minutes] = time.split(':').map(Number);
+        const cutoff = new Date(assignment.startDate);
+        cutoff.setHours(hours, minutes, 0, 0);
+        if (Date.now() > cutoff.getTime()) {
+            throw new common_1.ConflictException(`"${assignment.code ?? 'Bus'}" has departed and the ${time} cutoff has passed. Only an administrator can change crew, vehicle, provider or dates now.`);
+        }
+    }
+    async notifyAssignmentUpdated(before, after, actor) {
+        const changes = [];
+        if (before.guideId !== after.guideId)
+            changes.push('guide');
+        if (before.driverId !== after.driverId)
+            changes.push('driver');
+        if (before.vehicleId !== after.vehicleId)
+            changes.push('vehicle');
+        if (before.providerId !== after.providerId)
+            changes.push('provider');
+        if (before.startDate?.getTime?.() !== after.startDate?.getTime?.() ||
+            before.endDate?.getTime?.() !== after.endDate?.getTime?.()) {
+            changes.push('dates');
+        }
+        if (before.status !== after.status)
+            changes.push('status');
+        if (changes.length === 0)
+            return;
+        const summary = this.buildAssignmentSummary(after);
+        const current = new Set([after.guideId, after.driverId].filter(Boolean));
+        const removed = new Set();
+        if (before.guideId && before.guideId !== after.guideId) {
+            removed.add(before.guideId);
+        }
+        if (before.driverId && before.driverId !== after.driverId) {
+            removed.add(before.driverId);
+        }
+        const providerIds = [before.providerId, after.providerId].filter((id) => Boolean(id));
+        if (providerIds.length > 0) {
+            const providerUsers = await this.prisma.user.findMany({
+                where: {
+                    role: client_1.RoleType.TRANSPORT_PROVIDER,
+                    providerId: { in: providerIds },
+                    isActive: true,
+                },
+                select: { id: true, providerId: true },
+            });
+            for (const user of providerUsers) {
+                if (user.providerId === after.providerId)
+                    current.add(user.id);
+                if (before.providerId !== after.providerId &&
+                    user.providerId === before.providerId) {
+                    removed.add(user.id);
+                }
+            }
+        }
+        await this.notifyUserIds([...current], 'Tour updated', `${summary}. Changed: ${changes.join(', ')}.`, {
+            kind: 'ASSIGNMENT_UPDATED',
+            assignmentId: after.id,
+            changed: changes,
+            url: '/dispatch-board',
+        });
+        if (removed.size > 0) {
+            await this.notifyUserIds([...removed], 'Removed from tour', `${summary}. You are no longer assigned to this trip.`, {
+                kind: 'ASSIGNMENT_UPDATED',
+                assignmentId: after.id,
+                changed: changes,
+                url: '/dispatch-board',
+            });
+        }
+    }
+    async notifyUserIds(userIds, title, body, data) {
+        for (const userId of [...new Set(userIds)]) {
+            const notification = await this.notificationService.create(userId, client_1.NotificationType.GENERAL, title, body, data);
+            this.gateway.notifyUser(userId, 'notification', notification);
+        }
+    }
+    buildAssignmentSummary(assignment) {
+        const crew = [
+            assignment.guide?.name ? `Guide: ${assignment.guide.name}` : null,
+            assignment.driver?.name ? `Driver: ${assignment.driver.name}` : null,
+            assignment.vehicle?.plateNumber
+                ? `Vehicle: ${assignment.vehicle.plateNumber}`
+                : null,
+            assignment.provider?.name
+                ? `Provider: ${assignment.provider.name}`
+                : null,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+        const when = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        }).format(new Date(assignment.startDate));
+        return `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${when}${crew ? ` · ${crew}` : ''}`;
     }
     async updateStatus(id, dto) {
         const before = await this.findOne(id);
@@ -1505,7 +1642,8 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         else if (dto.status === 'VERIFIED' &&
             !report.moneyVerifiedAt &&
             !report.moneyRejectedAt &&
-            !this.isOutsourced(assignment)) {
+            !this.isOutsourced(assignment) &&
+            this.canVerifyMoney(actor)) {
             const lines = await this.prisma.settlement.findMany({
                 where: { assignmentId: id },
                 include: { category: { select: { flowType: true } } },
@@ -1848,7 +1986,33 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         };
     }
     async remove(id) {
-        await this.findOne(id);
+        const assignment = await this.prisma.assignment.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                code: true,
+                status: true,
+                tourReport: { select: { moneyVerifiedAt: true } },
+            },
+        });
+        if (!assignment)
+            throw new common_1.NotFoundException('Assignment not found');
+        const [paymentLines, partnerPayment] = await Promise.all([
+            this.prisma.paymentPeriodLine.count({ where: { assignmentId: id } }),
+            this.prisma.partnerPayment.findUnique({
+                where: { assignmentId: id },
+                select: { id: true },
+            }),
+        ]);
+        const hasMoneyHistory = !!assignment.tourReport?.moneyVerifiedAt ||
+            paymentLines > 0 ||
+            !!partnerPayment;
+        const lockedStatus = assignment.status === client_1.AssignmentStatus.DISPATCHED ||
+            assignment.status === client_1.AssignmentStatus.VERIFYING ||
+            assignment.status === client_1.AssignmentStatus.COMPLETED;
+        if (hasMoneyHistory || lockedStatus) {
+            throw new common_1.ConflictException(`"${assignment.code ?? 'Trip'}" cannot be deleted because it has a trip report, locked/exported money or settlement history. Cancel it instead so the audit trail is kept.`);
+        }
         await this.prisma.booking.updateMany({
             where: { assignmentId: id },
             data: {

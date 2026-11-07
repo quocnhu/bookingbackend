@@ -37,6 +37,8 @@ import {
   Permissions,
   AnyPermissions,
 } from '@/common/decorators/permissions.decorator';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { RoleType } from '@prisma/client';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Public } from '@/common/decorators/public.decorator';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
@@ -113,13 +115,13 @@ export class AssignmentsController {
   }
 
   @Get('board/crew')
-  @Permissions('assignment.read')
+  @Roles(RoleType.ADMIN, RoleType.OFFICE)
   getBoardCrew() {
     return this.assignmentsService.getBoardCrew();
   }
 
   @Get('board/crew/availability')
-  @Permissions('assignment.read')
+  @Roles(RoleType.ADMIN, RoleType.OFFICE)
   getCrewAvailability(@Query('from') from?: string, @Query('to') to?: string) {
     return this.assignmentsService.getCrewAvailability(
       new Date(from ?? Date.now()),
@@ -167,8 +169,11 @@ export class AssignmentsController {
 
   @Get(':id')
   @Permissions('assignment.read')
-  findOne(@Param('id') id: string) {
-    return this.assignmentsService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.findOne(id, actor);
   }
 
   @Post()

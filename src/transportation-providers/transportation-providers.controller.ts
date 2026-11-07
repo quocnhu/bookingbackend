@@ -8,6 +8,8 @@ import {
   UpdateTransportationVehicleDto,
 } from './dto/transportation-provider.dto';
 import { Permissions } from '@/common/decorators/permissions.decorator';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { RoleType } from '@prisma/client';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 
@@ -16,16 +18,19 @@ export class TransportationProvidersController {
   constructor(private readonly transportationProvidersService: TransportationProvidersService) {}
 
   @Get()
+  @Roles(RoleType.ADMIN, RoleType.OFFICE, RoleType.TRANSPORT_PROVIDER)
   findAll(@CurrentUser() actor: AuthenticatedUser) {
     return this.transportationProvidersService.findAll(actor);
   }
 
   @Get('drivers')
+  @Roles(RoleType.ADMIN, RoleType.OFFICE, RoleType.TRANSPORT_PROVIDER)
   findAllDrivers(@CurrentUser() actor: AuthenticatedUser) {
     return this.transportationProvidersService.findAllDrivers(actor);
   }
 
   @Get(':id')
+  @Roles(RoleType.ADMIN, RoleType.OFFICE, RoleType.TRANSPORT_PROVIDER)
   findOne(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
     return this.transportationProvidersService.findOne(id, actor);
   }

@@ -1841,6 +1841,11 @@ export class AccountingService {
     if (period.voidedAt) {
       throw new ConflictException('This period was already voided');
     }
+    if (period.paidAt) {
+      throw new ConflictException(
+        'This period is already marked paid — record a reversal instead of voiding it.',
+      );
+    }
 
     const voided = await this.prisma.paymentPeriod.update({
       where: { id: periodId },

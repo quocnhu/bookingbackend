@@ -39,6 +39,7 @@ export class AutoCrewService {
         guideId: true,
         driverId: true,
         providerId: true,
+        provider: { select: { isCompany: true } },
         executionMode: true,
       },
     });
@@ -65,14 +66,18 @@ export class AutoCrewService {
       if (guideId) updates.guideId = guideId;
     }
     if (!assignment.driverId) {
-      const driverId = await this.pickUserId(
-        RoleType.DRIVER,
-        assignment.id,
-        start,
-        end,
-        assignment.providerId,
-      );
-      if (driverId) updates.driverId = driverId;
+      const thirdPartyProvider =
+        !!assignment.providerId && assignment.provider?.isCompany === false;
+      if (!thirdPartyProvider) {
+        const driverId = await this.pickUserId(
+          RoleType.DRIVER,
+          assignment.id,
+          start,
+          end,
+          assignment.providerId,
+        );
+        if (driverId) updates.driverId = driverId;
+      }
     }
 
     if (updates.guideId || updates.driverId) {
@@ -195,7 +200,9 @@ export class AutoCrewService {
 
     candidates.sort(
       (a, b) =>
-        b.company - a.company || b.rating - a.rating || a.name.localeCompare(b.name),
+        b.company - a.company ||
+        b.rating - a.rating ||
+        a.name.localeCompare(b.name),
     );
     return candidates[0]?.id ?? null;
   }

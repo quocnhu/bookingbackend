@@ -4,7 +4,8 @@ import { CreateFolderDto, RenameFileDto, RenameFolderDto } from './dto/drive.dto
 export declare class DriveController {
     private readonly driveService;
     constructor(driveService: DriveService);
-    root(user: AuthenticatedUser): Promise<{
+    private driveUserId;
+    root(user: AuthenticatedUser, userId?: string): Promise<{
         current: {
             id: string;
             createdAt: Date;
@@ -54,6 +55,12 @@ export declare class DriveController {
             maxUploadBytes: number;
         };
     }>;
+    listUsers(): Promise<{
+        role: import("@prisma/client").$Enums.RoleType;
+        id: string;
+        name: string | null;
+        email: string;
+    }[]>;
     ensureDate(user: AuthenticatedUser, date?: string): Promise<{
         id: string;
         createdAt: Date;
@@ -72,7 +79,7 @@ export declare class DriveController {
         parentId: string | null;
         kind: string;
     }>;
-    folder(id: string, user: AuthenticatedUser): Promise<{
+    folder(id: string, user: AuthenticatedUser, userId?: string): Promise<{
         current: {
             id: string;
             createdAt: Date;
@@ -122,7 +129,7 @@ export declare class DriveController {
             maxUploadBytes: number;
         };
     }>;
-    createFolder(dto: CreateFolderDto, user: AuthenticatedUser): Promise<{
+    createFolder(dto: CreateFolderDto, user: AuthenticatedUser, userId?: string): Promise<{
         id: string;
         createdAt: Date;
         name: string;
@@ -131,7 +138,7 @@ export declare class DriveController {
         parentId: string | null;
         kind: string;
     }>;
-    renameFolder(id: string, dto: RenameFolderDto, user: AuthenticatedUser): Promise<{
+    renameFolder(id: string, dto: RenameFolderDto, user: AuthenticatedUser, userId?: string): Promise<{
         id: string;
         createdAt: Date;
         name: string;
@@ -140,12 +147,12 @@ export declare class DriveController {
         parentId: string | null;
         kind: string;
     }>;
-    deleteFolder(id: string, user: AuthenticatedUser): Promise<{
+    deleteFolder(id: string, user: AuthenticatedUser, userId?: string): Promise<{
         success: boolean;
     }>;
     uploadAvatar(file: Express.Multer.File, targetUserId: string | undefined, user: AuthenticatedUser): Promise<import("./drive.service").DriveFileView>;
-    upload(file: Express.Multer.File, folderId: string, name: string, date: string, useDateFolder: string, tourName: string, user: AuthenticatedUser): Promise<import("./drive.service").DriveFileView>;
-    renameFile(id: string, dto: RenameFileDto, user: AuthenticatedUser): Promise<{
+    upload(file: Express.Multer.File, folderId: string, name: string, date: string, useDateFolder: string, tourName: string, user: AuthenticatedUser, userId?: string): Promise<import("./drive.service").DriveFileView>;
+    renameFile(id: string, dto: RenameFileDto, user: AuthenticatedUser, userId?: string): Promise<{
         id: string;
         createdAt: Date;
         name: string;
@@ -155,7 +162,7 @@ export declare class DriveController {
         mimeType: string | null;
         folderId: string;
     }>;
-    deleteFile(id: string, user: AuthenticatedUser): Promise<{
+    deleteFile(id: string, user: AuthenticatedUser, userId?: string): Promise<{
         success: boolean;
     }>;
 }

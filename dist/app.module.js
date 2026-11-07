@@ -41,6 +41,7 @@ const leaves_module_1 = require("./leaves/leaves.module");
 const coordinates_module_1 = require("./coordinates/coordinates.module");
 const route_prices_module_1 = require("./route-prices/route-prices.module");
 const transportation_providers_module_1 = require("./transportation-providers/transportation-providers.module");
+const transport_requests_module_1 = require("./transport-requests/transport-requests.module");
 const accounting_module_1 = require("./accounting/accounting.module");
 const payment_module_1 = require("./payment/payment.module");
 const partners_module_1 = require("./partners/partners.module");
@@ -79,6 +80,7 @@ exports.AppModule = AppModule = __decorate([
             coordinates_module_1.CoordinatesModule,
             route_prices_module_1.RoutePricesModule,
             transportation_providers_module_1.TransportationProvidersModule,
+            transport_requests_module_1.TransportRequestsModule,
             accounting_module_1.AccountingModule,
             payment_module_1.PaymentModule,
             partners_module_1.PartnersModule,

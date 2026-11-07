@@ -134,6 +134,12 @@ export declare class DriveService {
             maxUploadBytes: number;
         };
     }>;
+    listDriveUsers(): Promise<{
+        role: import("@prisma/client").$Enums.RoleType;
+        id: string;
+        name: string | null;
+        email: string;
+    }[]>;
     createFolder(userId: string, dto: CreateFolderDto): Promise<{
         id: string;
         createdAt: Date;

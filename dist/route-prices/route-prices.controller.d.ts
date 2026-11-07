@@ -80,6 +80,7 @@ export declare class RoutePricesController {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         };
     } & {
         id: string;
@@ -135,6 +136,7 @@ export declare class RoutePricesController {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         };
     } & {
         id: string;
@@ -190,6 +192,7 @@ export declare class RoutePricesController {
             id: string;
             name: string;
             isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         };
     } & {
         id: string;

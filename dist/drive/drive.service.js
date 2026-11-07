@@ -239,6 +239,12 @@ let DriveService = DriveService_1 = class DriveService {
             quota: await this.quotaInfo(userId),
         };
     }
+    async listDriveUsers() {
+        return this.prisma.user.findMany({
+            select: { id: true, name: true, email: true, role: true },
+            orderBy: [{ name: 'asc' }, { email: 'asc' }],
+        });
+    }
     async createFolder(userId, dto) {
         const targetId = dto.parentId ?? (await this.ensureUserDrive(userId)).root.id;
         await this.assertFolderAccess(userId, targetId);
@@ -478,14 +484,16 @@ let DriveService = DriveService_1 = class DriveService {
         let current = await this.prisma.driveFolder.findUnique({
             where: { id: folderId },
         });
+        const chain = [];
         while (current && current.userId === userId && current.kind !== 'root') {
-            items.push({ id: current.id, name: current.name });
+            chain.push({ id: current.id, name: current.name });
             current = current.parentId
                 ? await this.prisma.driveFolder.findUnique({
                     where: { id: current.parentId },
                 })
                 : null;
         }
+        items.push(...chain.reverse());
         return items;
     }
     async collectFileKeys(userId, folderId) {

@@ -9,8 +9,11 @@ export class DashboardController {
 
   @Get('stats')
   @Permissions('dashboard.read')
-  stats() {
-    return this.dashboardService.stats();
+  stats(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.dashboardService.stats(fromDate, toDate);
   }
 
   @Get('charts')

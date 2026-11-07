@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -12,7 +13,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { RoleType } from '@prisma/client';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { Roles } from '@/common/decorators/roles.decorator';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 import { DriveService } from './drive.service';
 import {
@@ -28,9 +31,27 @@ const MAX_FILE_SIZE = 512 * 1024 * 1024; // 512MB buffer
 export class DriveController {
   constructor(private readonly driveService: DriveService) {}
 
+  /** ADMIN may browse/manage another user's Drive; everyone else is self-only. */
+  private driveUserId(actor: AuthenticatedUser, requested?: string) {
+    if (actor.role === RoleType.ADMIN) return requested || actor.id;
+    if (requested && requested !== actor.id) {
+      throw new ForbiddenException('You can only access your own Drive');
+    }
+    return actor.id;
+  }
+
   @Get()
-  root(@CurrentUser() user: AuthenticatedUser) {
-    return this.driveService.listContents(user.id);
+  root(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('userId') userId?: string,
+  ) {
+    return this.driveService.listContents(this.driveUserId(user, userId));
+  }
+
+  @Get('users')
+  @Roles(RoleType.ADMIN)
+  listUsers() {
+    return this.driveService.listDriveUsers();
   }
 
   @Get('ensure-date')
@@ -50,16 +71,21 @@ export class DriveController {
   }
 
   @Get('folders/:id')
-  folder(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.driveService.listContents(user.id, id);
+  folder(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('userId') userId?: string,
+  ) {
+    return this.driveService.listContents(this.driveUserId(user, userId), id);
   }
 
   @Post('folders')
   createFolder(
     @Body() dto: CreateFolderDto,
     @CurrentUser() user: AuthenticatedUser,
+    @Query('userId') userId?: string,
   ) {
-    return this.driveService.createFolder(user.id, dto);
+    return this.driveService.createFolder(this.driveUserId(user, userId), dto);
   }
 
   @Patch('folders/:id')
@@ -67,16 +93,22 @@ export class DriveController {
     @Param('id') id: string,
     @Body() dto: RenameFolderDto,
     @CurrentUser() user: AuthenticatedUser,
+    @Query('userId') userId?: string,
   ) {
-    return this.driveService.renameFolder(user.id, id, dto);
+    return this.driveService.renameFolder(
+      this.driveUserId(user, userId),
+      id,
+      dto,
+    );
   }
 
   @Delete('folders/:id')
   deleteFolder(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Query('userId') userId?: string,
   ) {
-    return this.driveService.deleteFolder(user.id, id);
+    return this.driveService.deleteFolder(this.driveUserId(user, userId), id);
   }
 
   @Post('avatar')
@@ -109,11 +141,12 @@ export class DriveController {
     @Body('useDateFolder') useDateFolder: string,
     @Body('tourName') tourName: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Query('userId') userId?: string,
   ) {
     const useDate =
       useDateFolder === 'true' || useDateFolder === '1' || undefined;
     return this.driveService.uploadFile(
-      user.id,
+      this.driveUserId(user, userId),
       file,
       folderId || undefined,
       name,
@@ -126,12 +159,21 @@ export class DriveController {
     @Param('id') id: string,
     @Body() dto: RenameFileDto,
     @CurrentUser() user: AuthenticatedUser,
+    @Query('userId') userId?: string,
   ) {
-    return this.driveService.renameFile(user.id, id, dto);
+    return this.driveService.renameFile(
+      this.driveUserId(user, userId),
+      id,
+      dto,
+    );
   }
 
   @Delete('files/:id')
-  deleteFile(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.driveService.deleteFile(user.id, id);
+  deleteFile(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('userId') userId?: string,
+  ) {
+    return this.driveService.deleteFile(this.driveUserId(user, userId), id);
   }
 }

@@ -1,6 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { BookingStatus, AssignmentStatus, PaymentStatus } from '@prisma/client';
+import {
+  AuthProvider,
+  BookingStatus,
+  AssignmentStatus,
+  FeeFlowType,
+  MoneyPayeeType,
+  PaymentStatus,
+  PaymentRecordStatus,
+  RoleType,
+} from '@prisma/client';
 
 export type RangeKey = 'day' | 'week' | 'month';
 
@@ -47,11 +56,37 @@ export class DashboardService {
     return -1;
   }
 
-  async stats() {
+  async stats(fromDate?: string, toDate?: string) {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
+
+    const hasRange = Boolean(fromDate && toDate);
+    const revenueFrom = hasRange ? new Date(`${fromDate}T00:00:00`) : null;
+    const revenueTo = hasRange ? new Date(`${toDate}T23:59:59.999`) : null;
+    if (
+      hasRange &&
+      (Number.isNaN(revenueFrom!.getTime()) ||
+        Number.isNaN(revenueTo!.getTime()))
+    ) {
+      throw new BadRequestException('Invalid revenue date range');
+    }
+    const paymentWhere = hasRange
+      ? {
+          status: PaymentRecordStatus.PAID,
+          paidAt: { gte: revenueFrom!, lte: revenueTo! },
+        }
+      : { status: PaymentRecordStatus.PAID };
+    const pendingValueWhere = hasRange
+      ? {
+          payment: PaymentStatus.PENDING,
+          createdAt: { gte: revenueFrom!, lte: revenueTo! },
+        }
+      : { payment: PaymentStatus.PENDING };
+    const moneyLockedWhere = hasRange
+      ? { gte: revenueFrom!, lte: revenueTo! }
+      : { not: null };
 
     const [
       totalBookings,
@@ -65,14 +100,31 @@ export class DashboardService {
       totalAssignments,
       todayLogins,
       lockedAccounts,
+      collectedAgg,
+      collectedTodayAgg,
+      pendingValueAgg,
+      localUsers,
+      googleUsers,
+      customerUsers,
+      googleCustomers,
+      settledToCompanyAgg,
+      settledToGuideAgg,
     ] = await Promise.all([
       this.prisma.booking.count(),
       this.prisma.booking.count({ where: { createdAt: { gte: todayStart, lte: todayEnd } } }),
       this.prisma.booking.count({ where: { status: BookingStatus.PENDING } }),
       this.prisma.assignment.count({
-        where: { status: AssignmentStatus.DISPATCHED, startDate: { gte: todayStart, lte: todayEnd } },
+        where: {
+          status: {
+            in: [
+              AssignmentStatus.DISPATCHED,
+              AssignmentStatus.VERIFYING,
+              AssignmentStatus.COMPLETED,
+            ],
+          },
+          startDate: { gte: todayStart, lte: todayEnd },
+        },
       }),
-      this.prisma.assignment.count({ where: { status: AssignmentStatus.VERIFYING } }),
       this.prisma.tour.count(),
       this.prisma.user.count(),
       this.prisma.role.count(),
@@ -80,6 +132,50 @@ export class DashboardService {
       this.prisma.assignment.count(),
       this.prisma.userSession.count({ where: { loggedInAt: { gte: todayStart, lte: todayEnd } } }),
       this.prisma.user.count({ where: { lockoutUntil: { gt: new Date() } } }),
+      this.prisma.bookingPayment.aggregate({
+        where: paymentWhere,
+        _sum: { amount: true },
+      }),
+      this.prisma.bookingPayment.aggregate({
+        where: {
+          status: PaymentRecordStatus.PAID,
+          paidAt: { gte: todayStart, lte: todayEnd },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.booking.aggregate({
+        where: pendingValueWhere,
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.user.count({ where: { authProvider: AuthProvider.LOCAL } }),
+      this.prisma.user.count({ where: { authProvider: AuthProvider.GOOGLE } }),
+      this.prisma.user.count({ where: { role: RoleType.CUSTOMER } }),
+      this.prisma.user.count({
+        where: {
+          role: RoleType.CUSTOMER,
+          authProvider: AuthProvider.GOOGLE,
+        },
+      }),
+      this.prisma.tourReport.aggregate({
+        where: {
+          moneyVerifiedAt: moneyLockedWhere,
+          settlementFlow: FeeFlowType.COLLECT_MONEY,
+          moneyPayeeType: {
+            in: [MoneyPayeeType.GUIDE, MoneyPayeeType.DRIVER],
+          },
+        },
+        _sum: { netAmount: true },
+      }),
+      this.prisma.tourReport.aggregate({
+        where: {
+          moneyVerifiedAt: moneyLockedWhere,
+          settlementFlow: FeeFlowType.PAY_MONEY,
+          moneyPayeeType: {
+            in: [MoneyPayeeType.GUIDE, MoneyPayeeType.DRIVER],
+          },
+        },
+        _sum: { netAmount: true },
+      }),
     ]);
 
     return {
@@ -94,6 +190,19 @@ export class DashboardService {
       totalAssignments,
       todayLogins,
       lockedAccounts,
+      totalRevenue: Number(collectedAgg._sum.amount ?? 0),
+      revenueToday: Number(collectedTodayAgg._sum.amount ?? 0),
+      pendingRevenue: Number(pendingValueAgg._sum.totalAmount ?? 0),
+      localUsers,
+      googleUsers,
+      customerUsers,
+      googleCustomers,
+      settledToCompany: Number(settledToCompanyAgg._sum.netAmount ?? 0),
+      settledToGuide: Math.abs(
+        Number(settledToGuideAgg._sum.netAmount ?? 0),
+      ),
+      revenueFrom: fromDate ?? null,
+      revenueTo: toDate ?? null,
     };
   }
 
@@ -102,7 +211,7 @@ export class DashboardService {
     const startTime = buckets[0].start;
     const endTime = buckets[buckets.length - 1].end;
 
-    const [bookings, sessions, auditLogs] = await Promise.all([
+    const [bookings, sessions, auditLogs, payments] = await Promise.all([
       this.prisma.booking.findMany({
         where: { createdAt: { gte: new Date(startTime), lte: new Date(endTime) } },
         select: { createdAt: true, payment: true, status: true },
@@ -115,6 +224,13 @@ export class DashboardService {
         where: { createdAt: { gte: new Date(Date.now() - 7 * 86400000) } },
         select: { action: true },
       }),
+      this.prisma.bookingPayment.findMany({
+        where: {
+          status: PaymentRecordStatus.PAID,
+          paidAt: { gte: new Date(startTime), lte: new Date(endTime) },
+        },
+        select: { amount: true, paidAt: true },
+      }),
     ]);
 
     const bookingsByBucket = buckets.map((b) => ({
@@ -125,6 +241,16 @@ export class DashboardService {
     const loginsByBucket = buckets.map((b) => ({
       label: b.label,
       count: sessions.filter((x) => this.bucketIndex(buckets, x.loggedInAt.getTime()) === buckets.indexOf(b)).length,
+    }));
+
+    const revenueByBucket = buckets.map((b, i) => ({
+      label: b.label,
+      amount: payments
+        .filter(
+          (p) =>
+            p.paidAt && this.bucketIndex(buckets, p.paidAt.getTime()) === i,
+        )
+        .reduce((sum, p) => sum + Number(p.amount), 0),
     }));
 
     const paymentStatusDistribution = (
@@ -151,6 +277,7 @@ export class DashboardService {
       range,
       bookingsByBucket,
       loginsByBucket,
+      revenueByBucket,
       paymentStatusDistribution,
       bookingStatusDistribution,
       activityByAction,

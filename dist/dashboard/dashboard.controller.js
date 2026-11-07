@@ -21,8 +21,8 @@ let DashboardController = class DashboardController {
     constructor(dashboardService) {
         this.dashboardService = dashboardService;
     }
-    stats() {
-        return this.dashboardService.stats();
+    stats(fromDate, toDate) {
+        return this.dashboardService.stats(fromDate, toDate);
     }
     charts(range = 'week') {
         return this.dashboardService.charts(range);
@@ -35,8 +35,10 @@ exports.DashboardController = DashboardController;
 __decorate([
     (0, common_1.Get)('stats'),
     (0, permissions_decorator_1.Permissions)('dashboard.read'),
+    __param(0, (0, common_1.Query)('fromDate')),
+    __param(1, (0, common_1.Query)('toDate')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", void 0)
 ], DashboardController.prototype, "stats", null);
 __decorate([

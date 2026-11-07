@@ -17,6 +17,8 @@ const common_1 = require("@nestjs/common");
 const transportation_providers_service_1 = require("./transportation-providers.service");
 const transportation_provider_dto_1 = require("./dto/transportation-provider.dto");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
+const client_1 = require("@prisma/client");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let TransportationProvidersController = class TransportationProvidersController {
     transportationProvidersService;
@@ -57,6 +59,7 @@ let TransportationProvidersController = class TransportationProvidersController 
 exports.TransportationProvidersController = TransportationProvidersController;
 __decorate([
     (0, common_1.Get)(),
+    (0, roles_decorator_1.Roles)(client_1.RoleType.ADMIN, client_1.RoleType.OFFICE, client_1.RoleType.TRANSPORT_PROVIDER),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -64,6 +67,7 @@ __decorate([
 ], TransportationProvidersController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)('drivers'),
+    (0, roles_decorator_1.Roles)(client_1.RoleType.ADMIN, client_1.RoleType.OFFICE, client_1.RoleType.TRANSPORT_PROVIDER),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -71,6 +75,7 @@ __decorate([
 ], TransportationProvidersController.prototype, "findAllDrivers", null);
 __decorate([
     (0, common_1.Get)(':id'),
+    (0, roles_decorator_1.Roles)(client_1.RoleType.ADMIN, client_1.RoleType.OFFICE, client_1.RoleType.TRANSPORT_PROVIDER),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),

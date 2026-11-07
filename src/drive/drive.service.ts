@@ -343,6 +343,18 @@ export class DriveService {
     };
   }
 
+  /**
+   * Admin-only: every user whose Drive can be browsed. Users who have never
+   * opened their Drive yet have no root folder; `listContents` creates it on
+   * first browse, so they are included here too (e.g. drivers).
+   */
+  async listDriveUsers() {
+    return this.prisma.user.findMany({
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+    });
+  }
+
   async createFolder(userId: string, dto: CreateFolderDto) {
     const targetId =
       dto.parentId ?? (await this.ensureUserDrive(userId)).root.id;
@@ -644,14 +656,16 @@ export class DriveService {
     let current = await this.prisma.driveFolder.findUnique({
       where: { id: folderId },
     });
+    const chain: { id: string | null; name: string }[] = [];
     while (current && current.userId === userId && current.kind !== 'root') {
-      items.push({ id: current.id, name: current.name });
+      chain.push({ id: current.id, name: current.name });
       current = current.parentId
         ? await this.prisma.driveFolder.findUnique({
             where: { id: current.parentId },
           })
         : null;
     }
+    items.push(...chain.reverse());
     return items;
   }
 
