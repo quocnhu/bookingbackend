@@ -24,16 +24,22 @@ export const CANCEL_WINDOW_MS = CANCEL_WINDOW_HOURS * 60 * 60 * 1000;
  * Returns null when the departure date is unknown — then the window cannot
  * be evaluated and the cancellation is allowed.
  */
-export function cancelDeadline(startingDate?: Date | null): Date | null {
+export function cancelDeadline(
+  startingDate?: Date | null,
+  hours: number = CANCEL_WINDOW_HOURS,
+): Date | null {
   if (!startingDate) return null;
-  return new Date(startingDate.getTime() - CANCEL_WINDOW_MS);
+  return new Date(startingDate.getTime() - hours * 60 * 60 * 1000);
 }
 
 /**
  * True when the cancellation window for this booking has already closed.
  */
-export function isPastCancelWindow(startingDate?: Date | null): boolean {
-  const deadline = cancelDeadline(startingDate);
+export function isPastCancelWindow(
+  startingDate?: Date | null,
+  hours: number = CANCEL_WINDOW_HOURS,
+): boolean {
+  const deadline = cancelDeadline(startingDate, hours);
   if (!deadline) return false;
   return Date.now() > deadline.getTime();
 }

@@ -5,13 +5,15 @@ import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { CreateLeaveDto, QueryLeaveDto, QueryTimesheetDto, UpdateLeaveStatusDto } from './dto/leave.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import { DispatchPolicyService } from "../dispatch-policy/dispatch-policy.service";
 export declare class LeavesService {
     private readonly prisma;
     private readonly auditService;
     private readonly notificationService;
     private readonly gateway;
+    private readonly dispatchPolicy;
     private readonly logger;
-    constructor(prisma: PrismaService, auditService: AuditService, notificationService: NotificationService, gateway: NotificationsGateway);
+    constructor(prisma: PrismaService, auditService: AuditService, notificationService: NotificationService, gateway: NotificationsGateway, dispatchPolicy: DispatchPolicyService);
     private includeUser;
     private normalizeRange;
     private assertRequestTiming;
@@ -19,21 +21,21 @@ export declare class LeavesService {
     create(dto: CreateLeaveDto, actor: AuthenticatedUser): Promise<{
         user: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         };
         reviewedBy: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         userId: string;
-        updatedAt: Date;
         startDate: Date;
         endDate: Date;
         status: import("@prisma/client").$Enums.LeaveStatus;
@@ -88,21 +90,21 @@ export declare class LeavesService {
     updateStatus(id: string, dto: UpdateLeaveStatusDto, actor: AuthenticatedUser): Promise<{
         user: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         };
         reviewedBy: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         userId: string;
-        updatedAt: Date;
         startDate: Date;
         endDate: Date;
         status: import("@prisma/client").$Enums.LeaveStatus;

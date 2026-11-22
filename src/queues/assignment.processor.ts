@@ -13,6 +13,7 @@ import { AuditService } from '@/audit/audit.service';
 import { AssignmentBoardService } from './assignment-board.service';
 import { AutoCrewService } from './auto-crew.service';
 import { NotificationsGateway } from '@/notifications/notifications.gateway';
+import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
 import { ASSIGN_QUEUE } from './queue.constants';
 import { AssignJobData } from './assignment.queue';
 
@@ -45,6 +46,7 @@ export class AssignmentProcessor extends WorkerHost {
     private readonly auditService: AuditService,
     private readonly autoCrew: AutoCrewService,
     private readonly gateway: NotificationsGateway,
+    private readonly dispatchPolicy: DispatchPolicyService,
   ) {
     super();
   }
@@ -72,9 +74,30 @@ export class AssignmentProcessor extends WorkerHost {
     if (!booking.startingDate)
       return { skipped: true, reason: 'NO_START_DATE' };
 
+    const seal = await this.dispatchPolicy.getSealInfo(booking.startingDate);
+    if (booking.lateBooking || seal.sealed) {
+      const waiting = await this.board.attachToWaitingList(bookingId);
+      if ('error' in waiting) {
+        return { skipped: true, reason: waiting.error };
+      }
+      this.gateway.notifyAll('board:refresh', {
+        assignmentId: waiting.assignmentId,
+        action: 'waiting_list',
+      });
+      this.logger.log(
+        `Late booking ${booking.bookingRef} held on waiting list ${waiting.assignmentId}`,
+      );
+      return {
+        status: 'WAITING_LIST',
+        bookingId,
+        bookingRef: booking.bookingRef,
+        assignmentId: waiting.assignmentId,
+      };
+    }
+
     // AUTO and MANUAL share the same booking → bus + crew logic.
-    // The toggle does NOT gate assignment here — it only gates the 4am
-    // auto-dispatch cron (see auto-dispatch.cron.ts). Every booking with a
+    // The toggle does NOT gate assignment here — it only gates the 23:00
+    // next-day auto-dispatch cron (see auto-dispatch.cron.ts). Every booking with a
     // start date finds/shares a bus or inits a new one, then auto-fills crew.
     // EXTENSION POINT (auto/manual): add per-booking overrides here as needed,
     // e.g. per-tour mode (SystemSetting key `assignMode:<tourId>`), auto-assign

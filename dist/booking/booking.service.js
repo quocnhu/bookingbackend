@@ -19,6 +19,8 @@ const audit_service_1 = require("../audit/audit.service");
 const booking_normalizer_service_1 = require("../parsing/booking-normalizer.service");
 const assignment_board_service_1 = require("../queues/assignment-board.service");
 const assignment_queue_1 = require("../queues/assignment.queue");
+const mail_service_1 = require("../mail/mail.service");
+const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
 const cancellation_1 = require("../common/constants/cancellation");
 const email_merge_util_1 = require("./email-merge.util");
 const raw_data_entity_1 = require("../raw-data/raw-data.entity");
@@ -43,19 +45,25 @@ function tokenOverlap(a, b) {
             common += 1;
     return common / Math.min(A.size, B.size);
 }
-let BookingService = BookingService_1 = class BookingService {
+let BookingService = class BookingService {
+    static { BookingService_1 = this; }
     prisma;
     auditService;
     normalizer;
     board;
     assignmentQueue;
+    mail;
+    dispatchPolicy;
     logger = new common_1.Logger(BookingService_1.name);
-    constructor(prisma, auditService, normalizer, board, assignmentQueue) {
+    static CANCELLATION_WINDOW_KEY = 'cancellationWindowHours';
+    constructor(prisma, auditService, normalizer, board, assignmentQueue, mail, dispatchPolicy) {
         this.prisma = prisma;
         this.auditService = auditService;
         this.normalizer = normalizer;
         this.board = board;
         this.assignmentQueue = assignmentQueue;
+        this.mail = mail;
+        this.dispatchPolicy = dispatchPolicy;
     }
     async upsert(data, rawDataId, actorId, createdWho, emailDate) {
         const bookingRef = data.bookingRef;
@@ -195,9 +203,7 @@ let BookingService = BookingService_1 = class BookingService {
     outcomeFor(action, changed) {
         if (action === 'CANCEL')
             return raw_data_entity_1.RAW_DATA_OUTCOME.CANCELLED;
-        return changed
-            ? raw_data_entity_1.RAW_DATA_OUTCOME.UPDATED
-            : raw_data_entity_1.RAW_DATA_OUTCOME.UNCHANGED;
+        return changed ? raw_data_entity_1.RAW_DATA_OUTCOME.UPDATED : raw_data_entity_1.RAW_DATA_OUTCOME.UNCHANGED;
     }
     buildEmailUpdateData(parsed, existing, action) {
         return (0, email_merge_util_1.buildEmailUpdateData)(parsed, existing, action);
@@ -213,6 +219,15 @@ let BookingService = BookingService_1 = class BookingService {
             return;
         }
         if (!booking.assignmentId && booking.startingDate) {
+            if (!booking.lateBooking) {
+                const seal = await this.dispatchPolicy.getSealInfo(booking.startingDate);
+                if (seal.sealed) {
+                    await this.prisma.booking.update({
+                        where: { id: booking.id },
+                        data: { lateBooking: true },
+                    });
+                }
+            }
             await this.assignmentQueue.enqueue(booking.id);
         }
     }
@@ -251,6 +266,10 @@ let BookingService = BookingService_1 = class BookingService {
             noShowReason: data.noShowReason,
         };
         const { booking } = await this.upsert(clean, undefined, actorId, data.createdWho ?? 'Manual Entry');
+        if (booking.channel === client_1.BookingProvider.MANUAL &&
+            !booking.parentBookingId) {
+            void this.mail.sendBookingConfirmation(booking.id);
+        }
         return booking;
     }
     async findExisting(source, bookingRef) {
@@ -369,7 +388,8 @@ let BookingService = BookingService_1 = class BookingService {
         if (!isCrew && !canManage) {
             throw new common_1.ForbiddenException('Only the assigned crew or Accounting can record this collection');
         }
-        if (dto.method === client_1.PaymentMethod.PAYPAL || dto.method === client_1.PaymentMethod.OTA) {
+        if (dto.method === client_1.PaymentMethod.PAYPAL ||
+            dto.method === client_1.PaymentMethod.OTA) {
             throw new common_1.BadRequestException('Cash or bank transfer is required here');
         }
         const updated = await this.prisma.booking.update({
@@ -413,7 +433,8 @@ let BookingService = BookingService_1 = class BookingService {
         if (booking.payment === client_1.PaymentStatus.PAID) {
             return booking;
         }
-        if (dto.method === client_1.PaymentMethod.PAYPAL || dto.method === client_1.PaymentMethod.OTA) {
+        if (dto.method === client_1.PaymentMethod.PAYPAL ||
+            dto.method === client_1.PaymentMethod.OTA) {
             throw new common_1.BadRequestException('Cash or bank transfer is required here');
         }
         let amount = Number(booking.totalAmount ?? 0);
@@ -474,6 +495,7 @@ let BookingService = BookingService_1 = class BookingService {
             afterData: updated,
             changedBy: actor.id,
         });
+        void this.mail.sendBookingConfirmation(id);
         return updated;
     }
     async findOne(id) {
@@ -510,7 +532,7 @@ let BookingService = BookingService_1 = class BookingService {
             throw new common_1.NotFoundException('Booking not found');
         return booking;
     }
-    async quoteWebsite(tourId, tourType, totalPax) {
+    async quoteWebsite(tourId, tourType, totalPax, startingDate) {
         const tour = await this.prisma.tour.findUnique({
             where: { id: tourId },
             select: {
@@ -581,6 +603,9 @@ let BookingService = BookingService_1 = class BookingService {
         const discountPercent = pct > 0 ? pct : 0;
         const unitPrice = Math.round(unit * (1 - discountPercent / 100) * 100) / 100;
         const totalAmount = Math.round(unitPrice * totalPax * 100) / 100;
+        const seal = startingDate
+            ? await this.dispatchPolicy.getSealInfo(startingDate)
+            : null;
         return {
             tourId: tour.id,
             tourName: tour.name,
@@ -595,19 +620,39 @@ let BookingService = BookingService_1 = class BookingService {
             privatePaxOptions: tour.privatePaxPrices
                 .filter((tier) => Number(tier.pricePerPerson) > 0)
                 .map((tier) => tier.pax),
+            lateBooking: seal?.sealed ?? false,
+            urgentBooking: seal?.urgent ?? false,
+            dispatchCutoffAt: seal?.cutoffAt ?? null,
+            dispatchCutoffTime: seal?.cutoffTime ?? null,
         };
     }
     websiteQuote(dto) {
-        return this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax);
+        return this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax, dto.startingDate);
     }
     async createWebsite(dto, actor) {
         if (!actor?.id)
             throw new common_1.ForbiddenException('Please sign in to book');
-        const quote = await this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax);
+        const quote = await this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax, dto.startingDate);
         const payLater = !!dto.payLater;
         const start = new Date(dto.startingDate);
         if (Number.isNaN(start.getTime())) {
             throw new common_1.BadRequestException('Invalid start date');
+        }
+        const seal = await this.dispatchPolicy.getSealInfo(start);
+        if (seal.sealed && !dto.lateBooking) {
+            throw new common_1.BadRequestException(`This departure is closed for normal bookings after ${seal.cutoffTime}. Tick the late-booking option to join the waiting list and get a reply after 05:00.`);
+        }
+        const range = this.dispatchPolicy.dayRange(start);
+        const sameDay = await this.prisma.booking.count({
+            where: {
+                customerUserId: actor.id,
+                parentBookingId: null,
+                status: { not: client_1.BookingStatus.CANCELED },
+                startingDate: { gte: range.start, lte: range.end },
+            },
+        });
+        if (sameDay >= 3) {
+            throw new common_1.BadRequestException('Each account can book at most 3 tours for the same date.');
         }
         const dueAt = new Date(start.getTime() + quote.durationDays * 24 * 60 * 60 * 1000);
         const payload = {
@@ -619,14 +664,18 @@ let BookingService = BookingService_1 = class BookingService {
             payLater,
             paymentDueAt: payLater ? dueAt : undefined,
             paymentNote: payLater
-                ? (dto.paymentNote?.trim() ||
-                    'Collect the remaining payment at the end of the tour.')
+                ? dto.paymentNote?.trim() ||
+                    'Collect the remaining payment at the end of the tour.'
                 : undefined,
             totalAmount: quote.totalAmount,
             currency: quote.currency,
             customerUserId: actor.id,
+            lateBooking: seal.sealed,
         };
         const booking = await this.create(payload, actor);
+        if (payLater && !seal.sealed) {
+            void this.mail.sendBookingConfirmation(booking.id);
+        }
         return { booking, quote };
     }
     async create(dto, actor) {
@@ -639,9 +688,16 @@ let BookingService = BookingService_1 = class BookingService {
         const submitted = dto.bookingRef?.trim();
         let bookingRef = submitted || this.randomBookingRef(dto.tourType);
         let booking = null;
+        const seal = dto.startingDate
+            ? await this.dispatchPolicy.getSealInfo(dto.startingDate)
+            : null;
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                const data = { ...dto, bookingRef };
+                const data = {
+                    ...dto,
+                    bookingRef,
+                    lateBooking: !!(seal?.sealed || dto.lateBooking),
+                };
                 if (dto.startingDate)
                     data.startingDate = new Date(dto.startingDate);
                 if (!data.payment) {
@@ -666,7 +722,9 @@ let BookingService = BookingService_1 = class BookingService {
             }
             catch (e) {
                 const isUniqueViolation = e?.code === 'P2002';
-                if (!isUniqueViolation || !this.looksGenerated(bookingRef) || attempt === 2) {
+                if (!isUniqueViolation ||
+                    !this.looksGenerated(bookingRef) ||
+                    attempt === 2) {
                     throw e;
                 }
                 this.logger.warn(`Booking ref is duplicated, issuing a new ref (attempt ${attempt + 1})`);
@@ -698,6 +756,10 @@ let BookingService = BookingService_1 = class BookingService {
             afterData: booking,
         });
         await this.postWrite(booking);
+        if (booking.channel === client_1.BookingProvider.MANUAL &&
+            !booking.parentBookingId) {
+            void this.mail.sendBookingConfirmation(booking.id);
+        }
         return booking;
     }
     looksGenerated(bookingRef) {
@@ -922,7 +984,10 @@ let BookingService = BookingService_1 = class BookingService {
                         parentBookingId: parent.id,
                     },
                 });
-                rows.push({ assignmentId: assignment.id, bookingRef: child.bookingRef });
+                rows.push({
+                    assignmentId: assignment.id,
+                    bookingRef: child.bookingRef,
+                });
             }
             return rows;
         });
@@ -952,7 +1017,7 @@ let BookingService = BookingService_1 = class BookingService {
         const { overrideCancelWindow, ...dtoFields } = dto;
         if (dto.status === client_1.BookingStatus.CANCELED &&
             before.status !== client_1.BookingStatus.CANCELED) {
-            this.assertCancelAllowed(before, overrideCancelWindow, actor);
+            await this.assertCancelAllowed(before, overrideCancelWindow, actor);
         }
         const data = { ...dtoFields };
         if (dto.startingDate)
@@ -971,18 +1036,56 @@ let BookingService = BookingService_1 = class BookingService {
         await this.postWrite(booking);
         return booking;
     }
-    assertCancelAllowed(booking, override, actor) {
-        const deadline = (0, cancellation_1.cancelDeadline)(booking.startingDate);
+    async assertCancelAllowed(booking, override, actor) {
+        const hours = await this.getCancellationWindowHours();
+        const deadline = (0, cancellation_1.cancelDeadline)(booking.startingDate, hours);
         if (!deadline)
             return;
         if (Date.now() <= deadline.getTime())
             return;
         if (!override) {
-            throw new common_1.BadRequestException(`Cancellation window closed — ${booking.bookingRef} departs on ${booking.startingDate.toISOString()} and can only be cancelled more than ${cancellation_1.CANCEL_WINDOW_HOURS}h before departure (deadline ${deadline.toISOString()}).`);
+            throw new common_1.BadRequestException(`Cancellation window closed — ${booking.bookingRef} departs on ${booking.startingDate.toISOString()} and can only be cancelled more than ${hours}h before departure (deadline ${deadline.toISOString()}).`);
         }
         if (actor?.role !== client_1.RoleType.ADMIN) {
             throw new common_1.ForbiddenException('Only an administrator can cancel a booking inside the cancellation window');
         }
+    }
+    async getCancellationWindowHours() {
+        const row = await this.prisma.systemSetting.upsert({
+            where: { key: BookingService_1.CANCELLATION_WINDOW_KEY },
+            update: {},
+            create: {
+                key: BookingService_1.CANCELLATION_WINDOW_KEY,
+                value: String(cancellation_1.CANCEL_WINDOW_HOURS),
+            },
+        });
+        const hours = Number(row.value);
+        if (!Number.isFinite(hours) || hours < 0 || hours > 720) {
+            return cancellation_1.CANCEL_WINDOW_HOURS;
+        }
+        return Math.round(hours);
+    }
+    async updateCancellationWindow(hours, actorId) {
+        const before = { hours: await this.getCancellationWindowHours() };
+        if (!Number.isFinite(hours) || hours < 0 || hours > 720) {
+            throw new common_1.BadRequestException('Cancellation window must be between 0 and 720 hours');
+        }
+        const value = String(Math.round(hours));
+        await this.prisma.systemSetting.upsert({
+            where: { key: BookingService_1.CANCELLATION_WINDOW_KEY },
+            update: { value },
+            create: { key: BookingService_1.CANCELLATION_WINDOW_KEY, value },
+        });
+        const after = { hours: Number(value) };
+        await this.auditService.log({
+            entityType: 'SystemSetting',
+            entityId: BookingService_1.CANCELLATION_WINDOW_KEY,
+            action: 'UPDATE_CANCELLATION_WINDOW',
+            beforeData: before,
+            afterData: after,
+            changedBy: actorId ?? null,
+        });
+        return after;
     }
     async assertCanPatchBookings(bookingIds, actor) {
         if (actor.permissions?.includes('booking.update'))
@@ -1094,6 +1197,8 @@ exports.BookingService = BookingService = BookingService_1 = __decorate([
         audit_service_1.AuditService,
         booking_normalizer_service_1.BookingNormalizerService,
         assignment_board_service_1.AssignmentBoardService,
-        assignment_queue_1.AssignmentQueue])
+        assignment_queue_1.AssignmentQueue,
+        mail_service_1.MailService,
+        dispatch_policy_service_1.DispatchPolicyService])
 ], BookingService);
 //# sourceMappingURL=booking.service.js.map

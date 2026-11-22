@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BatchUpdateBookingsDto = exports.BookingPatchDto = exports.QueryBookingDto = exports.CreatePrivateGroupDto = exports.PrivateGroupBusDto = exports.UpdateBookingDto = exports.ConfirmBookingPaymentDto = exports.CollectBookingPaymentDto = exports.CreateWebsiteBookingDto = exports.WebsiteQuoteDto = exports.CreateBookingDto = void 0;
+exports.BatchUpdateBookingsDto = exports.BookingPatchDto = exports.QueryBookingDto = exports.CreatePrivateGroupDto = exports.PrivateGroupBusDto = exports.UpdateBookingDto = exports.UpdateCancellationWindowDto = exports.ConfirmBookingPaymentDto = exports.CollectBookingPaymentDto = exports.CreateWebsiteBookingDto = exports.WebsiteQuoteDto = exports.CreateBookingDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
@@ -203,6 +203,7 @@ class WebsiteQuoteDto {
     tourId;
     tourType;
     totalPax;
+    startingDate;
 }
 exports.WebsiteQuoteDto = WebsiteQuoteDto;
 __decorate([
@@ -222,6 +223,10 @@ __decorate([
     (0, class_validator_1.Max)(12),
     __metadata("design:type", Number)
 ], WebsiteQuoteDto.prototype, "totalPax", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Object)
+], WebsiteQuoteDto.prototype, "startingDate", void 0);
 class CreateWebsiteBookingDto {
     tourId;
     tourType;
@@ -238,6 +243,7 @@ class CreateWebsiteBookingDto {
     longitude;
     notes;
     payLater;
+    lateBooking;
     paymentNote;
 }
 exports.CreateWebsiteBookingDto = CreateWebsiteBookingDto;
@@ -331,6 +337,11 @@ __decorate([
 ], CreateWebsiteBookingDto.prototype, "payLater", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateWebsiteBookingDto.prototype, "lateBooking", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.Length)(0, 2000),
     __metadata("design:type", String)
@@ -361,6 +372,17 @@ __decorate([
     (0, class_validator_1.Length)(0, 500),
     __metadata("design:type", String)
 ], ConfirmBookingPaymentDto.prototype, "reference", void 0);
+class UpdateCancellationWindowDto {
+    hours;
+}
+exports.UpdateCancellationWindowDto = UpdateCancellationWindowDto;
+__decorate([
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(720),
+    __metadata("design:type", Number)
+], UpdateCancellationWindowDto.prototype, "hours", void 0);
 class UpdateBookingDto {
     status;
     overrideCancelWindow;

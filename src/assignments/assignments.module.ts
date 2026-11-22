@@ -3,15 +3,30 @@ import { AssignmentsController } from './assignments.controller';
 import { AssignmentsService } from './assignments.service';
 import { AutoDispatchCron } from './auto-dispatch.cron';
 import { TourReminderCron } from './tour-reminder.cron';
+import { PickupReminderCron } from './pickup-reminder.cron';
+import { WaitingListCron } from './waiting-list.cron';
 import { AuditModule } from '@/audit/audit.module';
 import { LeavesModule } from '@/leaves/leaves.module';
 import { AccountingModule } from '@/accounting/accounting.module';
 import { DriveModule } from '@/drive/drive.module';
+import { MailModule } from '@/mail/mail.module';
 
 @Module({
-  imports: [AuditModule, LeavesModule, AccountingModule, DriveModule],
+  imports: [
+    AuditModule,
+    LeavesModule,
+    AccountingModule,
+    DriveModule,
+    MailModule,
+  ],
   controllers: [AssignmentsController],
-  providers: [AssignmentsService, AutoDispatchCron, TourReminderCron],
+  providers: [
+    AssignmentsService,
+    AutoDispatchCron,
+    TourReminderCron,
+    PickupReminderCron,
+    WaitingListCron,
+  ],
   exports: [AssignmentsService],
 })
 export class AssignmentsModule {}

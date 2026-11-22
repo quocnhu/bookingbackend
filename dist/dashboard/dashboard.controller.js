@@ -14,18 +14,24 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DashboardController = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const dashboard_service_1 = require("./dashboard.service");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 let DashboardController = class DashboardController {
     dashboardService;
     constructor(dashboardService) {
         this.dashboardService = dashboardService;
     }
-    stats(fromDate, toDate) {
-        return this.dashboardService.stats(fromDate, toDate);
+    canViewFinance(user) {
+        return (user.role === client_1.RoleType.ADMIN ||
+            user.permissions?.includes('dashboard.finance.read'));
     }
-    charts(range = 'week') {
-        return this.dashboardService.charts(range);
+    stats(user, fromDate, toDate) {
+        return this.dashboardService.stats(fromDate, toDate, this.canViewFinance(user));
+    }
+    charts(user, range = 'week') {
+        return this.dashboardService.charts(range, this.canViewFinance(user));
     }
     widgets() {
         return this.dashboardService.widgets();
@@ -35,18 +41,20 @@ exports.DashboardController = DashboardController;
 __decorate([
     (0, common_1.Get)('stats'),
     (0, permissions_decorator_1.Permissions)('dashboard.read'),
-    __param(0, (0, common_1.Query)('fromDate')),
-    __param(1, (0, common_1.Query)('toDate')),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('fromDate')),
+    __param(2, (0, common_1.Query)('toDate')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", void 0)
 ], DashboardController.prototype, "stats", null);
 __decorate([
     (0, common_1.Get)('charts'),
     (0, permissions_decorator_1.Permissions)('dashboard.read'),
-    __param(0, (0, common_1.Query)('range')),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('range')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], DashboardController.prototype, "charts", null);
 __decorate([

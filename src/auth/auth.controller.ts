@@ -67,9 +67,14 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE] ?? dto.refreshToken;
-    const tokens = await this.authService.refresh(refreshToken);
-    this.setAuthCookies(res, tokens);
-    return { success: true };
+    try {
+      const tokens = await this.authService.refresh(refreshToken);
+      this.setAuthCookies(res, tokens);
+      return { success: true };
+    } catch (error) {
+      this.clearAuthCookies(res);
+      throw error;
+    }
   }
 
   @Public()

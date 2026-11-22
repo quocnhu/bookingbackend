@@ -18,14 +18,14 @@ export declare class TransportRequestsController {
         executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
         groupRef: string | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
             providerId: string | null;
         } | null;
@@ -36,15 +36,22 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
-        pickups: string | number | boolean | import("@prisma/client/runtime/library").JsonObject | import("@prisma/client/runtime/library").JsonArray;
+        pickups: import("@prisma/client/runtime/library").JsonArray | {
+            bookingRef: any;
+            customerName: any;
+            pickup: any;
+            totalPax: any;
+        }[];
         providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
         providerRequestedAt: Date | null;
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
+        lateBookings: number;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -65,13 +72,13 @@ export declare class TransportRequestsController {
         minLeadHours: number;
     }>;
     getProviderSettings(actor: AuthenticatedUser, providerId?: string): Promise<{
-        id: string;
         name: string;
+        id: string;
         assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
     }>;
     updateProviderSettings(dto: UpdateProviderAssignmentModeDto, actor: AuthenticatedUser): Promise<{
-        id: string;
         name: string;
+        id: string;
         assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
     }>;
     getDriverWorkload(actor: AuthenticatedUser, providerId?: string): Promise<{
@@ -139,14 +146,14 @@ export declare class TransportRequestsController {
         executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
         groupRef: string | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
             providerId: string | null;
         } | null;
@@ -157,15 +164,22 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
-        pickups: string | number | boolean | import("@prisma/client/runtime/library").JsonObject | import("@prisma/client/runtime/library").JsonArray;
+        pickups: import("@prisma/client/runtime/library").JsonArray | {
+            bookingRef: any;
+            customerName: any;
+            pickup: any;
+            totalPax: any;
+        }[];
         providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
         providerRequestedAt: Date | null;
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
+        lateBookings: number;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -185,14 +199,14 @@ export declare class TransportRequestsController {
         executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
         groupRef: string | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
             providerId: string | null;
         } | null;
@@ -203,15 +217,22 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
-        pickups: string | number | boolean | import("@prisma/client/runtime/library").JsonObject | import("@prisma/client/runtime/library").JsonArray;
+        pickups: import("@prisma/client/runtime/library").JsonArray | {
+            bookingRef: any;
+            customerName: any;
+            pickup: any;
+            totalPax: any;
+        }[];
         providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
         providerRequestedAt: Date | null;
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
+        lateBookings: number;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -231,14 +252,14 @@ export declare class TransportRequestsController {
         executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
         groupRef: string | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
             providerId: string | null;
         } | null;
@@ -249,15 +270,22 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
-        pickups: string | number | boolean | import("@prisma/client/runtime/library").JsonObject | import("@prisma/client/runtime/library").JsonArray;
+        pickups: import("@prisma/client/runtime/library").JsonArray | {
+            bookingRef: any;
+            customerName: any;
+            pickup: any;
+            totalPax: any;
+        }[];
         providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
         providerRequestedAt: Date | null;
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
+        lateBookings: number;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -277,14 +305,14 @@ export declare class TransportRequestsController {
         executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
         groupRef: string | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
             providerId: string | null;
         } | null;
@@ -295,15 +323,22 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
-        pickups: string | number | boolean | import("@prisma/client/runtime/library").JsonObject | import("@prisma/client/runtime/library").JsonArray;
+        pickups: import("@prisma/client/runtime/library").JsonArray | {
+            bookingRef: any;
+            customerName: any;
+            pickup: any;
+            totalPax: any;
+        }[];
         providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
         providerRequestedAt: Date | null;
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
+        lateBookings: number;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -323,14 +358,14 @@ export declare class TransportRequestsController {
         executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
         groupRef: string | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
             providerId: string | null;
         } | null;
@@ -341,15 +376,22 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
-        pickups: string | number | boolean | import("@prisma/client/runtime/library").JsonObject | import("@prisma/client/runtime/library").JsonArray;
+        pickups: import("@prisma/client/runtime/library").JsonArray | {
+            bookingRef: any;
+            customerName: any;
+            pickup: any;
+            totalPax: any;
+        }[];
         providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
         providerRequestedAt: Date | null;
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
+        lateBookings: number;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -369,14 +411,14 @@ export declare class TransportRequestsController {
         executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
         groupRef: string | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
             providerId: string | null;
         } | null;
@@ -387,15 +429,22 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
-        pickups: string | number | boolean | import("@prisma/client/runtime/library").JsonObject | import("@prisma/client/runtime/library").JsonArray;
+        pickups: import("@prisma/client/runtime/library").JsonArray | {
+            bookingRef: any;
+            customerName: any;
+            pickup: any;
+            totalPax: any;
+        }[];
         providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
         providerRequestedAt: Date | null;
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
+        lateBookings: number;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -415,14 +464,14 @@ export declare class TransportRequestsController {
         executionMode: import("@prisma/client").$Enums.AssignmentExecutionMode;
         groupRef: string | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
             providerId: string | null;
         } | null;
@@ -433,15 +482,22 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
-        pickups: string | number | boolean | import("@prisma/client/runtime/library").JsonObject | import("@prisma/client/runtime/library").JsonArray;
+        pickups: import("@prisma/client/runtime/library").JsonArray | {
+            bookingRef: any;
+            customerName: any;
+            pickup: any;
+            totalPax: any;
+        }[];
         providerRequestStatus: import("@prisma/client").$Enums.TransportRequestStatus;
         providerRequestedAt: Date | null;
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
+        lateBookings: number;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;

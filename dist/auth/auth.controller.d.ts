@@ -35,8 +35,8 @@ export declare class AuthController {
         roles: ({
             permissions: ({
                 permission: {
-                    id: string;
                     name: string;
+                    id: string;
                     code: string;
                     group: string | null;
                 };
@@ -45,10 +45,10 @@ export declare class AuthController {
                 permissionId: string;
             })[];
         } & {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
-            updatedAt: Date;
             description: string | null;
             isSystem: boolean;
         })[];
@@ -68,8 +68,8 @@ export declare class AuthController {
         roles: ({
             permissions: ({
                 permission: {
-                    id: string;
                     name: string;
+                    id: string;
                     code: string;
                     group: string | null;
                 };
@@ -78,10 +78,10 @@ export declare class AuthController {
                 permissionId: string;
             })[];
         } & {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
-            updatedAt: Date;
             description: string | null;
             isSystem: boolean;
         })[];

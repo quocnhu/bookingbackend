@@ -14,8 +14,8 @@ export declare class RoutePricesService {
     findAll(query: QueryRoutePriceDto, actor?: AuthenticatedUser): Promise<PaginatedResult<any>>;
     getDropdownData(actor?: AuthenticatedUser): Promise<{
         providers: {
-            id: string;
             name: string;
+            id: string;
             vehicles: {
                 id: string;
                 plateNumber: string;
@@ -24,8 +24,8 @@ export declare class RoutePricesService {
             }[];
         }[];
         tours: {
-            id: string;
             name: string;
+            id: string;
         }[];
     }>;
     getAssignable(actor?: AuthenticatedUser): Promise<{
@@ -42,9 +42,9 @@ export declare class RoutePricesService {
     }[]>;
     findOne(id: string): Promise<{
         tour: {
+            name: string;
             type: import("@prisma/client").$Enums.TourType;
             id: string;
-            name: string;
             code: string;
             durationDays: number | null;
             currency: string;
@@ -84,8 +84,8 @@ export declare class RoutePricesService {
             brand: string | null;
         };
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         };
@@ -98,9 +98,9 @@ export declare class RoutePricesService {
     }>;
     create(actor: AuthenticatedUser, dto: CreateRoutePriceDto): Promise<{
         tour: {
+            name: string;
             type: import("@prisma/client").$Enums.TourType;
             id: string;
-            name: string;
             code: string;
             durationDays: number | null;
             currency: string;
@@ -140,8 +140,8 @@ export declare class RoutePricesService {
             brand: string | null;
         };
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         };
@@ -154,9 +154,9 @@ export declare class RoutePricesService {
     }>;
     update(actor: AuthenticatedUser, id: string, dto: UpdateRoutePriceDto): Promise<{
         tour: {
+            name: string;
             type: import("@prisma/client").$Enums.TourType;
             id: string;
-            name: string;
             code: string;
             durationDays: number | null;
             currency: string;
@@ -196,8 +196,8 @@ export declare class RoutePricesService {
             brand: string | null;
         };
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         };

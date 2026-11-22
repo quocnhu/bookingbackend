@@ -66,6 +66,7 @@ enum BookingStatus {
 }
 
 enum AssignmentStatus {
+  WAITING_LIST // Late booking held after the 23:00 dispatch seal
   DRAFT_ASSIGNED // Admin drag-drop booking onto a bus but NOT dispatched yet
   PENDING // Driver + Guide + Vehicle all set — waiting to depart
   TRANSFERRED // Drag-drop changed vehicle/position — needs realtime update
@@ -78,6 +79,12 @@ enum AssignmentStatus {
 enum AssignmentOrigin {
   MANUAL // Created by Admin by hand (default)
   AUTO_ASSIGN // Created by the Auto-Assign engine / queue
+}
+
+// How the customer pickup reminder is delivered for a trip.
+enum PickupReminderMode {
+  AUTO // Cron sends it before pickup using the configured time
+  MANUAL // Only an admin/office user sends it with the button
 }
 
 enum TransportRequestStatus {
@@ -343,6 +350,8 @@ model GuideProfile {
 model CompanyProfile {
   id            String   @id @default(uuid())
   name          String
+  shortName     String? // brand name shown next to the icon in the sidebar
+  logoUrl       String? // uploaded PNG icon (public URL)
   address       String?
   phone         String?
   email         String?
@@ -609,6 +618,20 @@ model Booking {
   paymentConfirmedByName String?
   payments               BookingPayment[]
 
+  // Booking-confirmation "template" email sent to the tourist through the
+  // dedicated TEMPLATE_MAIL_* SMTP mailbox (not the TripAdvisor ingest mailbox).
+  // Null = not sent yet; set atomically as the send claim.
+  confirmationEmailSentAt DateTime?
+
+  // Pre-pickup reminder email sent to this customer (per booking so a failed
+  // send can be retried for just that guest).
+  pickupReminderSentAt DateTime?
+
+  // Booking created after the dispatch cutoff for an already-sealed date.
+  // It waits on a WAITING_LIST bus until an operator places it on a real bus;
+  // the confirmation mail is held until then.
+  lateBooking Boolean @default(false)
+
   isNoShow     Boolean @default(false)
   noShowReason String?
 
@@ -758,6 +781,7 @@ model Assignment {
   providerViewedAt      DateTime?
   providerRespondedAt   DateTime?
   providerDeadline      DateTime?
+  providerWarningAt     DateTime?
   providerRequestNote   String?                @db.Text
   providerResponseNote  String?                @db.Text
   providerDeclineReason String?                @db.Text
@@ -770,6 +794,10 @@ model Assignment {
   priceOverride Decimal?
   tripNotes     String?          @db.Text
   createdWho    String? // Who created the assignment: user name or "Auto-Assign System"
+
+  // Customer pre-pickup reminder
+  pickupReminderMode       PickupReminderMode @default(AUTO)
+  pickupReminderLastSentAt DateTime?
 
   tourReport TourReport?
 

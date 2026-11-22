@@ -19,6 +19,7 @@ const audit_service_1 = require("../audit/audit.service");
 const assignment_board_service_1 = require("./assignment-board.service");
 const auto_crew_service_1 = require("./auto-crew.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
+const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
 const queue_constants_1 = require("./queue.constants");
 const BUS_MAX_PAX = 12;
 function toDateKey(d) {
@@ -30,14 +31,16 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
     auditService;
     autoCrew;
     gateway;
+    dispatchPolicy;
     logger = new common_1.Logger(AssignmentProcessor_1.name);
-    constructor(prisma, board, auditService, autoCrew, gateway) {
+    constructor(prisma, board, auditService, autoCrew, gateway, dispatchPolicy) {
         super();
         this.prisma = prisma;
         this.board = board;
         this.auditService = auditService;
         this.autoCrew = autoCrew;
         this.gateway = gateway;
+        this.dispatchPolicy = dispatchPolicy;
     }
     async process(job) {
         const { bookingId } = job.data;
@@ -62,6 +65,24 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             return { skipped: true, reason: 'GROUP_PARENT' };
         if (!booking.startingDate)
             return { skipped: true, reason: 'NO_START_DATE' };
+        const seal = await this.dispatchPolicy.getSealInfo(booking.startingDate);
+        if (booking.lateBooking || seal.sealed) {
+            const waiting = await this.board.attachToWaitingList(bookingId);
+            if ('error' in waiting) {
+                return { skipped: true, reason: waiting.error };
+            }
+            this.gateway.notifyAll('board:refresh', {
+                assignmentId: waiting.assignmentId,
+                action: 'waiting_list',
+            });
+            this.logger.log(`Late booking ${booking.bookingRef} held on waiting list ${waiting.assignmentId}`);
+            return {
+                status: 'WAITING_LIST',
+                bookingId,
+                bookingRef: booking.bookingRef,
+                assignmentId: waiting.assignmentId,
+            };
+        }
         const executionMode = booking.tour?.requiresGuide === false
             ? client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY
             : client_1.AssignmentExecutionMode.COMPANY_GUIDED;
@@ -255,6 +276,7 @@ exports.AssignmentProcessor = AssignmentProcessor = AssignmentProcessor_1 = __de
         assignment_board_service_1.AssignmentBoardService,
         audit_service_1.AuditService,
         auto_crew_service_1.AutoCrewService,
-        notifications_gateway_1.NotificationsGateway])
+        notifications_gateway_1.NotificationsGateway,
+        dispatch_policy_service_1.DispatchPolicyService])
 ], AssignmentProcessor);
 //# sourceMappingURL=assignment.processor.js.map

@@ -33,7 +33,7 @@ let JwtAuthGuard = class JwtAuthGuard {
         const request = context.switchToHttp().getRequest();
         const token = this.extractToken(request);
         if (!token) {
-            return false;
+            throw new common_1.UnauthorizedException('Authentication required');
         }
         try {
             const payload = await this.jwtService.verifyAsync(token);
@@ -41,7 +41,7 @@ let JwtAuthGuard = class JwtAuthGuard {
             return true;
         }
         catch {
-            return false;
+            throw new common_1.UnauthorizedException('Invalid or expired token');
         }
     }
     extractToken(request) {

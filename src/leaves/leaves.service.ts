@@ -25,6 +25,7 @@ import {
   RoleType,
 } from '@prisma/client';
 import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
+import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
 import type { EmployeeGroup } from './employee-group';
 
 const LEAVE_BLOCKING_STATUSES = [LeaveStatus.PENDING, LeaveStatus.APPROVED];
@@ -32,7 +33,7 @@ const LEAVE_BLOCKING_STATUSES = [LeaveStatus.PENDING, LeaveStatus.APPROVED];
 /** Normal leave must be requested this many calendar days before the first day off. */
 const LEAVE_NOTICE_DAYS = 2;
 
-/** Automatic dispatch runs at 04:00, so same-day emergencies must be in before then. */
+/** Manual-mode fallback: same-day emergencies must be in before this hour. */
 const EMERGENCY_CUTOFF_HOUR = 4;
 
 @Injectable()
@@ -44,6 +45,7 @@ export class LeavesService {
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
     private readonly gateway: NotificationsGateway,
+    private readonly dispatchPolicy: DispatchPolicyService,
   ) {}
 
   private includeUser = {
@@ -68,18 +70,30 @@ export class LeavesService {
 
   /**
    * Normal leave: at least 2 calendar days of notice.
-   * Emergency leave: allowed last-minute, but the start day's 04:00 cutoff is
-   * strict — after that the automatic dispatch has already run.
+   * Emergency leave: in auto mode it must be in before the 23:00 dispatch
+   * cutoff on the previous day; manual mode keeps the 04:00 same-day cutoff.
    */
-  private assertRequestTiming(start: Date, isEmergency: boolean) {
+  private async assertRequestTiming(start: Date, isEmergency: boolean) {
     const now = new Date();
     if (isEmergency) {
+      const mode = await this.dispatchPolicy.getMode();
       const cutoff = new Date(start);
-      cutoff.setHours(EMERGENCY_CUTOFF_HOUR, 0, 0, 0);
-      if (now >= cutoff) {
-        throw new BadRequestException(
-          'Emergency leave for today must be submitted before 04:00, because automatic dispatch runs at 04:00.',
-        );
+      if (mode.autoMode) {
+        const [hours, minutes] = mode.cutoffTime.split(':').map(Number);
+        cutoff.setDate(cutoff.getDate() - 1);
+        cutoff.setHours(hours || 0, minutes || 0, 0, 0);
+        if (now >= cutoff) {
+          throw new BadRequestException(
+            `Emergency leave must be submitted before ${mode.cutoffTime} the day before, because automatic dispatch runs then.`,
+          );
+        }
+      } else {
+        cutoff.setHours(EMERGENCY_CUTOFF_HOUR, 0, 0, 0);
+        if (now >= cutoff) {
+          throw new BadRequestException(
+            'Emergency leave for today must be submitted before 04:00 in manual dispatch mode.',
+          );
+        }
       }
       return;
     }
@@ -112,7 +126,7 @@ export class LeavesService {
   async create(dto: CreateLeaveDto, actor: AuthenticatedUser) {
     const { start, end } = this.normalizeRange(dto.startDate, dto.endDate);
     const isEmergency = dto.isEmergency === true;
-    this.assertRequestTiming(start, isEmergency);
+    await this.assertRequestTiming(start, isEmergency);
 
     const isStaff = actor.role === RoleType.ADMIN || actor.role === RoleType.OFFICE;
     let targetUserId = actor.id;

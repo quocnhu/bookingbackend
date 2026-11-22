@@ -15,6 +15,7 @@ export declare class AutoCrewService {
         updates: {
             guideId?: string;
             driverId?: string;
+            providerId?: string;
         };
     }>;
     assignMissingCrew(horizonDays?: number): Promise<{
@@ -24,6 +25,6 @@ export declare class AutoCrewService {
     }>;
     private normalizeStart;
     private normalizeEnd;
-    private pickUserId;
+    private pickUser;
     private busyUserIds;
 }

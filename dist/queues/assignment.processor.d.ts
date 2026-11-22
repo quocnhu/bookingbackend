@@ -5,6 +5,7 @@ import { AuditService } from "../audit/audit.service";
 import { AssignmentBoardService } from './assignment-board.service';
 import { AutoCrewService } from './auto-crew.service';
 import { NotificationsGateway } from "../notifications/notifications.gateway";
+import { DispatchPolicyService } from "../dispatch-policy/dispatch-policy.service";
 import { AssignJobData } from './assignment.queue';
 export declare class AssignmentProcessor extends WorkerHost {
     private readonly prisma;
@@ -12,8 +13,9 @@ export declare class AssignmentProcessor extends WorkerHost {
     private readonly auditService;
     private readonly autoCrew;
     private readonly gateway;
+    private readonly dispatchPolicy;
     private readonly logger;
-    constructor(prisma: PrismaService, board: AssignmentBoardService, auditService: AuditService, autoCrew: AutoCrewService, gateway: NotificationsGateway);
+    constructor(prisma: PrismaService, board: AssignmentBoardService, auditService: AuditService, autoCrew: AutoCrewService, gateway: NotificationsGateway, dispatchPolicy: DispatchPolicyService);
     process(job: Job<AssignJobData>): Promise<{
         skipped: boolean;
         reason: string;
@@ -25,6 +27,13 @@ export declare class AssignmentProcessor extends WorkerHost {
         skipped: boolean;
         reason: string;
         assignmentId: string;
+        status?: undefined;
+        bookingId?: undefined;
+        bookingRef?: undefined;
+    } | {
+        skipped: boolean;
+        reason: "BOOKING_NOT_FOUND" | "ALREADY_ASSIGNED" | "NO_START_DATE" | undefined;
+        assignmentId?: undefined;
         status?: undefined;
         bookingId?: undefined;
         bookingRef?: undefined;

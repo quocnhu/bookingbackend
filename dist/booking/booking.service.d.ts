@@ -4,6 +4,8 @@ import { AuditService } from "../audit/audit.service";
 import { BookingNormalizerService, CleanBookingData } from "../parsing/booking-normalizer.service";
 import { AssignmentBoardService } from "../queues/assignment-board.service";
 import { AssignmentQueue } from "../queues/assignment.queue";
+import { MailService } from "../mail/mail.service";
+import { DispatchPolicyService } from "../dispatch-policy/dispatch-policy.service";
 import { CreateBookingDto, CreatePrivateGroupDto, CreateWebsiteBookingDto, BookingPatchDto, CollectBookingPaymentDto, ConfirmBookingPaymentDto, QueryBookingDto, UpdateBookingDto, WebsiteQuoteDto } from './dto/booking.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
@@ -22,8 +24,11 @@ export declare class BookingService {
     private readonly normalizer;
     private readonly board;
     private readonly assignmentQueue;
+    private readonly mail;
+    private readonly dispatchPolicy;
     private readonly logger;
-    constructor(prisma: PrismaService, auditService: AuditService, normalizer: BookingNormalizerService, board: AssignmentBoardService, assignmentQueue: AssignmentQueue);
+    private static readonly CANCELLATION_WINDOW_KEY;
+    constructor(prisma: PrismaService, auditService: AuditService, normalizer: BookingNormalizerService, board: AssignmentBoardService, assignmentQueue: AssignmentQueue, mail: MailService, dispatchPolicy: DispatchPolicyService);
     upsert(data: CleanBookingData, rawDataId?: string, actorId?: string, createdWho?: string, emailDate?: Date): Promise<{
         booking: Booking;
         created: boolean;
@@ -40,9 +45,9 @@ export declare class BookingService {
     private randomBookingRef;
     findAll(query: QueryBookingDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     collectBookingPayment(id: string, dto: CollectBookingPaymentDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -83,15 +88,18 @@ export declare class BookingService {
         paymentConfirmedAt: Date | null;
         paymentConfirmedById: string | null;
         paymentConfirmedByName: string | null;
+        confirmationEmailSentAt: Date | null;
+        pickupReminderSentAt: Date | null;
+        lateBooking: boolean;
         paxSequence: number;
         parentBookingId: string | null;
         movedFromBusId: string | null;
         emailDate: Date | null;
     }>;
     confirmBookingPayment(id: string, dto: ConfirmBookingPaymentDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -132,6 +140,9 @@ export declare class BookingService {
         paymentConfirmedAt: Date | null;
         paymentConfirmedById: string | null;
         paymentConfirmedByName: string | null;
+        confirmationEmailSentAt: Date | null;
+        pickupReminderSentAt: Date | null;
+        lateBooking: boolean;
         paxSequence: number;
         parentBookingId: string | null;
         movedFromBusId: string | null;
@@ -139,9 +150,9 @@ export declare class BookingService {
     }>;
     findOne(id: string): Promise<{
         tour: {
+            name: string;
             type: import("@prisma/client").$Enums.TourType;
             id: string;
-            name: string;
             code: string;
             durationDays: number | null;
             currency: string;
@@ -185,14 +196,14 @@ export declare class BookingService {
             payload: Prisma.JsonValue;
         } | null;
         customerUser: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         payments: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             provider: string | null;
             status: import("@prisma/client").$Enums.PaymentRecordStatus;
             currency: string;
@@ -230,9 +241,9 @@ export declare class BookingService {
             bookingRef: string;
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -273,6 +284,9 @@ export declare class BookingService {
         paymentConfirmedAt: Date | null;
         paymentConfirmedById: string | null;
         paymentConfirmedByName: string | null;
+        confirmationEmailSentAt: Date | null;
+        pickupReminderSentAt: Date | null;
+        lateBooking: boolean;
         paxSequence: number;
         parentBookingId: string | null;
         movedFromBusId: string | null;
@@ -291,12 +305,16 @@ export declare class BookingService {
         currency: string;
         priceTierPax: number | null;
         privatePaxOptions: number[];
+        lateBooking: boolean;
+        urgentBooking: boolean;
+        dispatchCutoffAt: string | null;
+        dispatchCutoffTime: string | null;
     }>;
     createWebsite(dto: CreateWebsiteBookingDto, actor?: AuthenticatedUser): Promise<{
         booking: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -337,6 +355,9 @@ export declare class BookingService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
@@ -354,12 +375,16 @@ export declare class BookingService {
             currency: string;
             priceTierPax: number | null;
             privatePaxOptions: number[];
+            lateBooking: boolean;
+            urgentBooking: boolean;
+            dispatchCutoffAt: string | null;
+            dispatchCutoffTime: string | null;
         };
     }>;
     create(dto: CreateBookingDto, actor?: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -400,6 +425,9 @@ export declare class BookingService {
         paymentConfirmedAt: Date | null;
         paymentConfirmedById: string | null;
         paymentConfirmedByName: string | null;
+        confirmationEmailSentAt: Date | null;
+        pickupReminderSentAt: Date | null;
+        lateBooking: boolean;
         paxSequence: number;
         parentBookingId: string | null;
         movedFromBusId: string | null;
@@ -411,9 +439,9 @@ export declare class BookingService {
     private assertBookingContactFields;
     createPrivateGroup(id: string, dto: CreatePrivateGroupDto, actor?: AuthenticatedUser): Promise<{
         tour: {
+            name: string;
             type: import("@prisma/client").$Enums.TourType;
             id: string;
-            name: string;
             code: string;
             durationDays: number | null;
             currency: string;
@@ -457,14 +485,14 @@ export declare class BookingService {
             payload: Prisma.JsonValue;
         } | null;
         customerUser: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         payments: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             provider: string | null;
             status: import("@prisma/client").$Enums.PaymentRecordStatus;
             currency: string;
@@ -502,9 +530,9 @@ export declare class BookingService {
             bookingRef: string;
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -545,15 +573,18 @@ export declare class BookingService {
         paymentConfirmedAt: Date | null;
         paymentConfirmedById: string | null;
         paymentConfirmedByName: string | null;
+        confirmationEmailSentAt: Date | null;
+        pickupReminderSentAt: Date | null;
+        lateBooking: boolean;
         paxSequence: number;
         parentBookingId: string | null;
         movedFromBusId: string | null;
         emailDate: Date | null;
     }>;
     update(id: string, dto: UpdateBookingDto, actor?: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -594,17 +625,24 @@ export declare class BookingService {
         paymentConfirmedAt: Date | null;
         paymentConfirmedById: string | null;
         paymentConfirmedByName: string | null;
+        confirmationEmailSentAt: Date | null;
+        pickupReminderSentAt: Date | null;
+        lateBooking: boolean;
         paxSequence: number;
         parentBookingId: string | null;
         movedFromBusId: string | null;
         emailDate: Date | null;
     }>;
     private assertCancelAllowed;
+    getCancellationWindowHours(): Promise<number>;
+    updateCancellationWindow(hours: number, actorId?: string | null): Promise<{
+        hours: number;
+    }>;
     private assertCanPatchBookings;
     updateBatch(items: BookingPatchDto[], actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -645,6 +683,9 @@ export declare class BookingService {
         paymentConfirmedAt: Date | null;
         paymentConfirmedById: string | null;
         paymentConfirmedByName: string | null;
+        confirmationEmailSentAt: Date | null;
+        pickupReminderSentAt: Date | null;
+        lateBooking: boolean;
         paxSequence: number;
         parentBookingId: string | null;
         movedFromBusId: string | null;

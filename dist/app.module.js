@@ -14,6 +14,7 @@ const serve_static_1 = require("@nestjs/serve-static");
 const throttler_1 = require("@nestjs/throttler");
 const schedule_1 = require("@nestjs/schedule");
 const prisma_module_1 = require("./prisma/prisma.module");
+const dispatch_policy_module_1 = require("./dispatch-policy/dispatch-policy.module");
 const cache_module_1 = require("./cache/cache.module");
 const audit_module_1 = require("./audit/audit.module");
 const auth_activities_module_1 = require("./auth-activities/auth-activities.module");
@@ -55,6 +56,7 @@ exports.AppModule = AppModule = __decorate([
             throttler_1.ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
             schedule_1.ScheduleModule.forRoot(),
             prisma_module_1.PrismaModule,
+            dispatch_policy_module_1.DispatchPolicyModule,
             storage_1.StorageModule,
             cache_module_1.CacheModule,
             audit_module_1.AuditModule,

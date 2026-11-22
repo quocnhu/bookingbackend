@@ -6,14 +6,14 @@ export declare class PermissionsService {
     constructor(prisma: PrismaService);
     findAll(query: QueryPermissionDto): Promise<PaginatedResult<any>>;
     findAllFlat(): Promise<{
-        id: string;
         name: string;
+        id: string;
         code: string;
         group: string | null;
     }[]>;
     findOne(id: string): Promise<{
-        id: string;
         name: string;
+        id: string;
         code: string;
         group: string | null;
     }>;

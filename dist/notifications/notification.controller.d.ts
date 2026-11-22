@@ -13,8 +13,8 @@ export declare class NotificationController {
         }[];
         users: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         }[];
     }>;

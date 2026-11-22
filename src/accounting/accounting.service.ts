@@ -53,7 +53,7 @@ export const PAYEE_LABELS: Record<PayeeType, string> = {
 const num = (v: unknown): number => Number(v ?? 0);
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 const fmtVnd = (v: unknown): string =>
-  `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.abs(Math.round(num(v))))} ₫`;
+  `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.abs(Math.round(num(v))))} ₫`;
 
 type Tx = Prisma.TransactionClient;
 

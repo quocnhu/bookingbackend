@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
@@ -19,6 +20,7 @@ import {
   SubmitTourReportDto,
   UpdateAssignmentDto,
   UpdateAssignmentStatusDto,
+  UpdatePickupReminderModeDto,
   UpdateRecallCutoffDto,
   VerifyTourReportDto,
 } from './dto/assignment.dto';
@@ -35,6 +37,8 @@ import {
   NotificationType,
   PartnerHandoffStatus,
   PartnerMoneyFlow,
+  PaymentStatus,
+  PickupReminderMode,
   Prisma,
   RoleType,
   TourReportSource,
@@ -47,6 +51,8 @@ import { LeavesService } from '@/leaves/leaves.service';
 import { STORAGE } from '@/storage';
 import type { FileStorage } from '@/storage';
 import { DriveService } from '@/drive/drive.service';
+import { MailService } from '@/mail/mail.service';
+import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
 import {
   pendingEvidenceKey,
   userStorageDir,
@@ -74,6 +80,8 @@ export class AssignmentsService {
     private readonly leavesService: LeavesService,
     @Inject(STORAGE) private readonly storage: FileStorage,
     private readonly drive: DriveService,
+    private readonly mail: MailService,
+    private readonly dispatchPolicy: DispatchPolicyService,
   ) {}
 
   private include = {
@@ -186,6 +194,8 @@ export class AssignmentsService {
         status: {
           in: [
             AssignmentStatus.PENDING,
+            AssignmentStatus.DRAFT_ASSIGNED,
+            AssignmentStatus.TRANSFERRED,
             AssignmentStatus.DISPATCHED,
             AssignmentStatus.VERIFYING,
           ],
@@ -394,21 +404,24 @@ export class AssignmentsService {
   /** Dispatches (departs) all PENDING trips that are active TODAY.
    *  Never dispatches future trips (only trips departing today or multi-day
    *  trips still running through today). */
-  async dispatchAllBoard(): Promise<{
+  async dispatchAllBoard(targetDate?: Date | string): Promise<{
     dispatched: number;
     skipped: number;
     skippedOnLeave: number;
   }> {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(startOfToday);
-    endOfToday.setHours(23, 59, 59, 999);
+    const range = this.dispatchPolicy.dayRange(targetDate ?? new Date());
 
     const items = await this.prisma.assignment.findMany({
       where: {
-        status: AssignmentStatus.PENDING,
-        startDate: { lte: endOfToday },
-        endDate: { gte: startOfToday },
+        status: {
+          in: [
+            AssignmentStatus.PENDING,
+            AssignmentStatus.DRAFT_ASSIGNED,
+            AssignmentStatus.TRANSFERRED,
+          ],
+        },
+        startDate: { gte: range.start, lte: range.end },
+        endDate: { gte: range.start },
       },
       select: {
         id: true,
@@ -537,12 +550,13 @@ export class AssignmentsService {
    *  EXTENSION POINT (auto/manual): add finer modes here as needed, e.g.
    *  per-date or per-tour modes (`assignMode:<tourId>`), without touching callers. */
   async setBoardOrigin(origin: AssignmentOrigin) {
+    const before = await this.dispatchPolicy.getMode();
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-    const [result] = await this.prisma.$transaction([
+    const writes: any[] = [
       this.prisma.assignment.updateMany({
         where: {
-          status: { not: AssignmentStatus.CANCELED },
+          status: { notIn: [AssignmentStatus.CANCELED, AssignmentStatus.WAITING_LIST] },
           startDate: { gte: startOfToday },
         },
         data: { origin },
@@ -552,7 +566,20 @@ export class AssignmentsService {
         update: { value: origin },
         create: { key: 'assignMode', value: origin },
       }),
-    ]);
+    ];
+    if (origin === AssignmentOrigin.AUTO_ASSIGN && !before.autoMode) {
+      writes.push(
+        this.prisma.systemSetting.upsert({
+          where: { key: 'autoModeActivatedAt' },
+          update: { value: new Date().toISOString() },
+          create: {
+            key: 'autoModeActivatedAt',
+            value: new Date().toISOString(),
+          },
+        }),
+      );
+    }
+    const [result] = await this.prisma.$transaction(writes);
     this.gateway.notifyAll('board:refresh', { action: 'origin_changed' });
     return { updated: result.count, mode: origin };
   }
@@ -751,12 +778,33 @@ export class AssignmentsService {
         a.tourReport.status === 'VERIFIED'
       : false;
 
+    const departureTimes = (a.bookings ?? [])
+      .map((b: any) => String(b.departureTime ?? '').trim())
+      .filter((value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value))
+      .sort();
+    const departureTime = departureTimes[0] ?? null;
+    const hour = departureTime ? Number(departureTime.slice(0, 2)) : null;
+    const departureBucket =
+      hour === null
+        ? 'UNSCHEDULED'
+        : hour < 12
+          ? 'MORNING'
+          : hour < 17
+            ? 'AFTERNOON'
+            : 'EVENING';
+    const lateBookings = (a.bookings ?? []).filter(
+      (b: any) => b.lateBooking,
+    ).length;
+
     return {
       ...a,
       totalPax,
       tourType: type,
       tourName,
       durationDays,
+      departureTime,
+      departureBucket,
+      lateBookings,
       pickups,
       tourReport: a.tourReport
         ? { ...a.tourReport, locked: tourReportLocked }
@@ -828,6 +876,75 @@ export class AssignmentsService {
   }
 
   /**
+   * Switch a trip's customer pickup reminder between AUTO (cron) and MANUAL
+   * (only the Dispatch Board button sends it).
+   */
+  async updatePickupReminderMode(
+    id: string,
+    dto: UpdatePickupReminderModeDto,
+    actor: AuthenticatedUser,
+  ) {
+    const before = await this.prisma.assignment.findUnique({
+      where: { id },
+      select: { id: true, pickupReminderMode: true },
+    });
+    if (!before) throw new NotFoundException('Assignment not found');
+    const updated = await this.prisma.assignment.update({
+      where: { id },
+      data: { pickupReminderMode: dto.mode },
+      select: { id: true, pickupReminderMode: true },
+    });
+    await this.auditService.log({
+      entityType: 'Assignment',
+      entityId: id,
+      action: 'UPDATE_PICKUP_REMINDER_MODE',
+      beforeData: before,
+      afterData: updated,
+      changedBy: actor.id,
+    });
+    return updated;
+  }
+
+  /** Send the pickup reminder now (admin/office explicit action). */
+  async sendPickupReminder(id: string, actor: AuthenticatedUser) {
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id },
+      select: { id: true, code: true, tourName: true },
+    });
+    if (!assignment) throw new NotFoundException('Assignment not found');
+
+    const result = await this.mail.sendPickupReminders(id, { force: true });
+    if (result.reason === 'DISABLED' || result.reason === 'NOT_CONFIGURED') {
+      throw new ServiceUnavailableException(
+        result.reason === 'DISABLED'
+          ? 'The template mailbox is disabled. Set TEMPLATE_MAIL_ENABLED=true and restart the backend.'
+          : 'The template mailbox is not configured. Fill the TEMPLATE_MAIL_* keys first.',
+      );
+    }
+    if (result.reason === 'ASSIGNMENT_NOT_FOUND') {
+      throw new NotFoundException('Assignment not found');
+    }
+    if (result.reason === 'ASSIGNMENT_CLOSED') {
+      throw new BadRequestException(
+        'This trip is completed or cancelled — no reminder can be sent.',
+      );
+    }
+
+    await this.auditService.log({
+      entityType: 'Assignment',
+      entityId: id,
+      action: 'SEND_PICKUP_REMINDER',
+      afterData: {
+        tourName: assignment.tourName,
+        code: assignment.code,
+        ...result,
+      } as Prisma.InputJsonValue,
+      changedBy: actor.id,
+    });
+    return result;
+  }
+
+  /**
    * Once the guide submits the tour report, the trip's bookings/crew/dates are
    * frozen so the report cannot disagree with the manifest. An administrator
    * may still override; accounting unlocks it by rejecting the report.
@@ -843,7 +960,8 @@ export class AssignmentsService {
 
   private isOutsourced(assignment: any) {
     return (
-      assignment?.executionMode === AssignmentExecutionMode.OUTSOURCED_PARTNER ||
+      assignment?.executionMode ===
+        AssignmentExecutionMode.OUTSOURCED_PARTNER ||
       assignment?.partnerStatus === PartnerHandoffStatus.HANDED_OFF
     );
   }
@@ -869,7 +987,9 @@ export class AssignmentsService {
         partnerId: assignment.partnerId ?? null,
       };
     }
-    if (assignment.executionMode === AssignmentExecutionMode.COMPANY_DRIVER_ONLY) {
+    if (
+      assignment.executionMode === AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+    ) {
       return {
         payeeType: MoneyPayeeType.DRIVER,
         userId: assignment.driverId ?? null,
@@ -917,6 +1037,10 @@ export class AssignmentsService {
         'New assignments can only start as PENDING or DRAFT_ASSIGNED. Use PUT /assignments/:id/status to dispatch or complete.',
       );
     }
+    await this.assertNotSealed(
+      startDate,
+      'create a new bus',
+    );
 
     const assignment = await this.prisma.assignment.create({
       data: {
@@ -967,6 +1091,12 @@ export class AssignmentsService {
     if (dto.executionMode === AssignmentExecutionMode.OUTSOURCED_PARTNER) {
       throw new BadRequestException(
         'Use the partner handoff action to send a trip to a partner agency.',
+      );
+    }
+    if (dto.startDate !== undefined || dto.endDate !== undefined) {
+      await this.assertNotSealed(
+        before.startDate,
+        'change the trip dates',
       );
     }
 
@@ -1038,21 +1168,32 @@ export class AssignmentsService {
    *  (departing today or multi-day trips still running through today).
    *  Blocks the admin from dispatching before the departure date — "dispatch only today". */
   private assertDispatchableToday(assignment: any) {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(startOfToday);
-    endOfToday.setHours(23, 59, 59, 999);
+    const today = this.dispatchPolicy.todayHcm();
+    const tomorrow = this.dispatchPolicy.dayRange(
+      this.dispatchPolicy.addDays(today.start, 1),
+    );
     const start = new Date(assignment.startDate);
     const end = new Date(assignment.endDate ?? assignment.startDate);
-    if (
-      start.getTime() > endOfToday.getTime() ||
-      end.getTime() < startOfToday.getTime()
-    ) {
+    if (start.getTime() > tomorrow.end.getTime() || end.getTime() < today.start.getTime()) {
       const label = `${start.getDate()}/${start.getMonth() + 1}/${start.getFullYear()}`;
       throw new BadRequestException(
-        `Cannot dispatch "${assignment.code ?? 'Bus'}" (starts ${label}) — only tours active today can be dispatched. Future departures must wait until their tour day.`,
+        `Cannot dispatch "${assignment.code ?? 'Bus'}" (starts ${label}) — only today's and tomorrow's departures can be dispatched.`,
       );
     }
+  }
+
+  /** The Dispatch Board for a sealed date only accepts Waiting List moves. */
+  private async assertNotSealed(startDate: Date | string, action: string) {
+    const info = await this.dispatchPolicy.getSealInfo(startDate);
+    if (info.sealed) {
+      throw new ConflictException(
+        `This day was sealed at ${info.cutoffTime}. You cannot ${action} after the seal — use the Waiting List and place late bookings on an open bus instead.`,
+      );
+    }
+  }
+
+  async getSealInfo(date: string) {
+    return this.dispatchPolicy.getSealInfo(date);
   }
 
   /** A bus cannot depart without crew — the guide is the money payee and the
@@ -1065,7 +1206,8 @@ export class AssignmentsService {
     }
     const missing: string[] = [];
     if (
-      assignment.executionMode !== AssignmentExecutionMode.COMPANY_DRIVER_ONLY &&
+      assignment.executionMode !==
+        AssignmentExecutionMode.COMPANY_DRIVER_ONLY &&
       !assignment.guideId
     ) {
       missing.push('tour guide');
@@ -1237,6 +1379,17 @@ export class AssignmentsService {
     const before = await this.findOne(id);
     if (dto.status === before.status) return before;
 
+    if (before.status === AssignmentStatus.WAITING_LIST) {
+      throw new BadRequestException(
+        'Waiting-list buses are placed onto a real bus by moving their bookings on the Dispatch Board. They cannot change status directly.',
+      );
+    }
+    if (dto.status === AssignmentStatus.WAITING_LIST) {
+      throw new BadRequestException(
+        'WAITING_LIST is reserved for late bookings created after the dispatch seal.',
+      );
+    }
+
     // ── Guard: Dispatch only happens for tours active TODAY ──
     if (dto.status === AssignmentStatus.DISPATCHED) {
       this.assertDispatchableToday(before);
@@ -1328,6 +1481,12 @@ export class AssignmentsService {
   ) {
     const code = assignment.code ?? 'Bus';
     const tour = assignment.tourName ?? '';
+    const startLabel = new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Ho_Chi_Minh',
+    }).format(new Date(assignment.startDate));
     const affectedUserIds = [assignment.driverId, assignment.guideId].filter(
       Boolean,
     ) as string[];
@@ -1341,8 +1500,8 @@ export class AssignmentsService {
       switch (toStatus) {
         case AssignmentStatus.DISPATCHED:
           type = NotificationType.ASSIGNED;
-          title = `🚌 ${code} departed`;
-          body = `Trip ${tour} has started. Please board the bus.`;
+          title = `✅ ${code} — confirmed`;
+          body = `Trip ${tour} on ${startLabel} is confirmed. Check your schedule and pickup details before departure.`;
           break;
         case AssignmentStatus.TRANSFERRED:
           type = NotificationType.TRANSFERRED;
@@ -1399,6 +1558,9 @@ export class AssignmentsService {
   ) {
     const assignment = await this.findOne(id);
     this.assertDetailsUnlocked(assignment, actor);
+    if (assignment.status !== AssignmentStatus.WAITING_LIST) {
+      await this.assertNotSealed(assignment.startDate, 'add bookings to a bus');
+    }
     const bookingsToAssign = await this.prisma.booking.findMany({
       where: { id: { in: dto.bookingIds } },
       select: {
@@ -1492,6 +1654,7 @@ export class AssignmentsService {
       assignmentId: id,
       action: 'assign_bookings',
     });
+    await this.confirmLateBookings(dto.bookingIds);
     return this.findOne(id);
   }
 
@@ -1502,6 +1665,12 @@ export class AssignmentsService {
   ) {
     const assignment = await this.findOne(id);
     this.assertDetailsUnlocked(assignment, actor);
+    if (assignment.status !== AssignmentStatus.WAITING_LIST) {
+      await this.assertNotSealed(
+        assignment.startDate,
+        'remove bookings from a bus',
+      );
+    }
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
@@ -1533,6 +1702,7 @@ export class AssignmentsService {
   ) {
     const assignment = await this.findOne(id);
     this.assertDetailsUnlocked(assignment, actor);
+    await this.assertNotSealed(assignment.startDate, 'reorder passengers');
     const result = await this.board.reorder(id, bookingIds);
     if (result.error) throw new BadRequestException(result.error);
     this.gateway.notifyAll('board:refresh', {
@@ -1555,6 +1725,21 @@ export class AssignmentsService {
     ]);
     this.assertDetailsUnlocked(fromAssignment, actor);
     this.assertDetailsUnlocked(toAssignment, actor);
+    // After the seal, the ONLY allowed move is placing a late booking from the
+    // waiting list onto a real bus — and only from 05:00 on the departure day.
+    if (fromAssignment.status !== AssignmentStatus.WAITING_LIST) {
+      await this.assertNotSealed(fromAssignment.startDate, 'move bookings');
+      await this.assertNotSealed(toAssignment.startDate, 'move bookings');
+    } else {
+      const opensAt = this.dispatchPolicy.latePlacementOpenAt(
+        toAssignment.startDate,
+      );
+      if (Date.now() < opensAt.getTime()) {
+        throw new ConflictException(
+          `Late bookings can be placed from 05:00 on the departure day (${opensAt.toLocaleString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh' })}).`,
+        );
+      }
+    }
 
     // Validate that the booking's tour matches the target assignment's tour
     const booking = await this.prisma.booking.findUnique({
@@ -1578,11 +1763,20 @@ export class AssignmentsService {
       toAssignmentId,
     );
     if (result.error) throw new BadRequestException(result.error);
-    // Record the origin as evidence: the bus this passenger was moved out of → keep it red on the board.
-    await this.prisma.booking.update({
-      where: { id: bookingId },
-      data: { movedFromBusId: fromAssignmentId },
+    // Record the origin as evidence: the bus this passenger was moved out of →
+    // keep it red on the board. The source bus may have been auto-deleted when
+    // its last passenger left, so only link it when it still exists.
+    const sourceStillExists = await this.prisma.assignment.findUnique({
+      where: { id: fromAssignmentId },
+      select: { id: true },
     });
+    if (sourceStillExists) {
+      await this.prisma.booking.update({
+        where: { id: bookingId },
+        data: { movedFromBusId: fromAssignmentId },
+      });
+    }
+    await this.confirmLateBookings([bookingId]);
     await this.notifyMoveBooking(fromAssignmentId, toAssignmentId, bookingId);
     this.gateway.notifyAll('board:refresh', {
       assignmentId: fromAssignmentId,
@@ -1593,6 +1787,35 @@ export class AssignmentsService {
       action: 'move_in',
     });
     return this.findOne(toAssignmentId);
+  }
+
+  /**
+   * A late booking's confirmation mail is held while it sits on the Waiting
+   * List. Once an operator places it on a real bus, send the template mail.
+   */
+  private async confirmLateBookings(bookingIds: string[]) {
+    if (bookingIds.length === 0) return;
+    try {
+      const bookings = await this.prisma.booking.findMany({
+        where: {
+          id: { in: bookingIds },
+          lateBooking: true,
+          confirmationEmailSentAt: null,
+          OR: [
+            { payment: PaymentStatus.PAID },
+            { payLater: true },
+          ],
+        },
+        select: { id: true },
+      });
+      for (const booking of bookings) {
+        void this.mail.sendBookingConfirmation(booking.id);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not release late-booking confirmation: ${(error as Error).message}`,
+      );
+    }
   }
 
   /** Notifies the guides of both ends (departure bus & arrival bus) when a passenger is dragged between 2 buses. */
@@ -1745,6 +1968,9 @@ export class AssignmentsService {
   async syncDatesFromBookings(assignmentId: string, actor?: AuthenticatedUser) {
     const assignment = await this.findOne(assignmentId);
     this.assertDetailsUnlocked(assignment, actor);
+    if (assignment.status !== AssignmentStatus.WAITING_LIST) {
+      await this.assertNotSealed(assignment.startDate, 'change the trip dates');
+    }
     const bookings = await this.prisma.booking.findMany({
       where: { assignmentId },
       select: { startingDate: true },
@@ -1994,6 +2220,16 @@ export class AssignmentsService {
         'Only the assigned tour guide or office staff can submit the tour report',
       );
     }
+    if (actor.role !== RoleType.ADMIN && actor.role !== RoleType.OFFICE) {
+      const tourStart = this.dispatchPolicy.dayRange(
+        assignment.startDate,
+      ).start;
+      if (Date.now() < tourStart.getTime()) {
+        throw new BadRequestException(
+          'This tour has not started yet. Submit the report after the tour begins.',
+        );
+      }
+    }
 
     const latest = await this.prisma.tourReport.findUnique({
       where: { assignmentId: id },
@@ -2121,8 +2357,7 @@ export class AssignmentsService {
       );
     }
 
-    const owner =
-      assignment.guide ??
+    const owner = assignment.guide ??
       assignment.driver ?? { id: actor.id, email: null, name: null };
     const ownerDir = userStorageDir(owner.id, owner.email, owner.name);
     const ext = (file.originalname.split('.').pop() || '').toLowerCase();
@@ -2298,9 +2533,7 @@ export class AssignmentsService {
           changedBy: actor.id,
         });
         const payeeName =
-          assignment.guide?.name ??
-          assignment.driver?.name ??
-          payee.userId;
+          assignment.guide?.name ?? assignment.driver?.name ?? payee.userId;
         if (report.submittedById) {
           const notif = await this.notificationService.create(
             report.submittedById,
@@ -2480,7 +2713,9 @@ export class AssignmentsService {
     cutoff.setHours(0, 0, 0, 0);
 
     const where: any = {
-      status: { not: AssignmentStatus.CANCELED },
+      status: {
+        notIn: [AssignmentStatus.CANCELED, AssignmentStatus.WAITING_LIST],
+      },
       endDate: { gte: cutoff },
     };
     if (actor.role === RoleType.TRANSPORT_PROVIDER) {
@@ -2671,10 +2906,14 @@ export class AssignmentsService {
         id: true,
         code: true,
         status: true,
+        startDate: true,
         tourReport: { select: { moneyVerifiedAt: true } },
       },
     });
     if (!assignment) throw new NotFoundException('Assignment not found');
+    if (assignment.status !== AssignmentStatus.WAITING_LIST) {
+      await this.assertNotSealed(assignment.startDate, 'delete a bus');
+    }
 
     const [paymentLines, partnerPayment] = await Promise.all([
       this.prisma.paymentPeriodLine.count({ where: { assignmentId: id } }),

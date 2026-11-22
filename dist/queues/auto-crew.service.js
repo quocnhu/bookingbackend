@@ -52,19 +52,24 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
         const end = this.normalizeEnd(assignment.endDate);
         const updates = {};
         if (needsGuide && !assignment.guideId) {
-            const guideId = await this.pickUserId(client_1.RoleType.TOUR_GUIDE, assignment.id, start, end, assignment.providerId);
-            if (guideId)
-                updates.guideId = guideId;
+            const guide = await this.pickUser(client_1.RoleType.TOUR_GUIDE, assignment.id, start, end, assignment.providerId);
+            if (guide)
+                updates.guideId = guide.id;
         }
         if (!assignment.driverId) {
-            const thirdPartyProvider = !!assignment.providerId && assignment.provider?.isCompany === false;
-            if (!thirdPartyProvider) {
-                const driverId = await this.pickUserId(client_1.RoleType.DRIVER, assignment.id, start, end, assignment.providerId);
-                if (driverId)
-                    updates.driverId = driverId;
+            const externalProvider = !!assignment.providerId && assignment.provider?.isCompany === false;
+            if (!externalProvider) {
+                const onlyCompany = !assignment.providerId;
+                const driver = await this.pickUser(client_1.RoleType.DRIVER, assignment.id, start, end, assignment.providerId, onlyCompany);
+                if (driver) {
+                    updates.driverId = driver.id;
+                    if (!assignment.providerId && driver.providerId) {
+                        updates.providerId = driver.providerId;
+                    }
+                }
             }
         }
-        if (updates.guideId || updates.driverId) {
+        if (updates.guideId || updates.driverId || updates.providerId) {
             await this.prisma.assignment.update({
                 where: { id: assignment.id },
                 data: updates,
@@ -128,7 +133,7 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
         e.setHours(23, 59, 59, 999);
         return e;
     }
-    async pickUserId(role, excludeAssignmentId, start, end, providerId) {
+    async pickUser(role, excludeAssignmentId, start, end, providerId, onlyCompany = false) {
         const busy = await this.busyUserIds(role, start, end, excludeAssignmentId);
         const users = await this.prisma.user.findMany({
             where: { isActive: true, role },
@@ -148,9 +153,16 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
             const onLeave = await this.leaves.hasLeaveConflict(u.id, start, end);
             if (onLeave)
                 continue;
+            const isCompany = !!u.provider?.isCompany;
+            if (role === client_1.RoleType.DRIVER) {
+                if (onlyCompany && !isCompany)
+                    continue;
+                if (providerId && !isCompany && u.providerId !== providerId)
+                    continue;
+            }
             let company = 0;
             if (role === client_1.RoleType.DRIVER) {
-                if (u.provider?.isCompany)
+                if (isCompany)
                     company = 2;
                 else if (u.providerId && u.providerId === providerId)
                     company = 1;
@@ -161,12 +173,26 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
             const rating = role === client_1.RoleType.DRIVER
                 ? (u.driverProfile?.rating ?? 0)
                 : (u.guideProfile?.rating ?? 0);
-            candidates.push({ id: u.id, company, rating, name: u.name ?? '' });
+            candidates.push({
+                id: u.id,
+                providerId: u.providerId,
+                isCompany,
+                company,
+                rating,
+                name: u.name ?? '',
+            });
         }
         candidates.sort((a, b) => b.company - a.company ||
             b.rating - a.rating ||
             a.name.localeCompare(b.name));
-        return candidates[0]?.id ?? null;
+        const best = candidates[0];
+        return best
+            ? {
+                id: best.id,
+                providerId: best.providerId,
+                isCompany: best.isCompany,
+            }
+            : null;
     }
     async busyUserIds(role, start, end, excludeAssignmentId) {
         const field = role === client_1.RoleType.DRIVER ? 'driverId' : 'guideId';

@@ -1,5 +1,5 @@
 import { PaginationDto } from "../../common/dto/pagination.dto";
-import { AssignmentExecutionMode, AssignmentOrigin, AssignmentStatus, PartnerMoneyFlow } from '@prisma/client';
+import { AssignmentExecutionMode, AssignmentOrigin, AssignmentStatus, PartnerMoneyFlow, PickupReminderMode } from '@prisma/client';
 export declare class CreateAssignmentDto {
     code?: string;
     tourName?: string;
@@ -42,6 +42,13 @@ export declare class UpdateAutoDispatchDto {
 }
 export declare class UpdateRecallCutoffDto {
     time: string;
+}
+export declare class UpdatePickupReminderSettingsDto {
+    enabled?: boolean;
+    time?: string;
+}
+export declare class UpdatePickupReminderModeDto {
+    mode: PickupReminderMode;
 }
 export declare class ConfirmPartnerHandoffDto {
     partnerId: string;

@@ -6,9 +6,9 @@ export declare class CoordinatesController {
     findAll(query: QueryCoordinateDto): Promise<import("../common/dto/pagination.dto").PaginatedResult<any>>;
     findOne(id: string): Promise<{
         coordinate: string | null;
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         latitude: number;
         longitude: number;
         address: string;
@@ -17,9 +17,9 @@ export declare class CoordinatesController {
     }>;
     create(dto: CreateCoordinateDto): Promise<{
         coordinate: string | null;
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         latitude: number;
         longitude: number;
         address: string;
@@ -28,9 +28,9 @@ export declare class CoordinatesController {
     }>;
     update(id: string, dto: UpdateCoordinateDto): Promise<{
         coordinate: string | null;
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         latitude: number;
         longitude: number;
         address: string;

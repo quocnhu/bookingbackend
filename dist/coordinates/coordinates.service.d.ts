@@ -9,9 +9,9 @@ export declare class CoordinatesService {
     findAll(query: QueryCoordinateDto): Promise<PaginatedResult<any>>;
     findOne(id: string): Promise<{
         coordinate: string | null;
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         latitude: number;
         longitude: number;
         address: string;
@@ -20,9 +20,9 @@ export declare class CoordinatesService {
     }>;
     create(dto: CreateCoordinateDto): Promise<{
         coordinate: string | null;
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         latitude: number;
         longitude: number;
         address: string;
@@ -31,9 +31,9 @@ export declare class CoordinatesService {
     }>;
     update(id: string, dto: UpdateCoordinateDto): Promise<{
         coordinate: string | null;
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         latitude: number;
         longitude: number;
         address: string;

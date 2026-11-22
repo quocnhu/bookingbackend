@@ -3,9 +3,10 @@ import { TransportRequestsController } from './transport-requests.controller';
 import { TransportRequestsService } from './transport-requests.service';
 import { AuditModule } from '@/audit/audit.module';
 import { LeavesModule } from '@/leaves/leaves.module';
+import { MailModule } from '@/mail/mail.module';
 
 @Module({
-  imports: [AuditModule, LeavesModule],
+  imports: [AuditModule, LeavesModule, MailModule],
   controllers: [TransportRequestsController],
   providers: [TransportRequestsService],
   exports: [TransportRequestsService],

@@ -10,11 +10,11 @@ export declare class TourCategoriesService {
             tours: number;
         };
     } & {
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         isActive: boolean;
-        updatedAt: Date;
         description: string | null;
         slug: string;
         sortOrder: number;
@@ -24,31 +24,31 @@ export declare class TourCategoriesService {
             tours: number;
         };
     } & {
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         isActive: boolean;
-        updatedAt: Date;
         description: string | null;
         slug: string;
         sortOrder: number;
     }>;
     create(dto: CreateTourCategoryDto): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         isActive: boolean;
-        updatedAt: Date;
         description: string | null;
         slug: string;
         sortOrder: number;
     }>;
     update(id: string, dto: UpdateTourCategoryDto): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         isActive: boolean;
-        updatedAt: Date;
         description: string | null;
         slug: string;
         sortOrder: number;

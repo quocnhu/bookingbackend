@@ -54,8 +54,8 @@ export declare class NotificationService {
         }[];
         users: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         }[];
     }>;

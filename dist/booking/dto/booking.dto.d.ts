@@ -33,6 +33,7 @@ export declare class WebsiteQuoteDto {
     tourId: string;
     tourType: TourType;
     totalPax: number;
+    startingDate?: string | Date;
 }
 export declare class CreateWebsiteBookingDto {
     tourId: string;
@@ -50,6 +51,7 @@ export declare class CreateWebsiteBookingDto {
     longitude?: number;
     notes?: string;
     payLater?: boolean;
+    lateBooking?: boolean;
     paymentNote?: string;
 }
 export declare class CollectBookingPaymentDto {
@@ -58,6 +60,9 @@ export declare class CollectBookingPaymentDto {
 }
 export declare class ConfirmBookingPaymentDto extends CollectBookingPaymentDto {
     reference?: string;
+}
+export declare class UpdateCancellationWindowDto {
+    hours: number;
 }
 export declare class UpdateBookingDto {
     status?: BookingStatus;

@@ -18,6 +18,7 @@ import {
   CreateWebsiteBookingDto,
   QueryBookingDto,
   UpdateBookingDto,
+  UpdateCancellationWindowDto,
   WebsiteQuoteDto,
 } from './dto/booking.dto';
 import { TourType } from '@prisma/client';
@@ -103,6 +104,23 @@ export class BookingController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.bookingService.createPrivateGroup(id, dto, actor);
+  }
+
+  @Get('cancellation-window')
+  @Permissions('booking.read')
+  getCancellationWindow() {
+    return this.bookingService
+      .getCancellationWindowHours()
+      .then((hours) => ({ hours }));
+  }
+
+  @Put('cancellation-window')
+  @Permissions('booking.update')
+  updateCancellationWindow(
+    @Body() dto: UpdateCancellationWindowDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.bookingService.updateCancellationWindow(dto.hours, actor.id);
   }
 
   @Get(':id')

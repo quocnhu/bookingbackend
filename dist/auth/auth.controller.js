@@ -45,9 +45,15 @@ let AuthController = class AuthController {
     }
     async refresh(dto, req, res) {
         const refreshToken = req.cookies?.[cookies_1.REFRESH_TOKEN_COOKIE] ?? dto.refreshToken;
-        const tokens = await this.authService.refresh(refreshToken);
-        this.setAuthCookies(res, tokens);
-        return { success: true };
+        try {
+            const tokens = await this.authService.refresh(refreshToken);
+            this.setAuthCookies(res, tokens);
+            return { success: true };
+        }
+        catch (error) {
+            this.clearAuthCookies(res);
+            throw error;
+        }
     }
     async logout(req, res) {
         await this.authService.logout(req.cookies?.[cookies_1.REFRESH_TOKEN_COOKIE], req.headers?.['user-agent']);

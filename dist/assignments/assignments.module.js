@@ -12,18 +12,33 @@ const assignments_controller_1 = require("./assignments.controller");
 const assignments_service_1 = require("./assignments.service");
 const auto_dispatch_cron_1 = require("./auto-dispatch.cron");
 const tour_reminder_cron_1 = require("./tour-reminder.cron");
+const pickup_reminder_cron_1 = require("./pickup-reminder.cron");
+const waiting_list_cron_1 = require("./waiting-list.cron");
 const audit_module_1 = require("../audit/audit.module");
 const leaves_module_1 = require("../leaves/leaves.module");
 const accounting_module_1 = require("../accounting/accounting.module");
 const drive_module_1 = require("../drive/drive.module");
+const mail_module_1 = require("../mail/mail.module");
 let AssignmentsModule = class AssignmentsModule {
 };
 exports.AssignmentsModule = AssignmentsModule;
 exports.AssignmentsModule = AssignmentsModule = __decorate([
     (0, common_1.Module)({
-        imports: [audit_module_1.AuditModule, leaves_module_1.LeavesModule, accounting_module_1.AccountingModule, drive_module_1.DriveModule],
+        imports: [
+            audit_module_1.AuditModule,
+            leaves_module_1.LeavesModule,
+            accounting_module_1.AccountingModule,
+            drive_module_1.DriveModule,
+            mail_module_1.MailModule,
+        ],
         controllers: [assignments_controller_1.AssignmentsController],
-        providers: [assignments_service_1.AssignmentsService, auto_dispatch_cron_1.AutoDispatchCron, tour_reminder_cron_1.TourReminderCron],
+        providers: [
+            assignments_service_1.AssignmentsService,
+            auto_dispatch_cron_1.AutoDispatchCron,
+            tour_reminder_cron_1.TourReminderCron,
+            pickup_reminder_cron_1.PickupReminderCron,
+            waiting_list_cron_1.WaitingListCron,
+        ],
         exports: [assignments_service_1.AssignmentsService],
     })
 ], AssignmentsModule);

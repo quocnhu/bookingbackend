@@ -16,14 +16,18 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const schedule_1 = require("@nestjs/schedule");
+const mail_service_1 = require("../mail/mail.service");
+const currency_util_1 = require("./currency.util");
 let PaymentService = PaymentService_1 = class PaymentService {
     prisma;
     audit;
+    mail;
     logger = new common_1.Logger(PaymentService_1.name);
     tokenCache = null;
-    constructor(prisma, audit) {
+    constructor(prisma, audit, mail) {
         this.prisma = prisma;
         this.audit = audit;
+        this.mail = mail;
     }
     get mode() {
         return (process.env.PAYPAL_MODE ?? 'sandbox').toLowerCase() === 'live'
@@ -45,19 +49,20 @@ let PaymentService = PaymentService_1 = class PaymentService {
         return (process.env.PAYPAL_CURRENCY ?? 'USD').toUpperCase();
     }
     get vndPerUsd() {
-        return Number(process.env.PAYPAL_VND_PER_USD ?? 25000);
+        return (0, currency_util_1.parseVndPerUsd)(process.env.PAYPAL_VND_PER_USD);
     }
     isConfigured() {
         return !!this.clientId && !!this.clientSecret;
     }
     publicConfig() {
+        const rate = this.vndPerUsd;
         return {
-            enabled: this.isConfigured(),
+            enabled: this.isConfigured() && rate != null,
             provider: 'paypal',
             mode: this.mode,
             clientId: this.clientId || null,
             currency: this.currency,
-            vndPerUsd: this.vndPerUsd,
+            vndPerUsd: rate ?? currency_util_1.DEFAULT_VND_PER_USD,
         };
     }
     pendingTtlMinutes() {
@@ -208,7 +213,9 @@ let PaymentService = PaymentService_1 = class PaymentService {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
             this.logger.error(`PayPal ${path} failed: ${res.status} ${JSON.stringify(body)}`);
-            throw new common_1.BadGatewayException(body?.message || body?.details?.[0]?.description || 'PayPal request failed');
+            throw new common_1.BadGatewayException(body?.message ||
+                body?.details?.[0]?.description ||
+                'PayPal request failed');
         }
         return body;
     }
@@ -246,22 +253,18 @@ let PaymentService = PaymentService_1 = class PaymentService {
         return booking;
     }
     providerAmount(bookingCurrency, amount) {
-        if (bookingCurrency.toUpperCase() === this.currency) {
-            return {
-                value: Math.round(amount * 100) / 100,
-                currency: this.currency,
-                rate: 1,
-            };
+        const result = (0, currency_util_1.convertBookingAmount)(amount, bookingCurrency, this.currency, this.vndPerUsd);
+        if (!result.ok) {
+            if (result.reason === 'INVALID_RATE') {
+                this.logger.error(`PayPal VND/USD rate is missing or outside the allowed range: ${process.env.PAYPAL_VND_PER_USD ?? '(unset)'}`);
+                throw new common_1.ServiceUnavailableException('PayPal exchange rate is not configured correctly');
+            }
+            if (result.reason === 'UNSUPPORTED_CURRENCY') {
+                throw new common_1.BadRequestException(`Cannot convert ${bookingCurrency} to PayPal currency ${this.currency}`);
+            }
+            throw new common_1.BadRequestException('Booking total is invalid for PayPal');
         }
-        if (bookingCurrency.toUpperCase() === 'VND' && this.currency === 'USD') {
-            const rate = this.vndPerUsd > 0 ? this.vndPerUsd : 25000;
-            return {
-                value: Math.round((amount / rate) * 100) / 100,
-                currency: this.currency,
-                rate,
-            };
-        }
-        throw new common_1.BadRequestException(`Cannot convert ${bookingCurrency} to PayPal currency ${this.currency}`);
+        return result.converted;
     }
     async createPayPalOrder(bookingId, actor) {
         this.assertConfigured();
@@ -433,6 +436,7 @@ let PaymentService = PaymentService_1 = class PaymentService {
             },
             changedBy: null,
         });
+        void this.mail.sendBookingConfirmation(payment.bookingId);
         return updated;
     }
     async capturePayPalOrder(bookingId, orderId, actor, note) {
@@ -449,7 +453,11 @@ let PaymentService = PaymentService_1 = class PaymentService {
             throw new common_1.NotFoundException('PayPal order does not belong to this booking');
         }
         if (payment.status === client_1.PaymentRecordStatus.PAID) {
-            return { status: 'COMPLETED', alreadyCaptured: true, paymentId: payment.id };
+            return {
+                status: 'COMPLETED',
+                alreadyCaptured: true,
+                paymentId: payment.id,
+            };
         }
         let order;
         try {
@@ -465,7 +473,9 @@ let PaymentService = PaymentService_1 = class PaymentService {
             });
         }
         const capture = this.captureDetails(order);
-        if (!capture || capture.status !== 'COMPLETED' || order?.status !== 'COMPLETED') {
+        if (!capture ||
+            capture.status !== 'COMPLETED' ||
+            order?.status !== 'COMPLETED') {
             throw new common_1.ConflictException('PayPal payment is not completed');
         }
         const updated = await this.markCaptured(payment.id, capture, order, note ?? 'Paid with PayPal');
@@ -522,9 +532,7 @@ let PaymentService = PaymentService_1 = class PaymentService {
                 status: client_1.PaymentRecordStatus.PAID,
                 paidAt,
                 grossAmount: gross != null ? new client_1.Prisma.Decimal(gross) : undefined,
-                commissionAmount: commission != null
-                    ? new client_1.Prisma.Decimal(commission)
-                    : undefined,
+                commissionAmount: commission != null ? new client_1.Prisma.Decimal(commission) : undefined,
                 confirmedById: actor.id,
                 confirmedByName: actor.name ?? actor.email ?? null,
                 createdById: actor.id,
@@ -569,7 +577,11 @@ let PaymentService = PaymentService_1 = class PaymentService {
         const certUrl = header('paypal-cert-url');
         const authAlgo = header('paypal-auth-algo');
         const transmissionSig = header('paypal-transmission-sig');
-        if (!transmissionId || !transmissionTime || !certUrl || !authAlgo || !transmissionSig) {
+        if (!transmissionId ||
+            !transmissionTime ||
+            !certUrl ||
+            !authAlgo ||
+            !transmissionSig) {
             throw new common_1.UnauthorizedException('Missing PayPal webhook signature headers');
         }
         const verification = await this.request('/v1/notifications/verify-webhook-signature', {
@@ -596,7 +608,7 @@ let PaymentService = PaymentService_1 = class PaymentService {
         const related = resource?.supplementary_data?.related_ids ?? {};
         const orderId = related?.order_id ?? null;
         const captureId = related?.capture_id ??
-            (type === "PAYMENT.CAPTURE.REFUNDED" ? null : (resource?.id ?? null));
+            (type === 'PAYMENT.CAPTURE.REFUNDED' ? null : (resource?.id ?? null));
         const payment = await this.prisma.bookingPayment.findFirst({
             where: orderId
                 ? { provider: 'PAYPAL', providerOrderId: orderId }
@@ -667,6 +679,7 @@ __decorate([
 exports.PaymentService = PaymentService = PaymentService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        audit_service_1.AuditService])
+        audit_service_1.AuditService,
+        mail_service_1.MailService])
 ], PaymentService);
 //# sourceMappingURL=payment.service.js.map

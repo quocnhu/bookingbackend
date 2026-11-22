@@ -12,12 +12,13 @@ const transport_requests_controller_1 = require("./transport-requests.controller
 const transport_requests_service_1 = require("./transport-requests.service");
 const audit_module_1 = require("../audit/audit.module");
 const leaves_module_1 = require("../leaves/leaves.module");
+const mail_module_1 = require("../mail/mail.module");
 let TransportRequestsModule = class TransportRequestsModule {
 };
 exports.TransportRequestsModule = TransportRequestsModule;
 exports.TransportRequestsModule = TransportRequestsModule = __decorate([
     (0, common_1.Module)({
-        imports: [audit_module_1.AuditModule, leaves_module_1.LeavesModule],
+        imports: [audit_module_1.AuditModule, leaves_module_1.LeavesModule, mail_module_1.MailModule],
         controllers: [transport_requests_controller_1.TransportRequestsController],
         providers: [transport_requests_service_1.TransportRequestsService],
         exports: [transport_requests_service_1.TransportRequestsService],

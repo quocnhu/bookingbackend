@@ -6,6 +6,8 @@ export declare class CompanyProfileController {
     constructor(companyProfileService: CompanyProfileService);
     publicProfile(): Promise<{
         name: string;
+        shortName: string | null;
+        logoUrl: string | null;
         address: string | null;
         phone: string | null;
         email: string | null;
@@ -14,29 +16,36 @@ export declare class CompanyProfileController {
         longitude: number | null;
     } | null>;
     get(): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         email: string | null;
-        updatedAt: Date;
         address: string | null;
         phone: string | null;
         website: string | null;
         rootLatitude: number | null;
         rootLongitude: number | null;
+        shortName: string | null;
+        logoUrl: string | null;
         taxId: string | null;
     } | null>;
     update(dto: UpdateCompanyProfileDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         email: string | null;
-        updatedAt: Date;
         address: string | null;
         phone: string | null;
         website: string | null;
         rootLatitude: number | null;
         rootLongitude: number | null;
+        shortName: string | null;
+        logoUrl: string | null;
         taxId: string | null;
+    }>;
+    uploadLogo(file: Express.Multer.File | undefined, actor: AuthenticatedUser): Promise<{
+        logoUrl: string | null;
     }>;
 }

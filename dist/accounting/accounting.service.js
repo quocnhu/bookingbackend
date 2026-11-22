@@ -27,7 +27,7 @@ exports.PAYEE_LABELS = {
 };
 const num = (v) => Number(v ?? 0);
 const round2 = (v) => Math.round(v * 100) / 100;
-const fmtVnd = (v) => `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.abs(Math.round(num(v))))} ₫`;
+const fmtVnd = (v) => `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.abs(Math.round(num(v))))} ₫`;
 let AccountingService = class AccountingService {
     prisma;
     audit;

@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateRoleDto, QueryRoleDto, UpdateRoleDto } from './dto/role.dto';
 import { PaginatedResult } from '@/common/dto/pagination.dto';
@@ -57,9 +57,8 @@ export class RolesService {
         throw new ForbiddenException('Cannot modify permissions of a system role');
       }
     }
-    if (dto.name !== undefined) {
-      const existing = await this.prisma.role.findUnique({ where: { name: dto.name } });
-      if (existing && existing.id !== id) throw new ConflictException('Role name already exists');
+    if (dto.name !== undefined && dto.name !== role.name) {
+      throw new BadRequestException('Role name cannot be changed after creation');
     }
     const data: any = { name: dto.name, description: dto.description };
     if (dto.permissionIds !== undefined) {

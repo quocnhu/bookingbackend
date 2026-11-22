@@ -17,6 +17,7 @@ const audit_service_1 = require("../audit/audit.service");
 const notification_service_1 = require("../notifications/notification.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
 const client_1 = require("@prisma/client");
+const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
 const LEAVE_BLOCKING_STATUSES = [client_1.LeaveStatus.PENDING, client_1.LeaveStatus.APPROVED];
 const LEAVE_NOTICE_DAYS = 2;
 const EMERGENCY_CUTOFF_HOUR = 4;
@@ -25,12 +26,14 @@ let LeavesService = LeavesService_1 = class LeavesService {
     auditService;
     notificationService;
     gateway;
+    dispatchPolicy;
     logger = new common_1.Logger(LeavesService_1.name);
-    constructor(prisma, auditService, notificationService, gateway) {
+    constructor(prisma, auditService, notificationService, gateway, dispatchPolicy) {
         this.prisma = prisma;
         this.auditService = auditService;
         this.notificationService = notificationService;
         this.gateway = gateway;
+        this.dispatchPolicy = dispatchPolicy;
     }
     includeUser = {
         user: { select: { id: true, name: true, email: true, role: true } },
@@ -49,13 +52,24 @@ let LeavesService = LeavesService_1 = class LeavesService {
         }
         return { start, end };
     }
-    assertRequestTiming(start, isEmergency) {
+    async assertRequestTiming(start, isEmergency) {
         const now = new Date();
         if (isEmergency) {
+            const mode = await this.dispatchPolicy.getMode();
             const cutoff = new Date(start);
-            cutoff.setHours(EMERGENCY_CUTOFF_HOUR, 0, 0, 0);
-            if (now >= cutoff) {
-                throw new common_1.BadRequestException('Emergency leave for today must be submitted before 04:00, because automatic dispatch runs at 04:00.');
+            if (mode.autoMode) {
+                const [hours, minutes] = mode.cutoffTime.split(':').map(Number);
+                cutoff.setDate(cutoff.getDate() - 1);
+                cutoff.setHours(hours || 0, minutes || 0, 0, 0);
+                if (now >= cutoff) {
+                    throw new common_1.BadRequestException(`Emergency leave must be submitted before ${mode.cutoffTime} the day before, because automatic dispatch runs then.`);
+                }
+            }
+            else {
+                cutoff.setHours(EMERGENCY_CUTOFF_HOUR, 0, 0, 0);
+                if (now >= cutoff) {
+                    throw new common_1.BadRequestException('Emergency leave for today must be submitted before 04:00 in manual dispatch mode.');
+                }
             }
             return;
         }
@@ -81,7 +95,7 @@ let LeavesService = LeavesService_1 = class LeavesService {
     async create(dto, actor) {
         const { start, end } = this.normalizeRange(dto.startDate, dto.endDate);
         const isEmergency = dto.isEmergency === true;
-        this.assertRequestTiming(start, isEmergency);
+        await this.assertRequestTiming(start, isEmergency);
         const isStaff = actor.role === client_1.RoleType.ADMIN || actor.role === client_1.RoleType.OFFICE;
         let targetUserId = actor.id;
         if (dto.userId) {
@@ -599,6 +613,7 @@ exports.LeavesService = LeavesService = LeavesService_1 = __decorate([
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_service_1.AuditService,
         notification_service_1.NotificationService,
-        notifications_gateway_1.NotificationsGateway])
+        notifications_gateway_1.NotificationsGateway,
+        dispatch_policy_service_1.DispatchPolicyService])
 ], LeavesService);
 //# sourceMappingURL=leaves.service.js.map

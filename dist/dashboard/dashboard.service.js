@@ -51,7 +51,7 @@ let DashboardService = class DashboardService {
         }
         return -1;
     }
-    async stats(fromDate, toDate) {
+    async stats(fromDate, toDate, canViewFinance = false) {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         const todayEnd = new Date();
@@ -79,7 +79,7 @@ let DashboardService = class DashboardService {
         const moneyLockedWhere = hasRange
             ? { gte: revenueFrom, lte: revenueTo }
             : { not: null };
-        const [totalBookings, todayBookings, pendingBookings, todayDispatched, totalTours, totalUsers, totalRoles, totalPermissions, totalAssignments, todayLogins, lockedAccounts, collectedAgg, collectedTodayAgg, pendingValueAgg, localUsers, googleUsers, customerUsers, googleCustomers, settledToCompanyAgg, settledToGuideAgg,] = await Promise.all([
+        const [totalBookings, todayBookings, pendingBookings, todayDispatched, totalTours, totalUsers, totalRoles, totalPermissions, totalAssignments, todayLogins, lockedAccounts, localUsers, googleUsers, customerUsers, googleCustomers,] = await Promise.all([
             this.prisma.booking.count(),
             this.prisma.booking.count({ where: { createdAt: { gte: todayStart, lte: todayEnd } } }),
             this.prisma.booking.count({ where: { status: client_1.BookingStatus.PENDING } }),
@@ -102,21 +102,6 @@ let DashboardService = class DashboardService {
             this.prisma.assignment.count(),
             this.prisma.userSession.count({ where: { loggedInAt: { gte: todayStart, lte: todayEnd } } }),
             this.prisma.user.count({ where: { lockoutUntil: { gt: new Date() } } }),
-            this.prisma.bookingPayment.aggregate({
-                where: paymentWhere,
-                _sum: { amount: true },
-            }),
-            this.prisma.bookingPayment.aggregate({
-                where: {
-                    status: client_1.PaymentRecordStatus.PAID,
-                    paidAt: { gte: todayStart, lte: todayEnd },
-                },
-                _sum: { amount: true },
-            }),
-            this.prisma.booking.aggregate({
-                where: pendingValueWhere,
-                _sum: { totalAmount: true },
-            }),
             this.prisma.user.count({ where: { authProvider: client_1.AuthProvider.LOCAL } }),
             this.prisma.user.count({ where: { authProvider: client_1.AuthProvider.GOOGLE } }),
             this.prisma.user.count({ where: { role: client_1.RoleType.CUSTOMER } }),
@@ -126,27 +111,46 @@ let DashboardService = class DashboardService {
                     authProvider: client_1.AuthProvider.GOOGLE,
                 },
             }),
-            this.prisma.tourReport.aggregate({
-                where: {
-                    moneyVerifiedAt: moneyLockedWhere,
-                    settlementFlow: client_1.FeeFlowType.COLLECT_MONEY,
-                    moneyPayeeType: {
-                        in: [client_1.MoneyPayeeType.GUIDE, client_1.MoneyPayeeType.DRIVER],
-                    },
-                },
-                _sum: { netAmount: true },
-            }),
-            this.prisma.tourReport.aggregate({
-                where: {
-                    moneyVerifiedAt: moneyLockedWhere,
-                    settlementFlow: client_1.FeeFlowType.PAY_MONEY,
-                    moneyPayeeType: {
-                        in: [client_1.MoneyPayeeType.GUIDE, client_1.MoneyPayeeType.DRIVER],
-                    },
-                },
-                _sum: { netAmount: true },
-            }),
         ]);
+        const finance = canViewFinance
+            ? await Promise.all([
+                this.prisma.bookingPayment.aggregate({
+                    where: paymentWhere,
+                    _sum: { amount: true },
+                }),
+                this.prisma.bookingPayment.aggregate({
+                    where: {
+                        status: client_1.PaymentRecordStatus.PAID,
+                        paidAt: { gte: todayStart, lte: todayEnd },
+                    },
+                    _sum: { amount: true },
+                }),
+                this.prisma.booking.aggregate({
+                    where: pendingValueWhere,
+                    _sum: { totalAmount: true },
+                }),
+                this.prisma.tourReport.aggregate({
+                    where: {
+                        moneyVerifiedAt: moneyLockedWhere,
+                        settlementFlow: client_1.FeeFlowType.COLLECT_MONEY,
+                        moneyPayeeType: {
+                            in: [client_1.MoneyPayeeType.GUIDE, client_1.MoneyPayeeType.DRIVER],
+                        },
+                    },
+                    _sum: { netAmount: true },
+                }),
+                this.prisma.tourReport.aggregate({
+                    where: {
+                        moneyVerifiedAt: moneyLockedWhere,
+                        settlementFlow: client_1.FeeFlowType.PAY_MONEY,
+                        moneyPayeeType: {
+                            in: [client_1.MoneyPayeeType.GUIDE, client_1.MoneyPayeeType.DRIVER],
+                        },
+                    },
+                    _sum: { netAmount: true },
+                }),
+            ])
+            : null;
         return {
             totalBookings,
             todayBookings,
@@ -159,24 +163,27 @@ let DashboardService = class DashboardService {
             totalAssignments,
             todayLogins,
             lockedAccounts,
-            totalRevenue: Number(collectedAgg._sum.amount ?? 0),
-            revenueToday: Number(collectedTodayAgg._sum.amount ?? 0),
-            pendingRevenue: Number(pendingValueAgg._sum.totalAmount ?? 0),
+            totalRevenue: finance ? Number(finance[0]._sum.amount ?? 0) : null,
+            revenueToday: finance ? Number(finance[1]._sum.amount ?? 0) : null,
+            pendingRevenue: finance ? Number(finance[2]._sum.totalAmount ?? 0) : null,
             localUsers,
             googleUsers,
             customerUsers,
             googleCustomers,
-            settledToCompany: Number(settledToCompanyAgg._sum.netAmount ?? 0),
-            settledToGuide: Math.abs(Number(settledToGuideAgg._sum.netAmount ?? 0)),
-            revenueFrom: fromDate ?? null,
-            revenueTo: toDate ?? null,
+            settledToCompany: finance ? Number(finance[3]._sum.netAmount ?? 0) : null,
+            settledToGuide: finance
+                ? Math.abs(Number(finance[4]._sum.netAmount ?? 0))
+                : null,
+            revenueFrom: canViewFinance ? (fromDate ?? null) : null,
+            revenueTo: canViewFinance ? (toDate ?? null) : null,
+            canViewFinance,
         };
     }
-    async charts(range) {
+    async charts(range, canViewFinance = false) {
         const buckets = this.buildBuckets(range);
         const startTime = buckets[0].start;
         const endTime = buckets[buckets.length - 1].end;
-        const [bookings, sessions, auditLogs, payments] = await Promise.all([
+        const [bookings, sessions, auditLogs] = await Promise.all([
             this.prisma.booking.findMany({
                 where: { createdAt: { gte: new Date(startTime), lte: new Date(endTime) } },
                 select: { createdAt: true, payment: true, status: true },
@@ -189,14 +196,16 @@ let DashboardService = class DashboardService {
                 where: { createdAt: { gte: new Date(Date.now() - 7 * 86400000) } },
                 select: { action: true },
             }),
-            this.prisma.bookingPayment.findMany({
+        ]);
+        const payments = canViewFinance
+            ? await this.prisma.bookingPayment.findMany({
                 where: {
                     status: client_1.PaymentRecordStatus.PAID,
                     paidAt: { gte: new Date(startTime), lte: new Date(endTime) },
                 },
                 select: { amount: true, paidAt: true },
-            }),
-        ]);
+            })
+            : [];
         const bookingsByBucket = buckets.map((b) => ({
             label: b.label,
             count: bookings.filter((x) => this.bucketIndex(buckets, x.createdAt.getTime()) === buckets.indexOf(b)).length,
@@ -205,12 +214,15 @@ let DashboardService = class DashboardService {
             label: b.label,
             count: sessions.filter((x) => this.bucketIndex(buckets, x.loggedInAt.getTime()) === buckets.indexOf(b)).length,
         }));
-        const revenueByBucket = buckets.map((b, i) => ({
-            label: b.label,
-            amount: payments
-                .filter((p) => p.paidAt && this.bucketIndex(buckets, p.paidAt.getTime()) === i)
-                .reduce((sum, p) => sum + Number(p.amount), 0),
-        }));
+        const revenueByBucket = canViewFinance
+            ? buckets.map((b, i) => ({
+                label: b.label,
+                amount: payments
+                    .filter((p) => p.paidAt &&
+                    this.bucketIndex(buckets, p.paidAt.getTime()) === i)
+                    .reduce((sum, p) => sum + Number(p.amount), 0),
+            }))
+            : [];
         const paymentStatusDistribution = [client_1.PaymentStatus.PAID, client_1.PaymentStatus.PENDING, client_1.PaymentStatus.REFUNDED].map((status) => ({
             status,
             value: bookings.filter((b) => b.payment === status).length,
@@ -232,38 +244,46 @@ let DashboardService = class DashboardService {
             paymentStatusDistribution,
             bookingStatusDistribution,
             activityByAction,
+            canViewFinance,
         };
     }
     async widgets() {
         const recentBookings = await this.prisma.booking.findMany({
             orderBy: { createdAt: 'desc' },
             take: 5,
-            include: { tour: { select: { id: true, name: true } } },
-        });
-        const recentRawData = await this.prisma.rawData.findMany({
-            orderBy: { createdAt: 'desc' },
-            take: 5,
-            select: { id: true, sourceId: true, status: true, createdAt: true },
-        });
-        const assignmentsToday = await this.prisma.assignment.findMany({
-            where: { status: client_1.AssignmentStatus.DISPATCHED },
-            orderBy: { startDate: 'desc' },
-            take: 5,
+            select: {
+                id: true,
+                bookingRef: true,
+                customerName: true,
+                status: true,
+                totalPax: true,
+                tour: { select: { id: true, name: true } },
+            },
         });
         const recentAuthActivity = await this.prisma.authActivity.findMany({
             orderBy: { createdAt: 'desc' },
             take: 20,
-            include: { user: { select: { id: true, email: true, name: true } } },
+            select: {
+                id: true,
+                userId: true,
+                eventType: true,
+                createdAt: true,
+                user: { select: { id: true, email: true, name: true } },
+            },
         });
         const recentActions = await this.prisma.auditLog.findMany({
             orderBy: { createdAt: 'desc' },
             take: 10,
-            include: { user: { select: { id: true, email: true, name: true } } },
+            select: {
+                id: true,
+                action: true,
+                changedBy: true,
+                createdAt: true,
+                user: { select: { id: true, email: true, name: true } },
+            },
         });
         return {
             recentBookings,
-            recentRawData,
-            assignmentsToday,
             recentAuthActivity,
             recentActions,
         };

@@ -13,6 +13,7 @@ exports.UpdateCompanyProfileDto = void 0;
 const class_validator_1 = require("class-validator");
 class UpdateCompanyProfileDto {
     name;
+    shortName;
     address;
     phone;
     email;
@@ -27,6 +28,12 @@ __decorate([
     (0, class_validator_1.MaxLength)(255),
     __metadata("design:type", String)
 ], UpdateCompanyProfileDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(60),
+    __metadata("design:type", String)
+], UpdateCompanyProfileDto.prototype, "shortName", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

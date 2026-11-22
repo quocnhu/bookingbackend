@@ -7,6 +7,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import type { RawBodyRequest } from '@nestjs/common';
 import { Public } from '@/common/decorators/public.decorator';
@@ -39,6 +40,7 @@ export class PaymentController {
   }
 
   @Post('paypal/orders')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   createOrder(
     @Body() dto: CreatePayPalOrderDto,
     @CurrentUser() actor: AuthenticatedUser,
@@ -55,6 +57,7 @@ export class PaymentController {
   }
 
   @Post('paypal/capture')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   captureOrder(
     @Body() dto: CapturePayPalOrderDto,
     @CurrentUser() actor: AuthenticatedUser,

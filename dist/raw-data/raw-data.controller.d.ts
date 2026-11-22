@@ -21,11 +21,11 @@ export declare class RawDataController {
                 id: string;
                 bookingRef: string;
             } | null;
+            updatedAt: Date;
             id: string;
             action: string | null;
             createdAt: Date;
             email: string | null;
-            updatedAt: Date;
             status: string;
             templateTag: string | null;
             sourceId: string;

@@ -90,21 +90,21 @@ export declare class LeavesController {
     create(dto: CreateLeaveDto, actor: AuthenticatedUser): Promise<{
         user: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         };
         reviewedBy: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         userId: string;
-        updatedAt: Date;
         startDate: Date;
         endDate: Date;
         status: import("@prisma/client").$Enums.LeaveStatus;
@@ -116,21 +116,21 @@ export declare class LeavesController {
     updateStatus(id: string, dto: UpdateLeaveStatusDto, actor: AuthenticatedUser): Promise<{
         user: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         };
         reviewedBy: {
             role: import("@prisma/client").$Enums.RoleType;
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         userId: string;
-        updatedAt: Date;
         startDate: Date;
         endDate: Date;
         status: import("@prisma/client").$Enums.LeaveStatus;

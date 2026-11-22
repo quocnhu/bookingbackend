@@ -8,8 +8,8 @@ export declare class RolesService {
     findOne(id: string): Promise<{
         permissions: ({
             permission: {
-                id: string;
                 name: string;
+                id: string;
                 code: string;
                 group: string | null;
             };
@@ -20,9 +20,10 @@ export declare class RolesService {
         users: ({
             user: {
                 role: import("@prisma/client").$Enums.RoleType;
+                updatedAt: Date;
+                name: string | null;
                 id: string;
                 createdAt: Date;
-                name: string | null;
                 authProvider: import("@prisma/client").$Enums.AuthProvider;
                 email: string;
                 avatarUrl: string | null;
@@ -34,33 +35,32 @@ export declare class RolesService {
                 userType: string | null;
                 storageQuotaMb: number;
                 providerId: string | null;
-                updatedAt: Date;
             };
         } & {
             userId: string;
             roleId: string;
         })[];
     } & {
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
-        updatedAt: Date;
         description: string | null;
         isSystem: boolean;
     }>;
     create(dto: CreateRoleDto): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
-        updatedAt: Date;
         description: string | null;
         isSystem: boolean;
     }>;
     update(id: string, dto: UpdateRoleDto): Promise<{
         permissions: ({
             permission: {
-                id: string;
                 name: string;
+                id: string;
                 code: string;
                 group: string | null;
             };
@@ -71,9 +71,10 @@ export declare class RolesService {
         users: ({
             user: {
                 role: import("@prisma/client").$Enums.RoleType;
+                updatedAt: Date;
+                name: string | null;
                 id: string;
                 createdAt: Date;
-                name: string | null;
                 authProvider: import("@prisma/client").$Enums.AuthProvider;
                 email: string;
                 avatarUrl: string | null;
@@ -85,17 +86,16 @@ export declare class RolesService {
                 userType: string | null;
                 storageQuotaMb: number;
                 providerId: string | null;
-                updatedAt: Date;
             };
         } & {
             userId: string;
             roleId: string;
         })[];
     } & {
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
-        updatedAt: Date;
         description: string | null;
         isSystem: boolean;
     }>;

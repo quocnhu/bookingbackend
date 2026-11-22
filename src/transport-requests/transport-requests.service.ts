@@ -20,6 +20,8 @@ import { AuditService } from '@/audit/audit.service';
 import { LeavesService } from '@/leaves/leaves.service';
 import { NotificationService } from '@/notifications/notification.service';
 import { NotificationsGateway } from '@/notifications/notifications.gateway';
+import { AutoCrewService } from '@/queues/auto-crew.service';
+import { MailService } from '@/mail/mail.service';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 import {
   AssignTransportRequestDto,
@@ -50,7 +52,7 @@ const DEFAULT_SETTINGS = {
   sendDaysBefore: 2,
   sendTime: '08:00',
   deadlineTime: '23:00',
-  minLeadHours: 8,
+  minLeadHours: 3,
 };
 
 const RECALL_CUTOFF_KEY = 'recallCutoffTime';
@@ -92,6 +94,8 @@ export class TransportRequestsService {
     private readonly leaves: LeavesService,
     private readonly notificationService: NotificationService,
     private readonly gateway: NotificationsGateway,
+    private readonly autoCrew: AutoCrewService,
+    private readonly mail: MailService,
   ) {}
 
   private include = assignmentInclude;
@@ -306,18 +310,28 @@ export class TransportRequestsService {
       throw new NotFoundException('Transportation provider not found');
 
     const settings = await this.getSettings();
-    const deadline = dto.deadline
+    let deadline = dto.deadline
       ? new Date(dto.deadline)
       : this.computeDeadline(assignment.startDate, settings);
     if (Number.isNaN(deadline.getTime())) {
       throw new BadRequestException('Invalid deadline');
     }
     if (deadline.getTime() <= Date.now()) {
-      throw new BadRequestException(
-        'The response deadline must be in the future',
-      );
+      // Manual send after the standard 23:00 deadline (e.g. the first provider
+      // failed): give the replacement a short window up to departure.
+      const now = Date.now();
+      const tripStart = new Date(assignment.startDate).getTime();
+      const leadMs = Math.max(1, settings.minLeadHours) * 60 * 60 * 1000;
+      const fallback = Math.min(now + leadMs, tripStart);
+      deadline = new Date(fallback > now ? fallback : now + 60 * 60 * 1000);
+      if (deadline.getTime() <= now) {
+        throw new BadRequestException(
+          'The trip already departed — a new provider request cannot be sent.',
+        );
+      }
     }
 
+    const previousProviderId = assignment.providerId;
     const updated = await this.prisma.assignment.update({
       where: { id: assignment.id },
       data: {
@@ -326,6 +340,7 @@ export class TransportRequestsService {
         providerRequestedAt: new Date(),
         providerRequestedById: actor.id,
         providerDeadline: deadline,
+        providerWarningAt: null,
         providerRequestNote: dto.note ?? null,
         providerViewedAt: null,
         providerRespondedAt: null,
@@ -350,6 +365,30 @@ export class TransportRequestsService {
       changedBy: actor.id,
     });
 
+    if (
+      previousProviderId &&
+      previousProviderId !== providerId &&
+      (
+        [
+          TransportRequestStatus.REQUESTED,
+          TransportRequestStatus.VIEWED,
+          TransportRequestStatus.ASSIGNED,
+          TransportRequestStatus.EXPIRED,
+        ] as TransportRequestStatus[]
+      ).includes(assignment.providerRequestStatus)
+    ) {
+      await this.notifyProvider(
+        previousProviderId,
+        'Route assigned to another provider',
+        `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} is no longer available to you — the travel agent assigned it to another provider.`,
+        {
+          kind: 'TRANSPORT_REASSIGNED',
+          assignmentId: updated.id,
+          status: TransportRequestStatus.CANCELLED,
+          url: '/transport-provider/requests',
+        },
+      );
+    }
     const suggestion = await this.suggestionText(updated);
     await this.notifyProvider(
       providerId,
@@ -416,6 +455,7 @@ export class TransportRequestsService {
     const assignment = await this.loadAssignment(assignmentId);
     this.assertRequestable(assignment);
 
+    const previousProviderId = assignment.providerId;
     const providerId = dto.providerId ?? assignment.providerId;
     if (!providerId) {
       throw new BadRequestException('Select a transportation provider first');
@@ -428,6 +468,19 @@ export class TransportRequestsService {
       actor,
       source: 'ADMIN_OVERRIDE',
     });
+    if (previousProviderId && previousProviderId !== providerId) {
+      await this.notifyProvider(
+        previousProviderId,
+        'Route assigned to another provider',
+        `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${this.formatDateTime(assignment.startDate)} is no longer available to you — the travel agent assigned it to another provider.`,
+        {
+          kind: 'TRANSPORT_REASSIGNED',
+          assignmentId: assignment.id,
+          status: TransportRequestStatus.CANCELLED,
+          url: '/transport-provider/requests',
+        },
+      );
+    }
     const updated = await this.loadAssignment(assignmentId);
     await this.notifyProvider(
       providerId,
@@ -767,7 +820,8 @@ export class TransportRequestsService {
 
   async processDueRequests() {
     const settings = await this.getSettings();
-    if (!settings.enabled) return { sent: 0, expired: 0, autoAssigned: 0 };
+    if (!settings.enabled)
+      return { sent: 0, expired: 0, autoAssigned: 0, warned: 0 };
 
     const now = new Date();
     const horizon = this.daysAhead(settings.sendDaysBefore + 1);
@@ -777,8 +831,6 @@ export class TransportRequestsService {
           in: [AssignmentStatus.DRAFT_ASSIGNED, AssignmentStatus.PENDING],
         },
         executionMode: { not: AssignmentExecutionMode.OUTSOURCED_PARTNER },
-        providerId: { not: null },
-        provider: { is: { isCompany: false } },
         startDate: { gt: now, lte: horizon },
         OR: [{ driverId: null }, { vehicleId: null }],
         providerRequestStatus: {
@@ -797,28 +849,77 @@ export class TransportRequestsService {
     let sent = 0;
     let expired = 0;
     let autoAssigned = 0;
+    let warned = 0;
 
     for (const assignment of assignments) {
-      const sendAt = this.computeSendAt(assignment.startDate, settings);
-      const deadline = this.computeDeadline(assignment.startDate, settings);
+      let current = assignment;
 
-      if (
-        assignment.providerRequestStatus === TransportRequestStatus.NOT_REQUIRED
-      ) {
+      // Company fleet first: give auto-crew a chance to bind a company driver.
+      // If none exists, reserve ONE external provider for this bus (each
+      // external provider carries at most one bus per departure date).
+      if (!current.providerId || current.provider?.isCompany) {
+        if (current.driverId) continue;
+        let companyDriverAssigned = false;
+        try {
+          const crew = await this.autoCrew.assignCrewForBus(current.id);
+          companyDriverAssigned = !!crew.updates?.driverId;
+        } catch (error) {
+          this.logger.warn(
+            `Auto-crew fallback failed for ${current.code ?? current.id}: ${(error as Error).message}`,
+          );
+        }
+        if (companyDriverAssigned) continue;
+
+        // After the deadline, do not reserve a fresh provider for a request
+        // that can no longer be answered — alert the admin instead.
+        const preliminaryDeadline = this.computeDeadline(
+          current.startDate,
+          settings,
+        );
+        if (now.getTime() >= preliminaryDeadline.getTime()) {
+          await this.warnNoProvider(current);
+          continue;
+        }
+
+        const provider = await this.pickExternalProvider(current);
+        if (!provider) {
+          await this.warnNoProvider(current);
+          continue;
+        }
+        current = await this.prisma.assignment.update({
+          where: { id: current.id },
+          data: {
+            providerId: provider.id,
+            providerRequestStatus: TransportRequestStatus.NOT_REQUIRED,
+            providerWarningAt: null,
+            providerViewedAt: null,
+            providerRespondedAt: null,
+            providerDeadline: null,
+          },
+          include: this.include,
+        });
+      }
+
+      if (current.provider?.isCompany) continue;
+
+      const sendAt = this.computeSendAt(current.startDate, settings);
+      const deadline = this.computeDeadline(current.startDate, settings);
+
+      if (current.providerRequestStatus === TransportRequestStatus.NOT_REQUIRED) {
         if (now.getTime() >= deadline.getTime()) {
           await this.expire(
-            assignment,
+            current,
             'Deadline passed before the request could be sent',
           );
           expired++;
           continue;
         }
         if (now.getTime() >= sendAt.getTime()) {
-          await this.sendInternal(assignment, settings, deadline);
+          await this.sendInternal(current, settings, deadline);
           sent++;
-          const providerMode = assignment.provider?.assignmentMode;
+          const providerMode = current.provider?.assignmentMode;
           if (providerMode === ProviderAssignmentMode.FULLY_AUTO) {
-            const didAssign = await this.tryAutoAssignInternal(assignment.id);
+            const didAssign = await this.tryAutoAssignInternal(current.id);
             if (didAssign) autoAssigned++;
           }
         }
@@ -826,20 +927,183 @@ export class TransportRequestsService {
       }
 
       if (
-        assignment.providerRequestStatus === TransportRequestStatus.REQUESTED ||
-        assignment.providerRequestStatus === TransportRequestStatus.VIEWED
+        current.providerRequestStatus === TransportRequestStatus.REQUESTED ||
+        current.providerRequestStatus === TransportRequestStatus.VIEWED
       ) {
         if (now.getTime() >= deadline.getTime()) {
           await this.expire(
-            assignment,
+            current,
             'No driver/vehicle confirmed before the deadline',
           );
           expired++;
+          continue;
+        }
+
+        // Warn the provider 3 hours before the deadline, once per request.
+        const warningAt = deadline.getTime() - 3 * 60 * 60 * 1000;
+        if (now.getTime() >= warningAt && !current.providerWarningAt) {
+          await this.warnProviderBeforeDeadline(current, deadline);
+          warned++;
         }
       }
     }
 
-    return { sent, expired, autoAssigned };
+    return { sent, expired, autoAssigned, warned };
+  }
+
+  /**
+   * Reserve one external provider for the bus: never the company fleet, and
+   * at most one bus per provider per departure date (least busy first).
+   */
+  private async pickExternalProvider(assignment: AssignmentView) {
+    const range = {
+      start: this.startOfDay(assignment.startDate),
+      end: this.endOfDay(assignment.startDate),
+    };
+    const [providers, used, workload] = await Promise.all([
+      this.prisma.transportationProvider.findMany({
+        where: {
+          isCompany: false,
+          users: { some: { isActive: true, role: RoleType.DRIVER } },
+        },
+        select: { id: true, name: true },
+      }),
+      this.prisma.assignment.findMany({
+        where: {
+          id: { not: assignment.id },
+          providerId: { not: null },
+          status: { not: AssignmentStatus.CANCELED },
+          startDate: { gte: range.start, lte: range.end },
+        },
+        select: { providerId: true },
+      }),
+      this.prisma.assignment.groupBy({
+        by: ['providerId'],
+        where: {
+          providerId: { not: null },
+          status: { not: AssignmentStatus.CANCELED },
+          startDate: { gte: this.daysAgo(30), lte: this.daysAhead(30) },
+        },
+        _count: { _all: true },
+      }),
+    ]);
+    const usedIds = new Set(used.map((row) => row.providerId));
+    const workloadMap = new Map(
+      workload.map((row) => [row.providerId, row._count._all]),
+    );
+    const candidates = providers.filter((provider) => !usedIds.has(provider.id));
+    if (candidates.length === 0) return null;
+    candidates.sort(
+      (a, b) =>
+        (workloadMap.get(a.id) ?? 0) - (workloadMap.get(b.id) ?? 0) ||
+        a.name.localeCompare(b.name),
+    );
+    return candidates[0];
+  }
+
+  private async warnProviderBeforeDeadline(
+    assignment: AssignmentView,
+    deadline: Date,
+  ) {
+    await this.prisma.assignment.update({
+      where: { id: assignment.id },
+      data: { providerWarningAt: new Date() },
+    });
+    const message = `${assignment.tourName ?? assignment.code ?? 'Tour'} on ${this.formatDateTime(assignment.startDate)} still has no driver/vehicle. Confirm before ${this.formatDateTime(deadline)} or the travel agent will assign another provider.`;
+    await this.notifyProvider(
+      assignment.providerId!,
+      'Driver assignment deadline approaching',
+      message,
+      {
+        kind: 'TRANSPORT_WARNING',
+        assignmentId: assignment.id,
+        status: assignment.providerRequestStatus,
+        url: '/transport-provider/requests',
+      },
+    );
+    await this.sendAlertEmails(assignment, {
+      title: 'Provider has not assigned a driver yet',
+      message,
+      audience: 'both',
+    });
+    this.gateway.notifyAll('transport:refresh', {
+      assignmentId: assignment.id,
+    });
+  }
+
+  private async warnNoProvider(assignment: AssignmentView) {
+    const recent =
+      assignment.providerWarningAt &&
+      Date.now() - assignment.providerWarningAt.getTime() < 6 * 60 * 60 * 1000;
+    if (recent) return;
+    await this.prisma.assignment.update({
+      where: { id: assignment.id },
+      data: { providerWarningAt: new Date() },
+    });
+    const message = `${assignment.tourName ?? assignment.code ?? 'Tour'} on ${this.formatDateTime(assignment.startDate)} has no available company driver and no external provider left for that date. Assign a provider manually.`;
+    await this.notifyAdmins('No transport provider available', message, {
+      kind: 'TRANSPORT_NO_PROVIDER',
+      assignmentId: assignment.id,
+      url: '/service/transport-requests',
+    });
+    await this.sendAlertEmails(assignment, {
+      title: 'No transport provider available',
+      message,
+      audience: 'admin',
+    });
+  }
+
+  private async sendAlertEmails(
+    assignment: AssignmentView,
+    input: { title: string; message: string; audience: 'admin' | 'provider' | 'both' },
+  ) {
+    const frontend = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+    const adminEmails =
+      input.audience === 'provider'
+        ? []
+        : (
+            await this.prisma.user.findMany({
+              where: {
+                role: { in: [RoleType.ADMIN, RoleType.OFFICE] },
+                isActive: true,
+              },
+              select: { email: true },
+            })
+          ).map((user) => user.email);
+    const providerEmails =
+      input.audience === 'admin' || !assignment.providerId
+        ? []
+        : (
+            await this.prisma.user.findMany({
+              where: {
+                role: RoleType.TRANSPORT_PROVIDER,
+                providerId: assignment.providerId,
+                isActive: true,
+              },
+              select: { email: true },
+            })
+          ).map((user) => user.email);
+
+    if (adminEmails.length > 0) {
+      await this.mail.sendTransportAlert({
+        to: adminEmails,
+        title: input.title,
+        message: input.message,
+        reference: assignment.code ?? assignment.id,
+        actionLabel: 'Open Transport requests',
+        actionUrl: `${frontend}/service/transport-requests`,
+      });
+    }
+    if (providerEmails.length > 0) {
+      await this.mail.sendTransportAlert({
+        to: providerEmails,
+        title: input.title,
+        message: input.message,
+        reference: assignment.code ?? assignment.id,
+        actionLabel: 'Open my transport requests',
+        actionUrl: `${frontend}/transport-provider/requests`,
+      });
+    }
   }
 
   private async sendInternal(
@@ -854,6 +1118,7 @@ export class TransportRequestsService {
         providerRequestedAt: new Date(),
         providerRequestedById: null,
         providerDeadline: deadline,
+        providerWarningAt: null,
         providerViewedAt: null,
         providerRespondedAt: null,
         providerResponseNote: null,
@@ -905,9 +1170,10 @@ export class TransportRequestsService {
       afterData: { reason },
       changedBy: null,
     });
+    const expiredMessage = `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${this.formatDateTime(assignment.startDate)} has no provider driver/vehicle. ${reason}. Assign another transportation provider or place the trip on the Waiting List.`;
     await this.notifyAdmins(
       'Transport request expired',
-      `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${this.formatDateTime(assignment.startDate)} has no provider driver/vehicle. ${reason}`,
+      expiredMessage,
       {
         kind: 'TRANSPORT_EXPIRED',
         assignmentId: assignment.id,
@@ -915,6 +1181,11 @@ export class TransportRequestsService {
         url: '/service/transport-requests',
       },
     );
+    await this.sendAlertEmails(assignment, {
+      title: 'Transport request expired — assign another provider',
+      message: expiredMessage,
+      audience: 'both',
+    });
     if (assignment.providerId) {
       await this.notifyProvider(
         assignment.providerId,
@@ -992,6 +1263,7 @@ export class TransportRequestsService {
         driverId,
         vehicleId,
         providerRequestStatus: TransportRequestStatus.ASSIGNED,
+        providerWarningAt: null,
         providerRespondedAt: new Date(),
         providerResponseNote: 'Automatically assigned by provider settings',
         providerAssignedById: null,
@@ -1114,6 +1386,7 @@ export class TransportRequestsService {
         driverId: driver.id,
         vehicleId,
         providerRequestStatus: TransportRequestStatus.ASSIGNED,
+        providerWarningAt: null,
         providerRespondedAt: new Date(),
         providerResponseNote: input.note ?? null,
         providerDeclineReason: null,
@@ -1214,13 +1487,27 @@ export class TransportRequestsService {
     }
     if (
       assignment.status === AssignmentStatus.CANCELED ||
-      assignment.status === AssignmentStatus.COMPLETED
+      assignment.status === AssignmentStatus.COMPLETED ||
+      assignment.status === AssignmentStatus.DISPATCHED ||
+      assignment.status === AssignmentStatus.VERIFYING
     ) {
-      throw new BadRequestException('This trip is closed');
+      throw new BadRequestException(
+        'This trip is already dispatched or closed — driver/provider changes are locked.',
+      );
     }
   }
 
   private assertProviderCanRespond(assignment: AssignmentView) {
+    if (
+      assignment.status === AssignmentStatus.DISPATCHED ||
+      assignment.status === AssignmentStatus.VERIFYING ||
+      assignment.status === AssignmentStatus.COMPLETED ||
+      assignment.status === AssignmentStatus.CANCELED
+    ) {
+      throw new BadRequestException(
+        'This trip is already dispatched or closed — the request is no longer available.',
+      );
+    }
     if (
       assignment.providerRequestStatus !== TransportRequestStatus.REQUESTED &&
       assignment.providerRequestStatus !== TransportRequestStatus.VIEWED
@@ -1313,6 +1600,17 @@ export class TransportRequestsService {
 
   private toView(a: AssignmentView) {
     const booking = a.bookings?.[0];
+    const pickups =
+      Array.isArray(a.pickupInfo) && a.pickupInfo.length > 0
+        ? a.pickupInfo
+        : (a.bookings ?? [])
+            .filter((item: any) => item.hotelName || item.address)
+            .map((item: any) => ({
+              bookingRef: item.bookingRef,
+              customerName: item.customerName,
+              pickup: item.hotelName || item.address,
+              totalPax: item.totalPax ?? 0,
+            }));
     return {
       id: a.id,
       code: a.code,
@@ -1330,12 +1628,14 @@ export class TransportRequestsService {
       driver: a.driver,
       vehicle: a.vehicle,
       guide: a.guide,
-      pickups: a.pickupInfo ?? [],
+      pickups,
       providerRequestStatus: a.providerRequestStatus,
       providerRequestedAt: a.providerRequestedAt,
       providerViewedAt: a.providerViewedAt,
       providerRespondedAt: a.providerRespondedAt,
       providerDeadline: a.providerDeadline,
+      providerWarningAt: a.providerWarningAt,
+      lateBookings: (a.bookings ?? []).filter((b: any) => b.lateBooking).length,
       providerRequestNote: a.providerRequestNote,
       providerResponseNote: a.providerResponseNote,
       providerDeclineReason: a.providerDeclineReason,

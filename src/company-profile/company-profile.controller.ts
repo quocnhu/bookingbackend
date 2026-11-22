@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { CompanyProfileService } from './company-profile.service';
 import { UpdateCompanyProfileDto } from './dto/update-company-profile.dto';
 import { Permissions } from '@/common/decorators/permissions.decorator';
@@ -24,6 +34,8 @@ export class CompanyProfileController {
     if (!profile) return null;
     return {
       name: profile.name,
+      shortName: profile.shortName,
+      logoUrl: profile.logoUrl,
       address: profile.address,
       phone: profile.phone,
       email: profile.email,
@@ -43,5 +55,20 @@ export class CompanyProfileController {
   @Permissions('company.update')
   update(@Body() dto: UpdateCompanyProfileDto, @CurrentUser() actor: AuthenticatedUser) {
     return this.companyProfileService.updateProfile(dto, actor);
+  }
+
+  @Post('logo')
+  @Permissions('company.update')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  uploadLogo(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.companyProfileService.updateLogo(file, actor);
   }
 }

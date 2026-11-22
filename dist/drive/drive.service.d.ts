@@ -27,48 +27,48 @@ export declare class DriveService {
     private storageKeyFor;
     ensureUserDrive(userId: string): Promise<{
         root: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         };
         avatar: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         };
         tour: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         };
     }>;
     ensureDateFolder(userId: string, parentId?: string, dateKey?: string): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
     getOrCreateTourFolder(userId: string, tourName: string, date?: Date | string): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
@@ -76,21 +76,21 @@ export declare class DriveService {
         moved: number;
     }>;
     getOrCreateTourGuideDateFolder(userId: string, date?: Date | string): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
     listContents(userId: string, folderId?: string): Promise<{
         current: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         } | null;
@@ -99,19 +99,19 @@ export declare class DriveService {
             name: string;
         }[];
         folders: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         }[];
         files: {
             url: string;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
             storageKey: string;
             size: number;
@@ -136,25 +136,25 @@ export declare class DriveService {
     }>;
     listDriveUsers(): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
-        id: string;
         name: string | null;
+        id: string;
         email: string;
     }[]>;
     createFolder(userId: string, dto: CreateFolderDto): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
     renameFolder(userId: string, id: string, dto: RenameFolderDto): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
@@ -172,9 +172,9 @@ export declare class DriveService {
         tourName?: string;
     }): Promise<DriveFileView>;
     renameFile(userId: string, id: string, dto: RenameFileDto): Promise<{
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
         storageKey: string;
         size: number;

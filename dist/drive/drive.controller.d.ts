@@ -7,11 +7,11 @@ export declare class DriveController {
     private driveUserId;
     root(user: AuthenticatedUser, userId?: string): Promise<{
         current: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         } | null;
@@ -20,19 +20,19 @@ export declare class DriveController {
             name: string;
         }[];
         folders: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         }[];
         files: {
             url: string;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
             storageKey: string;
             size: number;
@@ -57,35 +57,35 @@ export declare class DriveController {
     }>;
     listUsers(): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
-        id: string;
         name: string | null;
+        id: string;
         email: string;
     }[]>;
     ensureDate(user: AuthenticatedUser, date?: string): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
     ensureDatePost(user: AuthenticatedUser, date?: string): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
     folder(id: string, user: AuthenticatedUser, userId?: string): Promise<{
         current: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         } | null;
@@ -94,19 +94,19 @@ export declare class DriveController {
             name: string;
         }[];
         folders: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
-            updatedAt: Date;
             parentId: string | null;
             kind: string;
         }[];
         files: {
             url: string;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
             userId: string | null;
             storageKey: string;
             size: number;
@@ -130,20 +130,20 @@ export declare class DriveController {
         };
     }>;
     createFolder(dto: CreateFolderDto, user: AuthenticatedUser, userId?: string): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
     renameFolder(id: string, dto: RenameFolderDto, user: AuthenticatedUser, userId?: string): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
-        updatedAt: Date;
         parentId: string | null;
         kind: string;
     }>;
@@ -153,9 +153,9 @@ export declare class DriveController {
     uploadAvatar(file: Express.Multer.File, targetUserId: string | undefined, user: AuthenticatedUser): Promise<import("./drive.service").DriveFileView>;
     upload(file: Express.Multer.File, folderId: string, name: string, date: string, useDateFolder: string, tourName: string, user: AuthenticatedUser, userId?: string): Promise<import("./drive.service").DriveFileView>;
     renameFile(id: string, dto: RenameFileDto, user: AuthenticatedUser, userId?: string): Promise<{
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         userId: string | null;
         storageKey: string;
         size: number;

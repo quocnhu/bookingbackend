@@ -7,6 +7,11 @@ export class UpdateCompanyProfileDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(60)
+  shortName?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   address?: string;
 

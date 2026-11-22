@@ -54,33 +54,47 @@ export class AutoCrewService {
     const start = this.normalizeStart(assignment.startDate);
     const end = this.normalizeEnd(assignment.endDate);
 
-    const updates: { guideId?: string; driverId?: string } = {};
+    const updates: {
+      guideId?: string;
+      driverId?: string;
+      providerId?: string;
+    } = {};
     if (needsGuide && !assignment.guideId) {
-      const guideId = await this.pickUserId(
+      const guide = await this.pickUser(
         RoleType.TOUR_GUIDE,
         assignment.id,
         start,
         end,
         assignment.providerId,
       );
-      if (guideId) updates.guideId = guideId;
+      if (guide) updates.guideId = guide.id;
     }
     if (!assignment.driverId) {
-      const thirdPartyProvider =
+      const externalProvider =
         !!assignment.providerId && assignment.provider?.isCompany === false;
-      if (!thirdPartyProvider) {
-        const driverId = await this.pickUserId(
+      if (!externalProvider) {
+        // Company fleet first. With no provider selected we deliberately only
+        // consider company drivers; when none is free the transport-request
+        // flow picks one external provider for this bus.
+        const onlyCompany = !assignment.providerId;
+        const driver = await this.pickUser(
           RoleType.DRIVER,
           assignment.id,
           start,
           end,
           assignment.providerId,
+          onlyCompany,
         );
-        if (driverId) updates.driverId = driverId;
+        if (driver) {
+          updates.driverId = driver.id;
+          if (!assignment.providerId && driver.providerId) {
+            updates.providerId = driver.providerId;
+          }
+        }
       }
     }
 
-    if (updates.guideId || updates.driverId) {
+    if (updates.guideId || updates.driverId || updates.providerId) {
       await this.prisma.assignment.update({
         where: { id: assignment.id },
         data: updates,
@@ -153,13 +167,18 @@ export class AutoCrewService {
   }
 
   /** Pick an available user: guide / driver, not on leave, not double-booked. */
-  private async pickUserId(
+  private async pickUser(
     role: RoleType,
     excludeAssignmentId: string,
     start: Date,
     end: Date,
     providerId: string | null,
-  ): Promise<string | null> {
+    onlyCompany = false,
+  ): Promise<{
+    id: string;
+    providerId: string | null;
+    isCompany: boolean;
+  } | null> {
     const busy = await this.busyUserIds(role, start, end, excludeAssignmentId);
     const users = await this.prisma.user.findMany({
       where: { isActive: true, role },
@@ -175,6 +194,8 @@ export class AutoCrewService {
 
     const candidates: Array<{
       id: string;
+      providerId: string | null;
+      isCompany: boolean;
       company: number;
       rating: number;
       name: string;
@@ -184,9 +205,15 @@ export class AutoCrewService {
       const onLeave = await this.leaves.hasLeaveConflict(u.id, start, end);
       if (onLeave) continue;
 
+      const isCompany = !!u.provider?.isCompany;
+      if (role === RoleType.DRIVER) {
+        if (onlyCompany && !isCompany) continue;
+        if (providerId && !isCompany && u.providerId !== providerId) continue;
+      }
+
       let company = 0;
       if (role === RoleType.DRIVER) {
-        if (u.provider?.isCompany) company = 2;
+        if (isCompany) company = 2;
         else if (u.providerId && u.providerId === providerId) company = 1;
       } else if (u.guideProfile?.type === GuideType.OFFICIAL) {
         company = 2;
@@ -195,7 +222,14 @@ export class AutoCrewService {
         role === RoleType.DRIVER
           ? (u.driverProfile?.rating ?? 0)
           : (u.guideProfile?.rating ?? 0);
-      candidates.push({ id: u.id, company, rating, name: u.name ?? '' });
+      candidates.push({
+        id: u.id,
+        providerId: u.providerId,
+        isCompany,
+        company,
+        rating,
+        name: u.name ?? '',
+      });
     }
 
     candidates.sort(
@@ -204,7 +238,14 @@ export class AutoCrewService {
         b.rating - a.rating ||
         a.name.localeCompare(b.name),
     );
-    return candidates[0]?.id ?? null;
+    const best = candidates[0];
+    return best
+      ? {
+          id: best.id,
+          providerId: best.providerId,
+          isCompany: best.isCompany,
+        }
+      : null;
   }
 
   private async busyUserIds(

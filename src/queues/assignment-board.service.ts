@@ -1,8 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AssignmentStatus, BookingStatus, TourType } from '@prisma/client';
+import {
+  AssignmentExecutionMode,
+  AssignmentOrigin,
+  AssignmentStatus,
+  BookingStatus,
+  TourType,
+} from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { rootFromProfile, sortByRootDistance } from '@/geo/distance';
+import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
 
 /** A trip (bus) carrying at most 12 passengers — per bookingflow.md step 3. */
 const BUS_MAX_PAX = 12;
@@ -22,6 +29,7 @@ export class AssignmentBoardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly dispatchPolicy: DispatchPolicyService,
   ) {}
 
   /** Cancel an order → remove the booking from the trip and re-sequence that trip. */
@@ -55,6 +63,7 @@ export class AssignmentBoardService {
     ]);
     if (!assignment || bookings > 0) return false;
     if (
+      assignment.status !== AssignmentStatus.WAITING_LIST &&
       assignment.status !== AssignmentStatus.DRAFT_ASSIGNED &&
       assignment.status !== AssignmentStatus.PENDING &&
       assignment.status !== AssignmentStatus.TRANSFERRED
@@ -150,6 +159,104 @@ export class AssignmentBoardService {
     return { moved: true, toAssignmentId };
   }
 
+  /**
+   * Late booking after the dispatch seal: hold it on a WAITING_LIST bus for the
+   * same tour/date so the operator can drag it onto a real bus after 05:00.
+   * The booking stays PENDING (not confirmed) until it reaches a real bus.
+   */
+  async attachToWaitingList(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { tour: { select: { name: true, durationDays: true, requiresGuide: true } } },
+    });
+    if (!booking) return { error: 'BOOKING_NOT_FOUND' as const };
+    if (booking.assignmentId) {
+      return {
+        error: 'ALREADY_ASSIGNED' as const,
+        assignmentId: booking.assignmentId,
+      };
+    }
+    if (!booking.startingDate) return { error: 'NO_START_DATE' as const };
+
+    const range = this.dispatchPolicy.dayRange(booking.startingDate);
+    const tourName =
+      booking.tour?.name ?? booking.tourName ?? 'Late booking';
+    const durationDays = Math.max(1, booking.tour?.durationDays ?? 1);
+    const endDate = new Date(range.start);
+    endDate.setDate(endDate.getDate() + Math.max(1, durationDays - 1));
+    endDate.setHours(23, 59, 59, 999);
+
+    let waiting = await this.prisma.assignment.findFirst({
+      where: {
+        status: AssignmentStatus.WAITING_LIST,
+        tourName,
+        tourType: booking.tourType ?? null,
+        startDate: { gte: range.start, lte: range.end },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let created = false;
+    if (!waiting) {
+      const existing = await this.prisma.assignment.findMany({
+        where: { code: { startsWith: 'Waiting List Bus' } },
+        select: { code: true },
+      });
+      const numbers = existing
+        .map((row) => {
+          const match = /Waiting List Bus\s*(\d+)/i.exec(row.code ?? '');
+          return match ? Number(match[1]) : 0;
+        })
+        .filter((value) => Number.isFinite(value));
+      const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
+      waiting = await this.prisma.assignment.create({
+        data: {
+          code: `Waiting List Bus ${nextNumber} — ${tourName}`,
+          startDate: range.start,
+          endDate,
+          status: AssignmentStatus.WAITING_LIST,
+          origin: AssignmentOrigin.AUTO_ASSIGN,
+          executionMode:
+            booking.tour?.requiresGuide === false
+              ? AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+              : AssignmentExecutionMode.COMPANY_GUIDED,
+          tourType: booking.tourType ?? null,
+          tourName,
+          durationDays,
+          totalPax: 0,
+          createdWho: 'Automatic System (late booking)',
+        },
+      });
+      created = true;
+    }
+
+    await this.attachBooking(
+      waiting.id,
+      bookingId,
+      BookingStatus.PENDING,
+    );
+    await this.refreshSummary(waiting.id);
+    await this.prisma.booking.update({
+      where: { id: bookingId },
+      data: { lateBooking: true },
+    });
+    await this.auditService.log({
+      entityType: 'Assignment',
+      entityId: waiting.id,
+      action: 'WAITING_LIST_ATTACH',
+      afterData: {
+        bookingId,
+        bookingRef: booking.bookingRef,
+        created,
+      },
+    });
+    return {
+      waitingList: true as const,
+      assignmentId: waiting.id,
+      created,
+    };
+  }
+
   // ─── Helpers ─────────────────────────────────────────────────────────────
   /**
    * Attach a booking to a trip (used by auto-assign queue Stage 3).
@@ -169,7 +276,11 @@ export class AssignmentBoardService {
     return { assigned: true, assignmentId };
   }
 
-  private async attachBooking(assignmentId: string, bookingId: string) {
+  private async attachBooking(
+    assignmentId: string,
+    bookingId: string,
+    status: BookingStatus = BookingStatus.ASSIGNED,
+  ) {
     const maxSeq = await this.prisma.booking.aggregate({
       where: { assignmentId },
       _max: { paxSequence: true },
@@ -179,7 +290,7 @@ export class AssignmentBoardService {
       data: {
         assignmentId,
         paxSequence: (maxSeq._max.paxSequence ?? 0) + 1,
-        status: BookingStatus.ASSIGNED,
+        status,
       },
     });
   }

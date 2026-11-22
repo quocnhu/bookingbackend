@@ -17,6 +17,7 @@ import {
   AssignmentOrigin,
   AssignmentStatus,
   PartnerMoneyFlow,
+  PickupReminderMode,
   TourReportStatus,
 } from '@prisma/client';
 
@@ -137,7 +138,7 @@ export class SetBoardOriginDto {
   origin: AssignmentOrigin;
 }
 
-/** Scheduled auto-dispatch: toggle and cron expression (e.g. "0 4 * * *"). */
+/** Scheduled auto-dispatch: toggle and cron expression (e.g. "0 23 * * *"). */
 export class UpdateAutoDispatchDto {
   @IsOptional()
   @IsBoolean()
@@ -152,6 +153,23 @@ export class UpdateAutoDispatchDto {
 export class UpdateRecallCutoffDto {
   @IsString()
   time: string;
+}
+
+/** Global pickup-reminder schedule (default 06:00 Asia/Ho_Chi_Minh). */
+export class UpdatePickupReminderSettingsDto {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  time?: string;
+}
+
+/** Per-assignment pickup-reminder delivery mode. */
+export class UpdatePickupReminderModeDto {
+  @IsEnum(PickupReminderMode)
+  mode: PickupReminderMode;
 }
 
 export class ConfirmPartnerHandoffDto {

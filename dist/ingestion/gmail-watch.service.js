@@ -16,6 +16,7 @@ const schedule_1 = require("@nestjs/schedule");
 const prisma_service_1 = require("../prisma/prisma.service");
 const gmail_auth_provider_1 = require("./gmail-auth.provider");
 const RENEW_WINDOW_MS = 24 * 60 * 60 * 1000;
+const WATCH_TIMEZONE = 'Asia/Ho_Chi_Minh';
 let GmailWatchService = GmailWatchService_1 = class GmailWatchService {
     prisma;
     auth;
@@ -57,7 +58,7 @@ let GmailWatchService = GmailWatchService_1 = class GmailWatchService {
     async renewExpiringWatches() {
         const accounts = await this.prisma.gmailAccount.findMany();
         const soon = new Date(Date.now() + RENEW_WINDOW_MS);
-        const expiring = accounts.filter((a) => a.watchExpiration < soon);
+        const expiring = accounts.filter((a) => a.watchExpiration.getTime() <= soon.getTime());
         let renewed = 0;
         for (const account of expiring) {
             try {
@@ -82,7 +83,7 @@ let GmailWatchService = GmailWatchService_1 = class GmailWatchService {
 };
 exports.GmailWatchService = GmailWatchService;
 __decorate([
-    (0, schedule_1.Cron)(schedule_1.CronExpression.EVERY_DAY_AT_3AM),
+    (0, schedule_1.Cron)('15 * * * *', { timeZone: WATCH_TIMEZONE }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)

@@ -50,6 +50,14 @@ let BookingController = class BookingController {
     createPrivateGroup(id, dto, actor) {
         return this.bookingService.createPrivateGroup(id, dto, actor);
     }
+    getCancellationWindow() {
+        return this.bookingService
+            .getCancellationWindowHours()
+            .then((hours) => ({ hours }));
+    }
+    updateCancellationWindow(dto, actor) {
+        return this.bookingService.updateCancellationWindow(dto.hours, actor.id);
+    }
     findOne(id) {
         return this.bookingService.findOne(id);
     }
@@ -127,6 +135,22 @@ __decorate([
     __metadata("design:paramtypes", [String, booking_dto_1.CreatePrivateGroupDto, Object]),
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "createPrivateGroup", null);
+__decorate([
+    (0, common_1.Get)('cancellation-window'),
+    (0, permissions_decorator_1.Permissions)('booking.read'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "getCancellationWindow", null);
+__decorate([
+    (0, common_1.Put)('cancellation-window'),
+    (0, permissions_decorator_1.Permissions)('booking.update'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [booking_dto_1.UpdateCancellationWindowDto, Object]),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "updateCancellationWindow", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('booking.read'),

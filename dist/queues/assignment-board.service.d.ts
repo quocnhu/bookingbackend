@@ -1,10 +1,12 @@
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { DispatchPolicyService } from "../dispatch-policy/dispatch-policy.service";
 export declare class AssignmentBoardService {
     private readonly prisma;
     private readonly auditService;
+    private readonly dispatchPolicy;
     private readonly logger;
-    constructor(prisma: PrismaService, auditService: AuditService);
+    constructor(prisma: PrismaService, auditService: AuditService, dispatchPolicy: DispatchPolicyService);
     unassign(bookingId: string): Promise<{
         skipped: boolean;
         unassigned?: undefined;
@@ -29,6 +31,27 @@ export declare class AssignmentBoardService {
     } | {
         moved: boolean;
         toAssignmentId: string;
+        error?: undefined;
+    }>;
+    attachToWaitingList(bookingId: string): Promise<{
+        error: "BOOKING_NOT_FOUND";
+        assignmentId?: undefined;
+        waitingList?: undefined;
+        created?: undefined;
+    } | {
+        error: "ALREADY_ASSIGNED";
+        assignmentId: string;
+        waitingList?: undefined;
+        created?: undefined;
+    } | {
+        error: "NO_START_DATE";
+        assignmentId?: undefined;
+        waitingList?: undefined;
+        created?: undefined;
+    } | {
+        waitingList: true;
+        assignmentId: string;
+        created: boolean;
         error?: undefined;
     }>;
     attach(assignmentId: string, bookingId: string): Promise<{

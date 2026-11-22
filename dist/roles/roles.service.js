@@ -65,10 +65,8 @@ let RolesService = class RolesService {
                 throw new common_1.ForbiddenException('Cannot modify permissions of a system role');
             }
         }
-        if (dto.name !== undefined) {
-            const existing = await this.prisma.role.findUnique({ where: { name: dto.name } });
-            if (existing && existing.id !== id)
-                throw new common_1.ConflictException('Role name already exists');
+        if (dto.name !== undefined && dto.name !== role.name) {
+            throw new common_1.BadRequestException('Role name cannot be changed after creation');
         }
         const data = { name: dto.name, description: dto.description };
         if (dto.permissionIds !== undefined) {

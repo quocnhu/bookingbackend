@@ -5,19 +5,19 @@ export declare class AccountingController {
     private readonly accountingService;
     constructor(accountingService: AccountingService);
     listCategories(actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
-        updatedAt: Date;
         isSystem: boolean;
         code: string;
         flowType: import("@prisma/client").$Enums.FeeFlowType;
     }[]>;
     createCategory(dto: CreateSettlementCategoryDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
-        updatedAt: Date;
         isSystem: boolean;
         code: string;
         flowType: import("@prisma/client").$Enums.FeeFlowType;
@@ -28,18 +28,18 @@ export declare class AccountingController {
             customerName: string | null;
         } | null;
         category: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
-            updatedAt: Date;
             isSystem: boolean;
             code: string;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -51,18 +51,18 @@ export declare class AccountingController {
     })[]>;
     createSettlement(assignmentId: string, dto: CreateSettlementDto, actor: AuthenticatedUser): Promise<{
         category: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
-            updatedAt: Date;
             isSystem: boolean;
             code: string;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -73,9 +73,9 @@ export declare class AccountingController {
         reversesId: string | null;
     }>;
     updateSettlement(id: string, dto: UpdateSettlementDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -86,9 +86,9 @@ export declare class AccountingController {
         reversesId: string | null;
     }>;
     deleteSettlement(id: string, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -109,16 +109,16 @@ export declare class AccountingController {
         groupRef: string | null;
         moneyVerifiedAt: Date | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
         } | null;
         partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
         partnerAmount: import("@prisma/client/runtime/library").Decimal | null;
@@ -128,8 +128,8 @@ export declare class AccountingController {
         suggestedPayableTo: {
             basis: "ASSIGNMENT_GUIDE" | "ASSIGNMENT_DRIVER";
             kind: string;
-            id: string;
             name: string | null;
+            id: string;
         } | {
             id: string;
             name: string;
@@ -154,9 +154,9 @@ export declare class AccountingController {
         payableToId: string | null;
         payeeType: "DRIVER" | "GUIDE" | "PARTNER";
         partnerId: string | null;
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         status: import("@prisma/client").$Enums.TourReportStatus;
         assignmentId: string;
         submittedById: string | null;
@@ -192,9 +192,9 @@ export declare class AccountingController {
         evidenceImages: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
     rejectTourMoney(assignmentId: string, dto: RejectMoneyDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         status: import("@prisma/client").$Enums.TourReportStatus;
         assignmentId: string;
         submittedById: string | null;
@@ -277,13 +277,13 @@ export declare class AccountingController {
             tourName: string | null;
             plateNumber: string | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -301,18 +301,18 @@ export declare class AccountingController {
             tourName: string | null;
             plateNumber: string | null;
             guide: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -370,13 +370,13 @@ export declare class AccountingController {
             tourName: string | null;
             plateNumber: string | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -394,18 +394,18 @@ export declare class AccountingController {
             tourName: string | null;
             plateNumber: string | null;
             guide: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -464,13 +464,13 @@ export declare class AccountingController {
             tourName: string | null;
             plateNumber: string | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -488,18 +488,18 @@ export declare class AccountingController {
             tourName: string | null;
             plateNumber: string | null;
             guide: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -559,13 +559,13 @@ export declare class AccountingController {
             tourName: string | null;
             plateNumber: string | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -583,18 +583,18 @@ export declare class AccountingController {
             tourName: string | null;
             plateNumber: string | null;
             guide: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -692,9 +692,9 @@ export declare class AccountingController {
         voidReason: string | null;
     }>;
     markPartnerPaymentPaid(id: string, dto: MarkPeriodPaidDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         tourName: string | null;
         partnerId: string;
         status: import("@prisma/client").$Enums.PartnerPaymentStatus;

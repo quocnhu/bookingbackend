@@ -3,12 +3,14 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 import { QueryBookingPaymentsDto } from './dto/payment.dto';
+import { MailService } from "../mail/mail.service";
 export declare class PaymentService {
     private readonly prisma;
     private readonly audit;
+    private readonly mail;
     private readonly logger;
     private tokenCache;
-    constructor(prisma: PrismaService, audit: AuditService);
+    constructor(prisma: PrismaService, audit: AuditService, mail: MailService);
     private get mode();
     private get baseUrl();
     private get clientId();
@@ -33,19 +35,19 @@ export declare class PaymentService {
     listBookingPayments(query: QueryBookingPaymentsDto): Promise<{
         items: ({
             tour: {
+                name: string;
                 type: import("@prisma/client").$Enums.TourType;
                 id: string;
-                name: string;
             } | null;
             customerUser: {
-                id: string;
                 name: string | null;
+                id: string;
                 email: string;
             } | null;
             payments: {
+                updatedAt: Date;
                 id: string;
                 createdAt: Date;
-                updatedAt: Date;
                 provider: string | null;
                 status: import("@prisma/client").$Enums.PaymentRecordStatus;
                 currency: string;
@@ -68,9 +70,9 @@ export declare class PaymentService {
                 bookingId: string;
             }[];
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -111,6 +113,9 @@ export declare class PaymentService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
@@ -165,9 +170,9 @@ export declare class PaymentService {
         reference?: string;
         note?: string;
     }, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         provider: string | null;
         status: import("@prisma/client").$Enums.PaymentRecordStatus;
         currency: string;

@@ -188,6 +188,9 @@ export class WebsiteQuoteDto {
   @Min(1)
   @Max(12)
   totalPax: number;
+
+  @IsOptional()
+  startingDate?: string | Date;
 }
 
 /** Public/website booking, always tied to the signed-in customer account. */
@@ -266,6 +269,10 @@ export class CreateWebsiteBookingDto {
   payLater?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  lateBooking?: boolean;
+
+  @IsOptional()
   @IsString()
   @Length(0, 2000)
   paymentNote?: string;
@@ -287,6 +294,14 @@ export class ConfirmBookingPaymentDto extends CollectBookingPaymentDto {
   @IsString()
   @Length(0, 500)
   reference?: string;
+}
+
+export class UpdateCancellationWindowDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(720)
+  hours: number;
 }
 
 export class UpdateBookingDto {

@@ -11,12 +11,12 @@ export declare class PartnersService {
             partnerPayments: number;
         };
     } & {
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         email: string | null;
         isActive: boolean;
-        updatedAt: Date;
         address: string | null;
         phone: string | null;
         note: string | null;
@@ -28,12 +28,12 @@ export declare class PartnersService {
             partnerPayments: number;
         };
     } & {
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         email: string | null;
         isActive: boolean;
-        updatedAt: Date;
         address: string | null;
         phone: string | null;
         note: string | null;
@@ -45,36 +45,36 @@ export declare class PartnersService {
             partnerPayments: number;
         };
     } & {
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         email: string | null;
         isActive: boolean;
-        updatedAt: Date;
         address: string | null;
         phone: string | null;
         note: string | null;
         contactName: string | null;
     }>;
     create(dto: CreatePartnerDto): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         email: string | null;
         isActive: boolean;
-        updatedAt: Date;
         address: string | null;
         phone: string | null;
         note: string | null;
         contactName: string | null;
     }>;
     update(id: string, dto: UpdatePartnerDto): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
         email: string | null;
         isActive: boolean;
-        updatedAt: Date;
         address: string | null;
         phone: string | null;
         note: string | null;

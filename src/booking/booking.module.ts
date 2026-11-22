@@ -7,10 +7,11 @@ import { BookingNormalizerService } from '@/parsing/booking-normalizer.service';
 import { AuditModule } from '@/audit/audit.module';
 import { QueuesModule } from '@/queues/queues.module';
 import { GoogleModule } from '@/google/google.module';
+import { MailModule } from '@/mail/mail.module';
 import { redisProvider } from '@/ingestion/redis.provider';
 
 @Module({
-  imports: [AuditModule, QueuesModule, GoogleModule],
+  imports: [AuditModule, QueuesModule, GoogleModule, MailModule],
   controllers: [BookingController],
   providers: [
     redisProvider,

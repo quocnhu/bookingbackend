@@ -16,13 +16,14 @@ const schedule_1 = require("@nestjs/schedule");
 const cron_1 = require("cron");
 const client_1 = require("@prisma/client");
 const auto_crew_service_1 = require("../queues/auto-crew.service");
+const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
+Object.defineProperty(exports, "AUTO_DISPATCH_CRON_KEY", { enumerable: true, get: function () { return dispatch_policy_service_1.AUTO_DISPATCH_CRON_KEY; } });
+Object.defineProperty(exports, "AUTO_DISPATCH_ENABLED_KEY", { enumerable: true, get: function () { return dispatch_policy_service_1.AUTO_DISPATCH_ENABLED_KEY; } });
+Object.defineProperty(exports, "DEFAULT_AUTO_DISPATCH_CRON", { enumerable: true, get: function () { return dispatch_policy_service_1.DEFAULT_AUTO_DISPATCH_CRON; } });
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const assignments_service_1 = require("./assignments.service");
-exports.AUTO_DISPATCH_ENABLED_KEY = 'autoDispatchEnabled';
-exports.AUTO_DISPATCH_CRON_KEY = 'autoDispatchCron';
-exports.DEFAULT_AUTO_DISPATCH_CRON = '0 4 * * *';
-exports.AUTO_DISPATCH_TIMEZONE = process.env.AUTO_DISPATCH_TIMEZONE || 'Asia/Ho_Chi_Minh';
+exports.AUTO_DISPATCH_TIMEZONE = process.env.AUTO_DISPATCH_TIMEZONE || dispatch_policy_service_1.DISPATCH_TIMEZONE;
 const AUTO_DISPATCH_JOB = 'auto-dispatch';
 let AutoDispatchCron = AutoDispatchCron_1 = class AutoDispatchCron {
     autoCrewService;
@@ -30,13 +31,15 @@ let AutoDispatchCron = AutoDispatchCron_1 = class AutoDispatchCron {
     prisma;
     auditService;
     schedulerRegistry;
+    dispatchPolicy;
     logger = new common_1.Logger(AutoDispatchCron_1.name);
-    constructor(autoCrewService, assignmentsService, prisma, auditService, schedulerRegistry) {
+    constructor(autoCrewService, assignmentsService, prisma, auditService, schedulerRegistry, dispatchPolicy) {
         this.autoCrewService = autoCrewService;
         this.assignmentsService = assignmentsService;
         this.prisma = prisma;
         this.auditService = auditService;
         this.schedulerRegistry = schedulerRegistry;
+        this.dispatchPolicy = dispatchPolicy;
     }
     async onModuleInit() {
         try {
@@ -50,7 +53,12 @@ let AutoDispatchCron = AutoDispatchCron_1 = class AutoDispatchCron {
     }
     async getSettings() {
         const settings = await this.ensureSettings();
-        return { ...settings, timezone: exports.AUTO_DISPATCH_TIMEZONE, nextRun: this.getNextRun() };
+        return {
+            ...settings,
+            cutoffTime: this.dispatchPolicy.cronToCutoff(settings.cron),
+            timezone: exports.AUTO_DISPATCH_TIMEZONE,
+            nextRun: this.getNextRun(),
+        };
     }
     async updateSettings(input, actorId) {
         const before = await this.getSettings();
@@ -59,13 +67,20 @@ let AutoDispatchCron = AutoDispatchCron_1 = class AutoDispatchCron {
         }
         const updates = [];
         if (input.enabled !== undefined) {
+            const wasAuto = await this.dispatchPolicy.getMode();
             updates.push({
-                key: exports.AUTO_DISPATCH_ENABLED_KEY,
+                key: dispatch_policy_service_1.AUTO_DISPATCH_ENABLED_KEY,
                 value: input.enabled ? 'true' : 'false',
             });
+            if (input.enabled && !wasAuto.autoMode) {
+                updates.push({
+                    key: dispatch_policy_service_1.AUTO_MODE_ACTIVATED_AT_KEY,
+                    value: new Date().toISOString(),
+                });
+            }
         }
         if (input.cron !== undefined) {
-            updates.push({ key: exports.AUTO_DISPATCH_CRON_KEY, value: input.cron.trim() });
+            updates.push({ key: dispatch_policy_service_1.AUTO_DISPATCH_CRON_KEY, value: input.cron.trim() });
         }
         for (const entry of updates) {
             await this.prisma.systemSetting.upsert({
@@ -80,7 +95,7 @@ let AutoDispatchCron = AutoDispatchCron_1 = class AutoDispatchCron {
         const after = await this.getSettings();
         await this.auditService.log({
             entityType: 'SystemSetting',
-            entityId: exports.AUTO_DISPATCH_CRON_KEY,
+            entityId: dispatch_policy_service_1.AUTO_DISPATCH_CRON_KEY,
             action: 'UPDATE_AUTO_DISPATCH',
             beforeData: before,
             afterData: after,
@@ -92,27 +107,39 @@ let AutoDispatchCron = AutoDispatchCron_1 = class AutoDispatchCron {
     async ensureSettings() {
         const rows = await this.prisma.systemSetting.findMany({
             where: {
-                key: { in: [exports.AUTO_DISPATCH_ENABLED_KEY, exports.AUTO_DISPATCH_CRON_KEY] },
+                key: {
+                    in: [
+                        dispatch_policy_service_1.AUTO_DISPATCH_ENABLED_KEY,
+                        dispatch_policy_service_1.AUTO_DISPATCH_CRON_KEY,
+                        dispatch_policy_service_1.AUTO_MODE_ACTIVATED_AT_KEY,
+                    ],
+                },
             },
         });
         const map = new Map(rows.map((row) => [row.key, row.value]));
-        let cron = map.get(exports.AUTO_DISPATCH_CRON_KEY) ?? exports.DEFAULT_AUTO_DISPATCH_CRON;
+        let cron = map.get(dispatch_policy_service_1.AUTO_DISPATCH_CRON_KEY) ?? dispatch_policy_service_1.DEFAULT_AUTO_DISPATCH_CRON;
         try {
             this.validateCron(cron);
         }
         catch {
-            this.logger.warn(`Invalid stored auto-dispatch cron "${cron}" — falling back to "${exports.DEFAULT_AUTO_DISPATCH_CRON}"`);
-            cron = exports.DEFAULT_AUTO_DISPATCH_CRON;
+            this.logger.warn(`Invalid stored auto-dispatch cron "${cron}" — falling back to "${dispatch_policy_service_1.DEFAULT_AUTO_DISPATCH_CRON}"`);
+            cron = dispatch_policy_service_1.DEFAULT_AUTO_DISPATCH_CRON;
         }
-        const enabled = (map.get(exports.AUTO_DISPATCH_ENABLED_KEY) ?? 'true').toLowerCase() !== 'false';
+        const enabled = (map.get(dispatch_policy_service_1.AUTO_DISPATCH_ENABLED_KEY) ?? 'true').toLowerCase() !== 'false';
         const defaults = [];
-        if (!map.has(exports.AUTO_DISPATCH_CRON_KEY)) {
-            defaults.push({ key: exports.AUTO_DISPATCH_CRON_KEY, value: cron });
+        if (!map.has(dispatch_policy_service_1.AUTO_DISPATCH_CRON_KEY)) {
+            defaults.push({ key: dispatch_policy_service_1.AUTO_DISPATCH_CRON_KEY, value: cron });
         }
-        if (!map.has(exports.AUTO_DISPATCH_ENABLED_KEY)) {
+        if (!map.has(dispatch_policy_service_1.AUTO_DISPATCH_ENABLED_KEY)) {
             defaults.push({
-                key: exports.AUTO_DISPATCH_ENABLED_KEY,
+                key: dispatch_policy_service_1.AUTO_DISPATCH_ENABLED_KEY,
                 value: enabled ? 'true' : 'false',
+            });
+        }
+        if (!map.has(dispatch_policy_service_1.AUTO_MODE_ACTIVATED_AT_KEY)) {
+            defaults.push({
+                key: dispatch_policy_service_1.AUTO_MODE_ACTIVATED_AT_KEY,
+                value: new Date(0).toISOString(),
             });
         }
         for (const entry of defaults) {
@@ -132,7 +159,7 @@ let AutoDispatchCron = AutoDispatchCron_1 = class AutoDispatchCron {
             new cron_1.CronTime(cron.trim(), exports.AUTO_DISPATCH_TIMEZONE);
         }
         catch {
-            throw new common_1.BadRequestException(`Invalid cron expression "${cron}". Example: "0 4 * * *" (daily at 04:00).`);
+            throw new common_1.BadRequestException(`Invalid cron expression "${cron}". Example: "0 23 * * *" (daily at 23:00).`);
         }
     }
     reschedule(cron) {
@@ -162,9 +189,9 @@ let AutoDispatchCron = AutoDispatchCron_1 = class AutoDispatchCron {
             this.logger.log('Auto-dispatch disabled — skipping scheduled run');
             return;
         }
-        this.logger.log('Auto-dispatch started: auto crew + dispatch');
+        this.logger.log('Auto-dispatch started: auto crew + tomorrow dispatch');
         try {
-            const crewResult = await this.autoCrewService.assignMissingCrew();
+            const crewResult = await this.autoCrewService.assignMissingCrew(1);
             this.logger.log(`Auto crew: scanned=${crewResult.scanned}, guide+${crewResult.guideAssigned}, driver+${crewResult.driverAssigned}`);
         }
         catch (error) {
@@ -177,9 +204,11 @@ let AutoDispatchCron = AutoDispatchCron_1 = class AutoDispatchCron {
             this.logger.log('Manual mode — skipping auto-dispatch (admin dispatches by hand)');
             return;
         }
+        const today = this.dispatchPolicy.todayHcm();
+        const tomorrow = this.dispatchPolicy.addDays(today.start, 1);
         try {
-            const dispatch = await this.assignmentsService.dispatchAllBoard();
-            this.logger.log(`Auto dispatch: dispatched=${dispatch.dispatched}`);
+            const dispatch = await this.assignmentsService.dispatchAllBoard(tomorrow);
+            this.logger.log(`Auto dispatch (${this.dispatchPolicy.dayKey(tomorrow)}): dispatched=${dispatch.dispatched}, skipped=${dispatch.skipped}, skippedOnLeave=${dispatch.skippedOnLeave}`);
         }
         catch (error) {
             this.logger.error('Auto dispatch failed', error.stack);
@@ -193,6 +222,7 @@ exports.AutoDispatchCron = AutoDispatchCron = AutoDispatchCron_1 = __decorate([
         assignments_service_1.AssignmentsService,
         prisma_service_1.PrismaService,
         audit_service_1.AuditService,
-        schedule_1.SchedulerRegistry])
+        schedule_1.SchedulerRegistry,
+        dispatch_policy_service_1.DispatchPolicyService])
 ], AutoDispatchCron);
 //# sourceMappingURL=auto-dispatch.cron.js.map

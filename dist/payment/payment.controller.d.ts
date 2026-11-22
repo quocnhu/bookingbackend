@@ -9,19 +9,19 @@ export declare class PaymentController {
     bookingPayments(query: QueryBookingPaymentsDto): Promise<{
         items: ({
             tour: {
+                name: string;
                 type: import("@prisma/client").$Enums.TourType;
                 id: string;
-                name: string;
             } | null;
             customerUser: {
-                id: string;
                 name: string | null;
+                id: string;
                 email: string;
             } | null;
             payments: {
+                updatedAt: Date;
                 id: string;
                 createdAt: Date;
-                updatedAt: Date;
                 provider: string | null;
                 status: import("@prisma/client").$Enums.PaymentRecordStatus;
                 currency: string;
@@ -44,9 +44,9 @@ export declare class PaymentController {
                 bookingId: string;
             }[];
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -87,6 +87,9 @@ export declare class PaymentController {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
@@ -138,9 +141,9 @@ export declare class PaymentController {
         alreadyCaptured?: undefined;
     }>;
     recordOtaRemittance(dto: RecordOtaRemittanceDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         provider: string | null;
         status: import("@prisma/client").$Enums.PaymentRecordStatus;
         currency: string;

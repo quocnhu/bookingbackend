@@ -65,7 +65,7 @@ export class TransportationProvidersService {
   }
 
   /** Driver roster freezes at 22:00 Vietnam time daily — providers must finish
-   *  assigning drivers before 10pm so the 4am auto crew+dispatch runs on a
+   *  assigning drivers before 23:00 so the next-day auto crew+dispatch runs on a
    *  settled roster. ADMIN stays exempt for emergencies. */
   private assertBeforeRosterFreeze(actor?: AuthenticatedUser) {
     if (actor?.role === RoleType.ADMIN) return;

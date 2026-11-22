@@ -61,6 +61,8 @@ type SeedCoordinate = {
 };
 type SeedCompany = {
   name: string;
+  shortName: string | null;
+  logoUrl: string | null;
   address: string | null;
   phone: string | null;
   email: string | null;
@@ -129,242 +131,247 @@ type SeedTour = {
 const PERMISSIONS: SeedPermission[] = [
   {
     "code": "accounting.category.create",
-    "name": "Tạo danh mục thu/chi",
+    "name": "Create settlement category",
     "group": "Accounting"
   },
   {
     "code": "accounting.money.reject",
-    "name": "Trả lại bảng kê thu/chi",
+    "name": "Return money sheet",
     "group": "Accounting"
   },
   {
     "code": "accounting.money.verify",
-    "name": "Xác minh & khoá tiền chuyến",
+    "name": "Verify & lock trip money",
     "group": "Accounting"
   },
   {
     "code": "accounting.period.export",
-    "name": "Xuất kỳ thanh toán",
+    "name": "Export payment period",
     "group": "Accounting"
   },
   {
     "code": "accounting.period.void",
-    "name": "Huỷ kỳ thanh toán đã xuất",
+    "name": "Void exported payment period",
     "group": "Accounting"
   },
   {
     "code": "accounting.read",
-    "name": "Xem Accounting Room",
+    "name": "View Accounting Room",
     "group": "Accounting"
   },
   {
     "code": "accounting.settlement.create",
-    "name": "Thêm khoản thu/chi",
+    "name": "Add settlement entry",
     "group": "Accounting"
   },
   {
     "code": "accounting.settlement.delete",
-    "name": "Xoá khoản thu/chi",
+    "name": "Delete settlement entry",
     "group": "Accounting"
   },
   {
     "code": "accounting.settlement.update",
-    "name": "Sửa khoản thu/chi",
+    "name": "Edit settlement entry",
     "group": "Accounting"
   },
   {
     "code": "assignment.create",
-    "name": "Tạo assignment",
+    "name": "Create assignment",
     "group": "Assignment"
   },
   {
     "code": "assignment.delete",
-    "name": "Xoá assignment",
+    "name": "Delete assignment",
     "group": "Assignment"
   },
   {
     "code": "assignment.read",
-    "name": "Xem assignment",
+    "name": "View assignments",
     "group": "Assignment"
   },
   {
     "code": "assignment.tour-report.submit",
-    "name": "Nộp báo cáo chuyến đi",
+    "name": "Submit trip report",
     "group": "Assignment"
   },
   {
     "code": "assignment.update",
-    "name": "Sửa assignment",
+    "name": "Edit assignment",
     "group": "Assignment"
   },
   {
     "code": "audit.read",
-    "name": "Xem audit log",
+    "name": "View audit log",
     "group": "System"
   },
   {
     "code": "auth.read",
-    "name": "Xem lịch sử đăng nhập",
+    "name": "View login history",
     "group": "System"
   },
   {
     "code": "booking.create",
-    "name": "Tạo booking",
+    "name": "Create booking",
     "group": "Booking"
   },
   {
     "code": "booking.delete",
-    "name": "Xoá booking",
+    "name": "Delete booking",
     "group": "Booking"
   },
   {
     "code": "booking.note.update",
-    "name": "Sửa ghi chú booking của chuyến mình",
+    "name": "Edit booking notes on own trips",
     "group": "Assignment"
   },
   {
     "code": "booking.read",
-    "name": "Xem booking",
+    "name": "View bookings",
     "group": "Booking"
   },
   {
     "code": "booking.update",
-    "name": "Sửa booking",
+    "name": "Edit booking",
     "group": "Booking"
   },
   {
     "code": "company.read",
-    "name": "Xem hồ sơ công ty",
+    "name": "View company profile",
     "group": "Company"
   },
   {
     "code": "company.update",
-    "name": "Cập nhật hồ sơ công ty",
+    "name": "Update company profile",
     "group": "Company"
   },
   {
     "code": "coordinate.create",
-    "name": "Tạo coordinate",
+    "name": "Create coordinate",
     "group": "Coordinate"
   },
   {
     "code": "coordinate.delete",
-    "name": "Xoá coordinate",
+    "name": "Delete coordinate",
     "group": "Coordinate"
   },
   {
     "code": "coordinate.update",
-    "name": "Sửa coordinate",
+    "name": "Edit coordinate",
     "group": "Coordinate"
   },
   {
     "code": "dashboard.read",
-    "name": "Xem dashboard",
+    "name": "View dashboard",
+    "group": "Dashboard"
+  },
+  {
+    "code": "dashboard.finance.read",
+    "name": "View dashboard revenue",
     "group": "Dashboard"
   },
   {
     "code": "driver.create",
-    "name": "Tạo tài xế",
+    "name": "Create driver",
     "group": "Provider Driver"
   },
   {
     "code": "driver.update",
-    "name": "Sửa tài xế",
+    "name": "Edit driver",
     "group": "Provider Driver"
   },
   {
     "code": "gmail.manage",
-    "name": "Quản lý mailbox Gmail",
+    "name": "Manage Gmail mailbox",
     "group": "System"
   },
   {
     "code": "provider.create",
-    "name": "Tạo transportation provider",
+    "name": "Create transportation provider",
     "group": "Provider"
   },
   {
     "code": "provider-driver.assign",
-    "name": "Gán tài xế vào provider",
+    "name": "Assign driver to provider",
     "group": "Provider Driver"
   },
   {
     "code": "provider-driver.unassign",
-    "name": "Gỡ tài xế khỏi provider",
+    "name": "Remove driver from provider",
     "group": "Provider Driver"
   },
   {
     "code": "role.manage",
-    "name": "Quản lý role/permission",
+    "name": "Manage roles & permissions",
     "group": "System"
   },
   {
     "code": "route-price.create",
-    "name": "Tạo route price",
+    "name": "Create route price",
     "group": "Route Price"
   },
   {
     "code": "route-price.delete",
-    "name": "Xoá route price",
+    "name": "Delete route price",
     "group": "Route Price"
   },
   {
     "code": "route-price.update",
-    "name": "Sửa route price",
+    "name": "Edit route price",
     "group": "Route Price"
   },
   {
     "code": "tour.create",
-    "name": "Tạo tour",
+    "name": "Create tour",
     "group": "Tour"
   },
   {
     "code": "tour.delete",
-    "name": "Xoá tour",
+    "name": "Delete tour",
     "group": "Tour"
   },
   {
     "code": "tour.itinerary.edit",
-    "name": "Sửa itinerary tour",
+    "name": "Edit tour itinerary",
     "group": "Tour"
   },
   {
     "code": "tour.update",
-    "name": "Sửa tour",
+    "name": "Edit tour",
     "group": "Tour"
   },
   {
     "code": "user.create",
-    "name": "Tạo user",
+    "name": "Create user",
     "group": "User"
   },
   {
     "code": "user.delete",
-    "name": "Xoá user",
+    "name": "Delete user",
     "group": "User"
   },
   {
     "code": "user.read",
-    "name": "Xem user",
+    "name": "View users",
     "group": "User"
   },
   {
     "code": "user.update",
-    "name": "Sửa user",
+    "name": "Edit user",
     "group": "User"
   },
   {
     "code": "vehicle.create",
-    "name": "Tạo xe (provider)",
+    "name": "Create vehicle (provider)",
     "group": "Vehicle"
   },
   {
     "code": "vehicle.delete",
-    "name": "Xoá xe (provider)",
+    "name": "Delete vehicle (provider)",
     "group": "Vehicle"
   },
   {
     "code": "vehicle.update",
-    "name": "Sửa xe (provider)",
+    "name": "Edit vehicle (provider)",
     "group": "Vehicle"
   }
 ];
@@ -375,6 +382,8 @@ const ROLES: SeedRole[] = [
     "description": "Phòng kế toán — kiểm tra, khoá tiền, xuất kỳ thanh toán",
     "isSystem": false,
     "permissions": [
+      "dashboard.read",
+      "dashboard.finance.read",
       "accounting.read",
       "accounting.settlement.create",
       "accounting.settlement.update",
@@ -392,6 +401,7 @@ const ROLES: SeedRole[] = [
     "isSystem": true,
     "permissions": [
       "dashboard.read",
+      "dashboard.finance.read",
       "booking.read",
       "booking.create",
       "booking.update",
@@ -461,7 +471,7 @@ const ROLES: SeedRole[] = [
   {
     "name": "TOUR_GUIDE",
     "description": "Hướng dẫn viên — nộp báo cáo, ghi chú và thu/hoàn tiền của chuyến mình",
-    "isSystem": true,
+    "isSystem": false,
     "permissions": [
       "assignment.tour-report.submit",
       "booking.note.update"
@@ -1317,6 +1327,8 @@ const COORDINATES: SeedCoordinate[] = [
 
 const COMPANY: SeedCompany | null = {
   "name": "SunShine Travel & Transportation Co., Ltd.",
+  "shortName": "Hana Tourist",
+  "logoUrl": null,
   "address": "88 Bach Dang Street, Hai Chau District, Da Nang, Vietnam",
   "phone": "+84 236 3888 999",
   "email": "hello@sunshine-travel.vn",
@@ -2402,9 +2414,11 @@ async function main() {
   if (COMPANY) {
     const existing = await prisma.companyProfile.findFirst();
     if (existing) {
+      const companyFields: Partial<SeedCompany> = { ...COMPANY };
+      delete companyFields.logoUrl;
       await prisma.companyProfile.update({
         where: { id: existing.id },
-        data: COMPANY,
+        data: companyFields,
       });
     } else {
       await prisma.companyProfile.create({ data: COMPANY });

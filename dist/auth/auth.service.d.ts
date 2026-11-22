@@ -66,8 +66,8 @@ export declare class AuthService {
         roles: ({
             permissions: ({
                 permission: {
-                    id: string;
                     name: string;
+                    id: string;
                     code: string;
                     group: string | null;
                 };
@@ -76,10 +76,10 @@ export declare class AuthService {
                 permissionId: string;
             })[];
         } & {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
-            updatedAt: Date;
             description: string | null;
             isSystem: boolean;
         })[];
@@ -102,8 +102,8 @@ export declare class AuthService {
         roles: ({
             permissions: ({
                 permission: {
-                    id: string;
                     name: string;
+                    id: string;
                     code: string;
                     group: string | null;
                 };
@@ -112,10 +112,10 @@ export declare class AuthService {
                 permissionId: string;
             })[];
         } & {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
-            updatedAt: Date;
             description: string | null;
             isSystem: boolean;
         })[];

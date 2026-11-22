@@ -1,6 +1,6 @@
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
-import { AssignBookingsDto, ConfirmPartnerHandoffDto, CreateAssignmentDto, FinalizeAssignmentDto, QueryAssignmentDto, ReturnPartnerHandoffDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, UpdateRecallCutoffDto, VerifyTourReportDto } from './dto/assignment.dto';
+import { AssignBookingsDto, ConfirmPartnerHandoffDto, CreateAssignmentDto, FinalizeAssignmentDto, QueryAssignmentDto, ReturnPartnerHandoffDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, UpdatePickupReminderModeDto, UpdateRecallCutoffDto, VerifyTourReportDto } from './dto/assignment.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
 import { AssignmentOrigin, Prisma } from '@prisma/client';
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
@@ -10,6 +10,8 @@ import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { LeavesService } from "../leaves/leaves.service";
 import type { FileStorage } from "../storage";
 import { DriveService } from "../drive/drive.service";
+import { MailService } from "../mail/mail.service";
+import { DispatchPolicyService } from "../dispatch-policy/dispatch-policy.service";
 export declare class AssignmentsService {
     private readonly prisma;
     private readonly auditService;
@@ -19,8 +21,10 @@ export declare class AssignmentsService {
     private readonly leavesService;
     private readonly storage;
     private readonly drive;
+    private readonly mail;
+    private readonly dispatchPolicy;
     private readonly logger;
-    constructor(prisma: PrismaService, auditService: AuditService, board: AssignmentBoardService, notificationService: NotificationService, gateway: NotificationsGateway, leavesService: LeavesService, storage: FileStorage, drive: DriveService);
+    constructor(prisma: PrismaService, auditService: AuditService, board: AssignmentBoardService, notificationService: NotificationService, gateway: NotificationsGateway, leavesService: LeavesService, storage: FileStorage, drive: DriveService, mail: MailService, dispatchPolicy: DispatchPolicyService);
     private include;
     findBoard(actor: AuthenticatedUser): Promise<any[]>;
     getBoardCrew(): Promise<{
@@ -119,7 +123,7 @@ export declare class AssignmentsService {
             }[];
         }[];
     }>;
-    dispatchAllBoard(): Promise<{
+    dispatchAllBoard(targetDate?: Date | string): Promise<{
         dispatched: number;
         skipped: number;
         skippedOnLeave: number;
@@ -134,7 +138,7 @@ export declare class AssignmentsService {
         time: string;
     }>;
     setBoardOrigin(origin: AssignmentOrigin): Promise<{
-        updated: number;
+        updated: any;
         mode: import("@prisma/client").$Enums.AssignmentOrigin;
     }>;
     private assertCrewAvailableForDates;
@@ -152,9 +156,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -190,8 +194,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -206,9 +210,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -249,29 +253,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -283,15 +290,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -324,6 +331,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -335,7 +343,14 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
+    updatePickupReminderMode(id: string, dto: UpdatePickupReminderModeDto, actor: AuthenticatedUser): Promise<{
+        id: string;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+    }>;
+    sendPickupReminder(id: string, actor: AuthenticatedUser): Promise<import("@/mail/mail.service").PickupReminderResult>;
     private assertDetailsUnlocked;
     private isOutsourced;
     private canVerifyMoney;
@@ -350,9 +365,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -388,8 +403,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -404,9 +419,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -447,29 +462,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -481,15 +499,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -522,6 +540,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -533,6 +552,8 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     update(id: string, dto: UpdateAssignmentDto, actor?: AuthenticatedUser): Promise<{
         vehicle: {
@@ -543,9 +564,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -581,8 +602,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -597,9 +618,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -640,29 +661,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -674,15 +698,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -715,6 +739,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -726,8 +751,12 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     private assertDispatchableToday;
+    private assertNotSealed;
+    getSealInfo(date: string): Promise<import("@/dispatch-policy/dispatch-policy.service").SealInfo>;
     private assertCrewAssigned;
     private assertRecallAllowed;
     private assertDispatchedUpdateAllowed;
@@ -743,9 +772,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -781,8 +810,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -797,9 +826,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -840,29 +869,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -874,15 +906,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -915,6 +947,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -926,6 +959,8 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     private sendStatusNotifications;
     assignBookings(id: string, dto: AssignBookingsDto, actor?: AuthenticatedUser): Promise<{
@@ -937,9 +972,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -975,8 +1010,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -991,9 +1026,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1034,29 +1069,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -1068,15 +1106,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -1109,6 +1147,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -1120,6 +1159,8 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     removeBooking(id: string, bookingId: string, actor?: AuthenticatedUser): Promise<{
         vehicle: {
@@ -1130,9 +1171,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -1168,8 +1209,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -1184,9 +1225,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1227,29 +1268,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -1261,15 +1305,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -1302,6 +1346,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -1313,6 +1358,8 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     reorderBookings(id: string, bookingIds: string[], actor?: AuthenticatedUser): Promise<{
         vehicle: {
@@ -1323,9 +1370,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -1361,8 +1408,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -1377,9 +1424,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1420,29 +1467,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -1454,15 +1504,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -1495,6 +1545,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -1506,6 +1557,8 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     moveBooking(fromAssignmentId: string, bookingId: string, toAssignmentId: string, actor?: AuthenticatedUser): Promise<{
         vehicle: {
@@ -1516,9 +1569,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -1554,8 +1607,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -1570,9 +1623,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1613,29 +1666,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -1647,15 +1703,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -1688,6 +1744,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -1699,7 +1756,10 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
+    private confirmLateBookings;
     private notifyMoveBooking;
     private refreshSummary;
     syncDatesFromBookings(assignmentId: string, actor?: AuthenticatedUser): Promise<{
@@ -1711,9 +1771,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -1749,8 +1809,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -1765,9 +1825,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1808,29 +1868,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -1842,15 +1905,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -1883,6 +1946,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -1894,6 +1958,8 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     confirmPartnerHandoff(id: string, dto: ConfirmPartnerHandoffDto, actor: AuthenticatedUser): Promise<{
         vehicle: {
@@ -1904,9 +1970,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -1942,8 +2008,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -1958,9 +2024,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -2001,29 +2067,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -2035,15 +2104,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -2076,6 +2145,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -2087,6 +2157,8 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     returnPartnerHandoff(id: string, dto: ReturnPartnerHandoffDto, actor: AuthenticatedUser): Promise<{
         vehicle: {
@@ -2097,9 +2169,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -2135,8 +2207,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -2151,9 +2223,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -2194,29 +2266,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -2228,15 +2303,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -2269,6 +2344,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -2280,11 +2356,13 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     submitTourReport(id: string, dto: SubmitTourReportDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         status: import("@prisma/client").$Enums.TourReportStatus;
         assignmentId: string;
         submittedById: string | null;
@@ -2338,9 +2416,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -2376,8 +2454,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -2392,9 +2470,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -2435,29 +2513,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -2469,15 +2550,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -2510,6 +2591,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -2521,6 +2603,8 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     finalize(id: string, dto: FinalizeAssignmentDto, actor: AuthenticatedUser): Promise<{
         vehicle: {
@@ -2531,9 +2615,9 @@ export declare class AssignmentsService {
             brand: string | null;
         } | null;
         tourReport: {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             status: import("@prisma/client").$Enums.TourReportStatus;
             assignmentId: string;
             submittedById: string | null;
@@ -2569,8 +2653,8 @@ export declare class AssignmentsService {
             evidenceImages: Prisma.JsonValue | null;
         } | null;
         provider: {
-            id: string;
             name: string;
+            id: string;
             isCompany: boolean;
             assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
         } | null;
@@ -2585,9 +2669,9 @@ export declare class AssignmentsService {
                 code: string | null;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -2628,29 +2712,32 @@ export declare class AssignmentsService {
             paymentConfirmedAt: Date | null;
             paymentConfirmedById: string | null;
             paymentConfirmedByName: string | null;
+            confirmationEmailSentAt: Date | null;
+            pickupReminderSentAt: Date | null;
+            lateBooking: boolean;
             paxSequence: number;
             parentBookingId: string | null;
             movedFromBusId: string | null;
             emailDate: Date | null;
         })[];
         driver: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         reportVerifier: {
-            id: string;
             name: string | null;
+            id: string;
             email: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
             email: string | null;
             isActive: boolean;
             phone: string | null;
@@ -2662,15 +2749,15 @@ export declare class AssignmentsService {
             payableToId: string;
             tourDate: Date;
             payableTo: {
-                id: string;
                 name: string | null;
+                id: string;
             };
         }[];
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
         providerId: string | null;
-        updatedAt: Date;
         code: string | null;
         startDate: Date;
         endDate: Date;
@@ -2703,6 +2790,7 @@ export declare class AssignmentsService {
         providerViewedAt: Date | null;
         providerRespondedAt: Date | null;
         providerDeadline: Date | null;
+        providerWarningAt: Date | null;
         providerRequestNote: string | null;
         providerResponseNote: string | null;
         providerDeclineReason: string | null;
@@ -2714,6 +2802,8 @@ export declare class AssignmentsService {
         priceOverride: Prisma.Decimal | null;
         tripNotes: string | null;
         createdWho: string | null;
+        pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
+        pickupReminderLastSentAt: Date | null;
     }>;
     findMyAssignments(actor: AuthenticatedUser): Promise<any[]>;
     findMyCalendar(actor: AuthenticatedUser, year?: number, month?: number): Promise<{
@@ -2759,8 +2849,8 @@ export declare class AssignmentsService {
                 brand: string | null;
             } | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 email: string;
             } | null;
             tourReport: {

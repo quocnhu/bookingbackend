@@ -18,6 +18,7 @@ const platform_express_1 = require("@nestjs/platform-express");
 const multer_1 = require("multer");
 const assignments_service_1 = require("./assignments.service");
 const auto_dispatch_cron_1 = require("./auto-dispatch.cron");
+const pickup_reminder_cron_1 = require("./pickup-reminder.cron");
 const accounting_service_1 = require("../accounting/accounting.service");
 const accounting_dto_1 = require("../accounting/dto/accounting.dto");
 const assignment_dto_1 = require("./dto/assignment.dto");
@@ -28,10 +29,12 @@ const current_user_decorator_1 = require("../common/decorators/current-user.deco
 let AssignmentsController = class AssignmentsController {
     assignmentsService;
     autoDispatchCron;
+    pickupReminderCron;
     accountingService;
-    constructor(assignmentsService, autoDispatchCron, accountingService) {
+    constructor(assignmentsService, autoDispatchCron, pickupReminderCron, accountingService) {
         this.assignmentsService = assignmentsService;
         this.autoDispatchCron = autoDispatchCron;
+        this.pickupReminderCron = pickupReminderCron;
         this.accountingService = accountingService;
     }
     findAll(query, actor) {
@@ -46,8 +49,24 @@ let AssignmentsController = class AssignmentsController {
     setBoardOrigin(dto) {
         return this.assignmentsService.setBoardOrigin(dto.origin);
     }
-    dispatchAllBoard() {
-        return this.assignmentsService.dispatchAllBoard();
+    dispatchAllBoard(date) {
+        if (!date)
+            return this.assignmentsService.dispatchAllBoard();
+        const parsed = new Date(date);
+        if (Number.isNaN(parsed.getTime())) {
+            throw new common_1.BadRequestException('Invalid dispatch date');
+        }
+        return this.assignmentsService.dispatchAllBoard(parsed);
+    }
+    getBoardSeal(date) {
+        if (!date) {
+            throw new common_1.BadRequestException('date=YYYY-MM-DD is required');
+        }
+        const parsed = new Date(date);
+        if (Number.isNaN(parsed.getTime())) {
+            throw new common_1.BadRequestException('Invalid date');
+        }
+        return this.assignmentsService.getSealInfo(date);
     }
     getAutoDispatchSettings() {
         return this.autoDispatchCron.getSettings();
@@ -57,6 +76,12 @@ let AssignmentsController = class AssignmentsController {
     }
     getRecallCutoff() {
         return this.assignmentsService.getRecallCutoff();
+    }
+    getPickupReminderSettings() {
+        return this.pickupReminderCron.getSettings();
+    }
+    updatePickupReminderSettings(dto, actor) {
+        return this.pickupReminderCron.updateSettings(dto, actor.id);
     }
     updateRecallCutoff(dto, actor) {
         return this.assignmentsService.updateRecallCutoff(dto, actor.id);
@@ -81,6 +106,12 @@ let AssignmentsController = class AssignmentsController {
     }
     findOne(id, actor) {
         return this.assignmentsService.findOne(id, actor);
+    }
+    updatePickupReminderMode(id, dto, actor) {
+        return this.assignmentsService.updatePickupReminderMode(id, dto, actor);
+    }
+    sendPickupReminder(id, actor) {
+        return this.assignmentsService.sendPickupReminder(id, actor);
     }
     create(dto, actor) {
         return this.assignmentsService.create(dto, actor);
@@ -167,10 +198,19 @@ __decorate([
 __decorate([
     (0, common_1.Post)('board/dispatch-all'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Body)('date')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "dispatchAllBoard", null);
+__decorate([
+    (0, common_1.Get)('board/seal'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __param(0, (0, common_1.Query)('date')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "getBoardSeal", null);
 __decorate([
     (0, common_1.Get)('board/auto-dispatch'),
     (0, permissions_decorator_1.Permissions)('assignment.read'),
@@ -194,6 +234,22 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "getRecallCutoff", null);
+__decorate([
+    (0, common_1.Get)('board/pickup-reminder'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "getPickupReminderSettings", null);
+__decorate([
+    (0, common_1.Put)('board/pickup-reminder'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [assignment_dto_1.UpdatePickupReminderSettingsDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "updatePickupReminderSettings", null);
 __decorate([
     (0, common_1.Put)('board/recall-cutoff'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),
@@ -264,6 +320,25 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "findOne", null);
+__decorate([
+    (0, common_1.Put)(':id/pickup-reminder-mode'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, assignment_dto_1.UpdatePickupReminderModeDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "updatePickupReminderMode", null);
+__decorate([
+    (0, common_1.Post)(':id/pickup-reminder'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "sendPickupReminder", null);
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('assignment.create'),
@@ -424,6 +499,7 @@ exports.AssignmentsController = AssignmentsController = __decorate([
     (0, common_1.Controller)('assignments'),
     __metadata("design:paramtypes", [assignments_service_1.AssignmentsService,
         auto_dispatch_cron_1.AutoDispatchCron,
+        pickup_reminder_cron_1.PickupReminderCron,
         accounting_service_1.AccountingService])
 ], AssignmentsController);
 //# sourceMappingURL=assignments.controller.js.map

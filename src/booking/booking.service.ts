@@ -30,6 +30,8 @@ import {
 } from '@/parsing/booking-normalizer.service';
 import { AssignmentBoardService } from '@/queues/assignment-board.service';
 import { AssignmentQueue } from '@/queues/assignment.queue';
+import { MailService } from '@/mail/mail.service';
+import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
 import {
   CreateBookingDto,
   CreatePrivateGroupDto,
@@ -52,10 +54,7 @@ import {
   EmailFields,
   hasBookingChanges,
 } from './email-merge.util';
-import {
-  RAW_DATA_OUTCOME,
-  RawDataOutcome,
-} from '@/raw-data/raw-data.entity';
+import { RAW_DATA_OUTCOME, RawDataOutcome } from '@/raw-data/raw-data.entity';
 
 export type WriteResult =
   | { status: 'SKIPPED'; reason: string; booking?: undefined }
@@ -96,6 +95,7 @@ function tokenOverlap(a: string, b: string): number {
 @Injectable()
 export class BookingService {
   private readonly logger = new Logger(BookingService.name);
+  private static readonly CANCELLATION_WINDOW_KEY = 'cancellationWindowHours';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -103,6 +103,8 @@ export class BookingService {
     private readonly normalizer: BookingNormalizerService,
     private readonly board: AssignmentBoardService,
     private readonly assignmentQueue: AssignmentQueue,
+    private readonly mail: MailService,
+    private readonly dispatchPolicy: DispatchPolicyService,
   ) {}
 
   // ─── Pipeline upsert (Stage 2) ──────────────────────────────────────────
@@ -236,7 +238,11 @@ export class BookingService {
         };
       }
 
-      const updateData = this.buildEmailUpdateData(parsed, existing, data.action);
+      const updateData = this.buildEmailUpdateData(
+        parsed,
+        existing,
+        data.action,
+      );
       const changed = hasBookingChanges(
         updateData,
         existing as unknown as Record<string, unknown>,
@@ -333,9 +339,7 @@ export class BookingService {
     changed: boolean,
   ): RawDataOutcome {
     if (action === 'CANCEL') return RAW_DATA_OUTCOME.CANCELLED;
-    return changed
-      ? RAW_DATA_OUTCOME.UPDATED
-      : RAW_DATA_OUTCOME.UNCHANGED;
+    return changed ? RAW_DATA_OUTCOME.UPDATED : RAW_DATA_OUTCOME.UNCHANGED;
   }
 
   /**
@@ -371,6 +375,17 @@ export class BookingService {
       return;
     }
     if (!booking.assignmentId && booking.startingDate) {
+      if (!booking.lateBooking) {
+        const seal = await this.dispatchPolicy.getSealInfo(
+          booking.startingDate,
+        );
+        if (seal.sealed) {
+          await this.prisma.booking.update({
+            where: { id: booking.id },
+            data: { lateBooking: true },
+          });
+        }
+      }
       await this.assignmentQueue.enqueue(booking.id);
     }
   }
@@ -402,9 +417,9 @@ export class BookingService {
       address: data.address,
       latitude: data.latitude,
       longitude: data.longitude,
-startingDate: data.startingDate
-      ? new Date(data.startingDate + 'T00:00:00.000+07:00').toISOString()
-      : undefined,
+      startingDate: data.startingDate
+        ? new Date(data.startingDate + 'T00:00:00.000+07:00').toISOString()
+        : undefined,
       departureTime: data.departureTime,
       customerName: data.customerName,
       hotelName: data.hotelName,
@@ -422,6 +437,12 @@ startingDate: data.startingDate
       actorId,
       data.createdWho ?? 'Manual Entry',
     );
+    if (
+      booking.channel === BookingProvider.MANUAL &&
+      !booking.parentBookingId
+    ) {
+      void this.mail.sendBookingConfirmation(booking.id);
+    }
     return booking;
   }
 
@@ -587,7 +608,10 @@ startingDate: data.startingDate
         'Only the assigned crew or Accounting can record this collection',
       );
     }
-    if (dto.method === PaymentMethod.PAYPAL || dto.method === PaymentMethod.OTA) {
+    if (
+      dto.method === PaymentMethod.PAYPAL ||
+      dto.method === PaymentMethod.OTA
+    ) {
       throw new BadRequestException('Cash or bank transfer is required here');
     }
     const updated = await this.prisma.booking.update({
@@ -596,7 +620,8 @@ startingDate: data.startingDate
         paymentCollectedAt: new Date(),
         paymentCollectedById: actor.id,
         paymentCollectedByName: actor.name ?? actor.email ?? null,
-        paymentMethod: dto.method ?? booking.paymentMethod ?? PaymentMethod.CASH,
+        paymentMethod:
+          dto.method ?? booking.paymentMethod ?? PaymentMethod.CASH,
         ...(dto.note ? { paymentNote: dto.note } : {}),
       },
     });
@@ -640,7 +665,10 @@ startingDate: data.startingDate
     if (booking.payment === PaymentStatus.PAID) {
       return booking;
     }
-    if (dto.method === PaymentMethod.PAYPAL || dto.method === PaymentMethod.OTA) {
+    if (
+      dto.method === PaymentMethod.PAYPAL ||
+      dto.method === PaymentMethod.OTA
+    ) {
       throw new BadRequestException('Cash or bank transfer is required here');
     }
 
@@ -657,14 +685,12 @@ startingDate: data.startingDate
       throw new BadRequestException('Booking total is missing');
     }
 
-    const collectedById =
-      booking.paymentCollectedById ?? actor.id;
+    const collectedById = booking.paymentCollectedById ?? actor.id;
     const payerType =
       collectedById === booking.assignment?.guideId
         ? PayerType.GUIDE
         : PayerType.STAFF;
-    const method =
-      dto.method ?? booking.paymentMethod ?? PaymentMethod.CASH;
+    const method = dto.method ?? booking.paymentMethod ?? PaymentMethod.CASH;
     const now = new Date();
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -713,6 +739,9 @@ startingDate: data.startingDate
       afterData: updated,
       changedBy: actor.id,
     });
+    // Idempotent: normally already sent when the pay-later booking was created;
+    // this retries if that send failed (or the mailbox was not configured yet).
+    void this.mail.sendBookingConfirmation(id);
     return updated;
   }
 
@@ -758,6 +787,7 @@ startingDate: data.startingDate
     tourId: string,
     tourType: TourType,
     totalPax: number,
+    startingDate?: string | Date,
   ) {
     const tour = await this.prisma.tour.findUnique({
       where: { id: tourId },
@@ -836,9 +866,13 @@ startingDate: data.startingDate
         )
       : 0;
     const discountPercent = pct > 0 ? pct : 0;
-    const unitPrice = Math.round(unit * (1 - discountPercent / 100) * 100) / 100;
+    const unitPrice =
+      Math.round(unit * (1 - discountPercent / 100) * 100) / 100;
     const totalAmount = Math.round(unitPrice * totalPax * 100) / 100;
 
+    const seal = startingDate
+      ? await this.dispatchPolicy.getSealInfo(startingDate)
+      : null;
     return {
       tourId: tour.id,
       tourName: tour.name,
@@ -853,11 +887,20 @@ startingDate: data.startingDate
       privatePaxOptions: tour.privatePaxPrices
         .filter((tier) => Number(tier.pricePerPerson) > 0)
         .map((tier) => tier.pax),
+      lateBooking: seal?.sealed ?? false,
+      urgentBooking: seal?.urgent ?? false,
+      dispatchCutoffAt: seal?.cutoffAt ?? null,
+      dispatchCutoffTime: seal?.cutoffTime ?? null,
     };
   }
 
   websiteQuote(dto: WebsiteQuoteDto) {
-    return this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax);
+    return this.quoteWebsite(
+      dto.tourId,
+      dto.tourType,
+      dto.totalPax,
+      dto.startingDate,
+    );
   }
 
   /**
@@ -867,11 +910,36 @@ startingDate: data.startingDate
    */
   async createWebsite(dto: CreateWebsiteBookingDto, actor?: AuthenticatedUser) {
     if (!actor?.id) throw new ForbiddenException('Please sign in to book');
-    const quote = await this.quoteWebsite(dto.tourId, dto.tourType, dto.totalPax);
+    const quote = await this.quoteWebsite(
+      dto.tourId,
+      dto.tourType,
+      dto.totalPax,
+      dto.startingDate,
+    );
     const payLater = !!dto.payLater;
     const start = new Date(dto.startingDate);
     if (Number.isNaN(start.getTime())) {
       throw new BadRequestException('Invalid start date');
+    }
+    const seal = await this.dispatchPolicy.getSealInfo(start);
+    if (seal.sealed && !dto.lateBooking) {
+      throw new BadRequestException(
+        `This departure is closed for normal bookings after ${seal.cutoffTime}. Tick the late-booking option to join the waiting list and get a reply after 05:00.`,
+      );
+    }
+    const range = this.dispatchPolicy.dayRange(start);
+    const sameDay = await this.prisma.booking.count({
+      where: {
+        customerUserId: actor.id,
+        parentBookingId: null,
+        status: { not: BookingStatus.CANCELED },
+        startingDate: { gte: range.start, lte: range.end },
+      },
+    });
+    if (sameDay >= 3) {
+      throw new BadRequestException(
+        'Each account can book at most 3 tours for the same date.',
+      );
     }
     const dueAt = new Date(
       start.getTime() + quote.durationDays * 24 * 60 * 60 * 1000,
@@ -885,18 +953,26 @@ startingDate: data.startingDate
       payLater,
       paymentDueAt: payLater ? dueAt : undefined,
       paymentNote: payLater
-        ? (dto.paymentNote?.trim() ||
-          'Collect the remaining payment at the end of the tour.')
+        ? dto.paymentNote?.trim() ||
+          'Collect the remaining payment at the end of the tour.'
         : undefined,
       totalAmount: quote.totalAmount,
       currency: quote.currency,
       customerUserId: actor.id,
+      lateBooking: seal.sealed,
     } as CreateBookingDto & {
       totalAmount: number;
       currency: string;
       customerUserId: string;
+      lateBooking: boolean;
     };
     const booking = await this.create(payload, actor);
+    // Pay-later bookings are confirmed at creation, so the tourist receives the
+    // confirmation template immediately. PayPal bookings get it after capture
+    // (see PaymentService.markCaptured), once the payment is actually paid.
+    if (payLater && !seal.sealed) {
+      void this.mail.sendBookingConfirmation(booking.id);
+    }
     return { booking, quote };
   }
 
@@ -920,9 +996,17 @@ startingDate: data.startingDate
     let bookingRef = submitted || this.randomBookingRef(dto.tourType);
     let booking: Booking | null = null;
 
+    const seal = dto.startingDate
+      ? await this.dispatchPolicy.getSealInfo(dto.startingDate)
+      : null;
+
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const data: any = { ...dto, bookingRef };
+        const data: any = {
+          ...dto,
+          bookingRef,
+          lateBooking: !!(seal?.sealed || (dto as any).lateBooking),
+        };
         if (dto.startingDate) data.startingDate = new Date(dto.startingDate);
         if (!data.payment) {
           data.payment =
@@ -950,7 +1034,11 @@ startingDate: data.startingDate
         break;
       } catch (e) {
         const isUniqueViolation = (e as { code?: string })?.code === 'P2002';
-        if (!isUniqueViolation || !this.looksGenerated(bookingRef) || attempt === 2) {
+        if (
+          !isUniqueViolation ||
+          !this.looksGenerated(bookingRef) ||
+          attempt === 2
+        ) {
           throw e;
         }
         this.logger.warn(
@@ -959,7 +1047,8 @@ startingDate: data.startingDate
         bookingRef = this.randomBookingRef(dto.tourType);
       }
     }
-    if (!booking) throw new ConflictException('Booking reference already exists');
+    if (!booking)
+      throw new ConflictException('Booking reference already exists');
 
     if (
       booking.channel === BookingProvider.MANUAL &&
@@ -987,6 +1076,15 @@ startingDate: data.startingDate
       afterData: booking,
     });
     await this.postWrite(booking);
+    // Manual/dashboard bookings (not OTA/pub-sub, not group children) get the
+    // same tourist confirmation template as website bookings. OTA emails are
+    // handled by the OTA/booking source, and the pub-sub path uses upsert().
+    if (
+      booking.channel === BookingProvider.MANUAL &&
+      !booking.parentBookingId
+    ) {
+      void this.mail.sendBookingConfirmation(booking.id);
+    }
     return booking;
   }
 
@@ -1123,7 +1221,10 @@ startingDate: data.startingDate
     if (buses.length === 0) {
       throw new BadRequestException('Add at least one bus');
     }
-    const busPaxTotal = buses.reduce((sum, bus) => sum + Number(bus.pax ?? 0), 0);
+    const busPaxTotal = buses.reduce(
+      (sum, bus) => sum + Number(bus.pax ?? 0),
+      0,
+    );
     if (busPaxTotal !== totalPax) {
       throw new BadRequestException(
         `Bus pax total (${busPaxTotal}) must equal the booking total pax (${totalPax})`,
@@ -1168,7 +1269,9 @@ startingDate: data.startingDate
           throw new BadRequestException('The selected driver is not a driver');
         }
         if (bus.guideId && roleById.get(bus.guideId) !== RoleType.TOUR_GUIDE) {
-          throw new BadRequestException('The selected guide is not a tour guide');
+          throw new BadRequestException(
+            'The selected guide is not a tour guide',
+          );
         }
       }
     }
@@ -1265,7 +1368,10 @@ startingDate: data.startingDate
             parentBookingId: parent.id,
           },
         });
-        rows.push({ assignmentId: assignment.id, bookingRef: child.bookingRef });
+        rows.push({
+          assignmentId: assignment.id,
+          bookingRef: child.bookingRef,
+        });
       }
       return rows;
     });
@@ -1315,7 +1421,7 @@ startingDate: data.startingDate
       dto.status === BookingStatus.CANCELED &&
       before.status !== BookingStatus.CANCELED
     ) {
-      this.assertCancelAllowed(before, overrideCancelWindow, actor);
+      await this.assertCancelAllowed(before, overrideCancelWindow, actor);
     }
 
     const data: any = { ...dtoFields };
@@ -1342,20 +1448,21 @@ startingDate: data.startingDate
   }
 
   /**
-   * Guard the cancellation window.
+   * Guard the cancellation window (dynamic SystemSetting).
    *
-   * The tour may only be cancelled while it departs more than
-   * CANCEL_WINDOW_HOURS from now — inside the window the vehicle, the guide
-   * and the tickets are already committed. An administrator may still cancel
+   * The tour may only be cancelled while it departs more than the configured
+   * number of hours from now — inside the window the vehicle, the guide and
+   * the tickets are already committed. An administrator may still cancel
    * (supplier cancellation, no-show, goodwill), but the override is recorded
    * in the audit trail.
    */
-  private assertCancelAllowed(
+  private async assertCancelAllowed(
     booking: Booking,
     override: boolean | undefined,
     actor?: AuthenticatedUser,
   ) {
-    const deadline = cancelDeadline(booking.startingDate);
+    const hours = await this.getCancellationWindowHours();
+    const deadline = cancelDeadline(booking.startingDate, hours);
     // Unknown departure date → the window cannot be evaluated → allow.
     if (!deadline) return;
     // Still inside the window → nothing to override.
@@ -1364,7 +1471,7 @@ startingDate: data.startingDate
     // The window is closed.
     if (!override) {
       throw new BadRequestException(
-        `Cancellation window closed — ${booking.bookingRef} departs on ${booking.startingDate!.toISOString()} and can only be cancelled more than ${CANCEL_WINDOW_HOURS}h before departure (deadline ${deadline.toISOString()}).`,
+        `Cancellation window closed — ${booking.bookingRef} departs on ${booking.startingDate!.toISOString()} and can only be cancelled more than ${hours}h before departure (deadline ${deadline.toISOString()}).`,
       );
     }
     if (actor?.role !== RoleType.ADMIN) {
@@ -1372,6 +1479,51 @@ startingDate: data.startingDate
         'Only an administrator can cancel a booking inside the cancellation window',
       );
     }
+  }
+
+  /** Current cancellation window in hours (dynamic, default 24). */
+  async getCancellationWindowHours(): Promise<number> {
+    const row = await this.prisma.systemSetting.upsert({
+      where: { key: BookingService.CANCELLATION_WINDOW_KEY },
+      update: {},
+      create: {
+        key: BookingService.CANCELLATION_WINDOW_KEY,
+        value: String(CANCEL_WINDOW_HOURS),
+      },
+    });
+    const hours = Number(row.value);
+    if (!Number.isFinite(hours) || hours < 0 || hours > 720) {
+      return CANCEL_WINDOW_HOURS;
+    }
+    return Math.round(hours);
+  }
+
+  async updateCancellationWindow(
+    hours: number,
+    actorId?: string | null,
+  ): Promise<{ hours: number }> {
+    const before = { hours: await this.getCancellationWindowHours() };
+    if (!Number.isFinite(hours) || hours < 0 || hours > 720) {
+      throw new BadRequestException(
+        'Cancellation window must be between 0 and 720 hours',
+      );
+    }
+    const value = String(Math.round(hours));
+    await this.prisma.systemSetting.upsert({
+      where: { key: BookingService.CANCELLATION_WINDOW_KEY },
+      update: { value },
+      create: { key: BookingService.CANCELLATION_WINDOW_KEY, value },
+    });
+    const after = { hours: Number(value) };
+    await this.auditService.log({
+      entityType: 'SystemSetting',
+      entityId: BookingService.CANCELLATION_WINDOW_KEY,
+      action: 'UPDATE_CANCELLATION_WINDOW',
+      beforeData: before,
+      afterData: after,
+      changedBy: actorId ?? null,
+    });
+    return after;
   }
 
   /**

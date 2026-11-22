@@ -30,19 +30,19 @@ export declare class AccountingService {
     private assertPayable;
     private range;
     listCategories(actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
-        updatedAt: Date;
         isSystem: boolean;
         code: string;
         flowType: import("@prisma/client").$Enums.FeeFlowType;
     }[]>;
     createCategory(actor: AuthenticatedUser, dto: CreateSettlementCategoryDto): Promise<{
+        updatedAt: Date;
+        name: string;
         id: string;
         createdAt: Date;
-        name: string;
-        updatedAt: Date;
         isSystem: boolean;
         code: string;
         flowType: import("@prisma/client").$Enums.FeeFlowType;
@@ -66,15 +66,15 @@ export declare class AccountingService {
                 customerName: string | null;
             } | null;
             category: {
-                id: string;
                 name: string;
+                id: string;
                 code: string;
                 flowType: import("@prisma/client").$Enums.FeeFlowType;
             } | null;
         } & {
+            updatedAt: Date;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             assignmentId: string | null;
             categoryId: string | null;
             note: string | null;
@@ -85,26 +85,26 @@ export declare class AccountingService {
             reversesId: string | null;
         })[];
         categories: {
-            id: string;
             name: string;
+            id: string;
             code: string;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         }[];
     }>;
     addTourMoney(actor: AuthenticatedUser, assignmentId: string, dto: CreateSettlementDto): Promise<{
         category: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
-            updatedAt: Date;
             isSystem: boolean;
             code: string;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -120,18 +120,18 @@ export declare class AccountingService {
             customerName: string | null;
         } | null;
         category: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
-            updatedAt: Date;
             isSystem: boolean;
             code: string;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -143,18 +143,18 @@ export declare class AccountingService {
     })[]>;
     createSettlement(actor: AuthenticatedUser, assignmentId: string, dto: CreateSettlementDto): Promise<{
         category: {
+            updatedAt: Date;
+            name: string;
             id: string;
             createdAt: Date;
-            name: string;
-            updatedAt: Date;
             isSystem: boolean;
             code: string;
             flowType: import("@prisma/client").$Enums.FeeFlowType;
         } | null;
     } & {
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -170,9 +170,9 @@ export declare class AccountingService {
         note?: string;
         categoryId?: string;
     }): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -183,9 +183,9 @@ export declare class AccountingService {
         reversesId: string | null;
     }>;
     deleteTourMoney(actor: AuthenticatedUser, assignmentId: string, settlementId: string): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -196,9 +196,9 @@ export declare class AccountingService {
         reversesId: string | null;
     }>;
     deleteSettlement(actor: AuthenticatedUser, id: string): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
@@ -224,16 +224,16 @@ export declare class AccountingService {
         groupRef: string | null;
         moneyVerifiedAt: Date | null;
         guide: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
         driver: {
-            id: string;
             name: string | null;
+            id: string;
         } | null;
         partner: {
-            id: string;
             name: string;
+            id: string;
         } | null;
         partnerStatus: import("@prisma/client").$Enums.PartnerHandoffStatus | null;
         partnerAmount: Prisma.Decimal | null;
@@ -243,8 +243,8 @@ export declare class AccountingService {
         suggestedPayableTo: {
             basis: "ASSIGNMENT_GUIDE" | "ASSIGNMENT_DRIVER";
             kind: string;
-            id: string;
             name: string | null;
+            id: string;
         } | {
             id: string;
             name: string;
@@ -269,9 +269,9 @@ export declare class AccountingService {
         payableToId: string | null;
         payeeType: "DRIVER" | "GUIDE" | "PARTNER";
         partnerId: string | null;
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         status: import("@prisma/client").$Enums.TourReportStatus;
         assignmentId: string;
         submittedById: string | null;
@@ -309,9 +309,9 @@ export declare class AccountingService {
     private payeeName;
     private notifySubmitter;
     rejectMoney(assignmentId: string, dto: RejectMoneyDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         status: import("@prisma/client").$Enums.TourReportStatus;
         assignmentId: string;
         submittedById: string | null;
@@ -397,13 +397,13 @@ export declare class AccountingService {
             tourName: string | null;
             plateNumber: string | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -421,18 +421,18 @@ export declare class AccountingService {
             tourName: string | null;
             plateNumber: string | null;
             guide: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -490,13 +490,13 @@ export declare class AccountingService {
             tourName: string | null;
             plateNumber: string | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -514,18 +514,18 @@ export declare class AccountingService {
             tourName: string | null;
             plateNumber: string | null;
             guide: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -586,13 +586,13 @@ export declare class AccountingService {
             tourName: string | null;
             plateNumber: string | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -610,18 +610,18 @@ export declare class AccountingService {
             tourName: string | null;
             plateNumber: string | null;
             guide: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -681,13 +681,13 @@ export declare class AccountingService {
             tourName: string | null;
             plateNumber: string | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -705,18 +705,18 @@ export declare class AccountingService {
             tourName: string | null;
             plateNumber: string | null;
             guide: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             driver: {
-                id: string;
                 name: string | null;
+                id: string;
                 providerId: string | null;
             } | null;
             provider: {
-                id: string;
                 name: string;
+                id: string;
                 isCompany: boolean;
             } | null;
             tourDate: Date;
@@ -810,9 +810,9 @@ export declare class AccountingService {
         voidReason: string | null;
     }>;
     markPartnerPaymentPaid(actor: AuthenticatedUser, paymentId: string, dto: MarkPeriodPaidDto): Promise<{
+        updatedAt: Date;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         tourName: string | null;
         partnerId: string;
         status: import("@prisma/client").$Enums.PartnerPaymentStatus;

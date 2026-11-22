@@ -14,6 +14,8 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompanyProfileController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
 const company_profile_service_1 = require("./company-profile.service");
 const update_company_profile_dto_1 = require("./dto/update-company-profile.dto");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
@@ -30,6 +32,8 @@ let CompanyProfileController = class CompanyProfileController {
             return null;
         return {
             name: profile.name,
+            shortName: profile.shortName,
+            logoUrl: profile.logoUrl,
             address: profile.address,
             phone: profile.phone,
             email: profile.email,
@@ -43,6 +47,9 @@ let CompanyProfileController = class CompanyProfileController {
     }
     update(dto, actor) {
         return this.companyProfileService.updateProfile(dto, actor);
+    }
+    uploadLogo(file, actor) {
+        return this.companyProfileService.updateLogo(file, actor);
     }
 };
 exports.CompanyProfileController = CompanyProfileController;
@@ -68,6 +75,19 @@ __decorate([
     __metadata("design:paramtypes", [update_company_profile_dto_1.UpdateCompanyProfileDto, Object]),
     __metadata("design:returntype", void 0)
 ], CompanyProfileController.prototype, "update", null);
+__decorate([
+    (0, common_1.Post)('logo'),
+    (0, permissions_decorator_1.Permissions)('company.update'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
+        storage: (0, multer_1.memoryStorage)(),
+        limits: { fileSize: 2 * 1024 * 1024 },
+    })),
+    __param(0, (0, common_1.UploadedFile)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], CompanyProfileController.prototype, "uploadLogo", null);
 exports.CompanyProfileController = CompanyProfileController = __decorate([
     (0, common_1.Controller)('company-profile'),
     __metadata("design:paramtypes", [company_profile_service_1.CompanyProfileService])

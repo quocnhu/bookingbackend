@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -14,6 +15,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AssignmentsService } from './assignments.service';
 import { AutoDispatchCron } from './auto-dispatch.cron';
+import { PickupReminderCron } from './pickup-reminder.cron';
 import { AccountingService } from '@/accounting/accounting.service';
 import { CreateSettlementDto } from '@/accounting/dto/accounting.dto';
 import {
@@ -30,6 +32,8 @@ import {
   UpdateAssignmentDto,
   UpdateAssignmentStatusDto,
   UpdateAutoDispatchDto,
+  UpdatePickupReminderModeDto,
+  UpdatePickupReminderSettingsDto,
   UpdateRecallCutoffDto,
   VerifyTourReportDto,
 } from './dto/assignment.dto';
@@ -48,6 +52,7 @@ export class AssignmentsController {
   constructor(
     private readonly assignmentsService: AssignmentsService,
     private readonly autoDispatchCron: AutoDispatchCron,
+    private readonly pickupReminderCron: PickupReminderCron,
     private readonly accountingService: AccountingService,
   ) {}
 
@@ -80,8 +85,26 @@ export class AssignmentsController {
 
   @Post('board/dispatch-all')
   @Permissions('assignment.update')
-  dispatchAllBoard() {
-    return this.assignmentsService.dispatchAllBoard();
+  dispatchAllBoard(@Body('date') date?: string) {
+    if (!date) return this.assignmentsService.dispatchAllBoard();
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Invalid dispatch date');
+    }
+    return this.assignmentsService.dispatchAllBoard(parsed);
+  }
+
+  @Get('board/seal')
+  @Permissions('assignment.read')
+  getBoardSeal(@Query('date') date?: string) {
+    if (!date) {
+      throw new BadRequestException('date=YYYY-MM-DD is required');
+    }
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Invalid date');
+    }
+    return this.assignmentsService.getSealInfo(date);
   }
 
   @Get('board/auto-dispatch')
@@ -103,6 +126,21 @@ export class AssignmentsController {
   @Permissions('assignment.read')
   getRecallCutoff() {
     return this.assignmentsService.getRecallCutoff();
+  }
+
+  @Get('board/pickup-reminder')
+  @Permissions('assignment.read')
+  getPickupReminderSettings() {
+    return this.pickupReminderCron.getSettings();
+  }
+
+  @Put('board/pickup-reminder')
+  @Permissions('assignment.update')
+  updatePickupReminderSettings(
+    @Body() dto: UpdatePickupReminderSettingsDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.pickupReminderCron.updateSettings(dto, actor.id);
   }
 
   @Put('board/recall-cutoff')
@@ -169,11 +207,27 @@ export class AssignmentsController {
 
   @Get(':id')
   @Permissions('assignment.read')
-  findOne(
+  findOne(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+    return this.assignmentsService.findOne(id, actor);
+  }
+
+  @Put(':id/pickup-reminder-mode')
+  @Permissions('assignment.update')
+  updatePickupReminderMode(
+    @Param('id') id: string,
+    @Body() dto: UpdatePickupReminderModeDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.updatePickupReminderMode(id, dto, actor);
+  }
+
+  @Post(':id/pickup-reminder')
+  @Permissions('assignment.update')
+  sendPickupReminder(
     @Param('id') id: string,
     @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.assignmentsService.findOne(id, actor);
+    return this.assignmentsService.sendPickupReminder(id, actor);
   }
 
   @Post()

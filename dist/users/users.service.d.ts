@@ -11,9 +11,10 @@ export declare class UsersService {
     findAll(query: QueryUserDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     findOne(id: string): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
+        updatedAt: Date;
+        name: string | null;
         id: string;
         createdAt: Date;
-        name: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
         email: string;
         avatarUrl: string | null;
@@ -21,13 +22,12 @@ export declare class UsersService {
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
-        updatedAt: Date;
         roles: ({
             role: {
+                updatedAt: Date;
+                name: string;
                 id: string;
                 createdAt: Date;
-                name: string;
-                updatedAt: Date;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -37,8 +37,8 @@ export declare class UsersService {
         })[];
         permissions: ({
             permission: {
-                id: string;
                 name: string;
+                id: string;
                 code: string;
                 group: string | null;
             };
@@ -49,9 +49,10 @@ export declare class UsersService {
     }>;
     create(dto: CreateUserDto): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
+        updatedAt: Date;
+        name: string | null;
         id: string;
         createdAt: Date;
-        name: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
         email: string;
         avatarUrl: string | null;
@@ -59,13 +60,12 @@ export declare class UsersService {
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
-        updatedAt: Date;
         roles: ({
             role: {
+                updatedAt: Date;
+                name: string;
                 id: string;
                 createdAt: Date;
-                name: string;
-                updatedAt: Date;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -75,8 +75,8 @@ export declare class UsersService {
         })[];
         permissions: ({
             permission: {
-                id: string;
                 name: string;
+                id: string;
                 code: string;
                 group: string | null;
             };
@@ -90,9 +90,10 @@ export declare class UsersService {
         role: RoleType;
     }): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
+        updatedAt: Date;
+        name: string | null;
         id: string;
         createdAt: Date;
-        name: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
         email: string;
         avatarUrl: string | null;
@@ -100,13 +101,12 @@ export declare class UsersService {
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
-        updatedAt: Date;
         roles: ({
             role: {
+                updatedAt: Date;
+                name: string;
                 id: string;
                 createdAt: Date;
-                name: string;
-                updatedAt: Date;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -116,8 +116,8 @@ export declare class UsersService {
         })[];
         permissions: ({
             permission: {
-                id: string;
                 name: string;
+                id: string;
                 code: string;
                 group: string | null;
             };
@@ -131,9 +131,10 @@ export declare class UsersService {
         role: RoleType;
     }): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
+        updatedAt: Date;
+        name: string | null;
         id: string;
         createdAt: Date;
-        name: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
         email: string;
         avatarUrl: string | null;
@@ -141,13 +142,12 @@ export declare class UsersService {
         lastLogin: Date | null;
         userType: string | null;
         storageQuotaMb: number;
-        updatedAt: Date;
         roles: ({
             role: {
+                updatedAt: Date;
+                name: string;
                 id: string;
                 createdAt: Date;
-                name: string;
-                updatedAt: Date;
                 description: string | null;
                 isSystem: boolean;
             };
@@ -157,8 +157,8 @@ export declare class UsersService {
         })[];
         permissions: ({
             permission: {
-                id: string;
                 name: string;
+                id: string;
                 code: string;
                 group: string | null;
             };

@@ -5,6 +5,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
+import { DispatchPolicyModule } from './dispatch-policy/dispatch-policy.module';
 import { CacheModule } from './cache/cache.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthActivitiesModule } from './auth-activities/auth-activities.module';
@@ -43,6 +44,7 @@ import { PartnersModule } from './partners/partners.module';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     ScheduleModule.forRoot(),
     PrismaModule,
+    DispatchPolicyModule,
     StorageModule,
     CacheModule,
     AuditModule,
