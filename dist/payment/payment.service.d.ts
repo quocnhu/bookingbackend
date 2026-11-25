@@ -4,13 +4,17 @@ import { AuditService } from "../audit/audit.service";
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 import { QueryBookingPaymentsDto } from './dto/payment.dto';
 import { MailService } from "../mail/mail.service";
+import { AssignmentQueue } from "../queues/assignment.queue";
+import { DispatchPolicyService } from "../dispatch-policy/dispatch-policy.service";
 export declare class PaymentService {
     private readonly prisma;
     private readonly audit;
     private readonly mail;
+    private readonly assignmentQueue;
+    private readonly dispatchPolicy;
     private readonly logger;
     private tokenCache;
-    constructor(prisma: PrismaService, audit: AuditService, mail: MailService);
+    constructor(prisma: PrismaService, audit: AuditService, mail: MailService, assignmentQueue: AssignmentQueue, dispatchPolicy: DispatchPolicyService);
     private get mode();
     private get baseUrl();
     private get clientId();
@@ -73,6 +77,7 @@ export declare class PaymentService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -101,6 +106,7 @@ export declare class PaymentService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -128,6 +134,7 @@ export declare class PaymentService {
     private assertConfigured;
     private accessToken;
     private request;
+    private getPayPalOrder;
     private bookingForCustomer;
     private providerAmount;
     createPayPalOrder(bookingId: string, actor: AuthenticatedUser): Promise<{
@@ -161,6 +168,12 @@ export declare class PaymentService {
         orderId: string;
         captureId: string | null;
         alreadyCaptured?: undefined;
+    }>;
+    reconcileUnpaidBooking(bookingId: string): Promise<{
+        paid: boolean;
+        safeToCancel: boolean;
+        pendingApproval: boolean;
+        checkedOrders: number;
     }>;
     recordOtaRemittance(bookingId: string, dto: {
         netAmount: number;

@@ -7,6 +7,10 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { renderBookingConfirmation } from './booking-confirmation.template';
+import {
+  DispatchReadinessRow,
+  renderDispatchReadiness,
+} from './dispatch-readiness.template';
 import { renderPickupReminder } from './pickup-reminder.template';
 import { renderTransportAlert } from './transport-alert.template';
 
@@ -360,6 +364,69 @@ export class MailService {
     } catch (error) {
       this.logger.error(
         `Transport alert pipeline failed: ${(error as Error).message}`,
+      );
+      return { sent: 0, reason: 'FAILED' };
+    }
+  }
+
+  /**
+   * One consolidated readiness table for Admin/Office. Delivered through the
+   * same dedicated template mailbox; failures are logged, never thrown.
+   */
+  async sendDispatchReadiness(input: {
+    to: string[];
+    dateKey: string;
+    dateLabel: string;
+    rows: DispatchReadinessRow[];
+    actionUrl?: string | null;
+  }): Promise<{ sent: number; reason?: string }> {
+    if (!this.isEnabled()) return { sent: 0, reason: 'DISABLED' };
+    if (!this.isConfigured()) {
+      this.logger.warn(
+        'Dispatch readiness mail is enabled but TEMPLATE_MAIL_HOST/FROM are not configured',
+      );
+      return { sent: 0, reason: 'NOT_CONFIGURED' };
+    }
+    const recipients = [
+      ...new Set(
+        (input.to ?? [])
+          .map((value) => (value ?? '').trim())
+          .filter((value) => EMAIL_RE.test(value)),
+      ),
+    ];
+    if (recipients.length === 0) return { sent: 0, reason: 'NO_RECIPIENT' };
+
+    try {
+      const company = await this.company();
+      const rendered = renderDispatchReadiness({
+        dateKey: input.dateKey,
+        dateLabel: input.dateLabel,
+        rows: input.rows,
+        actionLabel: 'Open dispatch board',
+        actionUrl: input.actionUrl,
+        company,
+      });
+      let sent = 0;
+      for (const to of recipients) {
+        try {
+          await this.deliver({
+            to,
+            subject: rendered.subject,
+            text: rendered.text,
+            html: rendered.html,
+            bookingRef: `DISPATCH-${input.dateKey}`,
+          });
+          sent++;
+        } catch (error) {
+          this.logger.error(
+            `Failed to send dispatch readiness mail to ${to}: ${(error as Error).message}`,
+          );
+        }
+      }
+      return { sent };
+    } catch (error) {
+      this.logger.error(
+        `Dispatch readiness mail pipeline failed: ${(error as Error).message}`,
       );
       return { sent: 0, reason: 'FAILED' };
     }

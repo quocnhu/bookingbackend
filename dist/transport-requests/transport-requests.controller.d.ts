@@ -36,8 +36,12 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: import("@prisma/client/runtime/library").JsonArray | {
             bookingRef: any;
@@ -132,6 +136,24 @@ export declare class TransportRequestsController {
         recommendedDriverId: string | null;
         recommendedVehicleId: string | null;
     }>;
+    prepare(date?: string, actor?: AuthenticatedUser): Promise<{
+        date: string;
+        buses: number;
+        crewAssigned: number;
+        guideRequestsSent: number;
+        companyGuidesAutoConfirmed: number;
+        providersReserved: number;
+        providerRequestsSent: number;
+        autoAssigned: number;
+        providerUnavailable: number;
+        freelanceAwaiting: number;
+        missing: {
+            assignmentId: string;
+            code: string | null;
+            tourName: string | null;
+            issues: string[];
+        }[];
+    }>;
     send(id: string, dto: SendTransportRequestDto, actor: AuthenticatedUser): Promise<{
         id: string;
         code: string | null;
@@ -164,8 +186,12 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: import("@prisma/client/runtime/library").JsonArray | {
             bookingRef: any;
@@ -217,8 +243,12 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: import("@prisma/client/runtime/library").JsonArray | {
             bookingRef: any;
@@ -270,8 +300,12 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: import("@prisma/client/runtime/library").JsonArray | {
             bookingRef: any;
@@ -323,8 +357,12 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: import("@prisma/client/runtime/library").JsonArray | {
             bookingRef: any;
@@ -376,8 +414,12 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: import("@prisma/client/runtime/library").JsonArray | {
             bookingRef: any;
@@ -429,8 +471,12 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: import("@prisma/client/runtime/library").JsonArray | {
             bookingRef: any;
@@ -482,8 +528,12 @@ export declare class TransportRequestsController {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: import("@prisma/client/runtime/library").JsonArray | {
             bookingRef: any;

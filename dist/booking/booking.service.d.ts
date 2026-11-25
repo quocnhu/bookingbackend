@@ -44,10 +44,40 @@ export declare class BookingService {
     previewBookingRef(tourType?: TourType): Promise<string>;
     private randomBookingRef;
     findAll(query: QueryBookingDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
-    collectBookingPayment(id: string, dto: CollectBookingPaymentDto, actor: AuthenticatedUser): Promise<{
+    findMine(actor: AuthenticatedUser): Promise<{
+        unpaid: boolean;
+        autoCancelAt: string | null;
+        canRetryPayment: boolean;
+        tour: {
+            name: string;
+            type: import("@prisma/client").$Enums.TourType;
+            id: string;
+            durationDays: number | null;
+            thumbnailUrl: string | null;
+            slug: string | null;
+        } | null;
+        assignment: {
+            id: string;
+            code: string | null;
+            status: import("@prisma/client").$Enums.AssignmentStatus;
+        } | null;
+        payments: {
+            id: string;
+            createdAt: Date;
+            status: import("@prisma/client").$Enums.PaymentRecordStatus;
+            currency: string;
+            note: string | null;
+            amount: Prisma.Decimal;
+            providerOrderId: string | null;
+            providerCaptureId: string | null;
+            providerAmount: Prisma.Decimal | null;
+            providerCurrency: string | null;
+            paidAt: Date | null;
+        }[];
         updatedAt: Date;
         id: string;
         createdAt: Date;
+        hotelId: string | null;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -76,6 +106,61 @@ export declare class BookingService {
         extra: Prisma.JsonValue | null;
         departureTime: string | null;
         rawDataId: string | null;
+        hotelCommissionPercent: Prisma.Decimal | null;
+        customerUserId: string | null;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+        payLater: boolean;
+        paymentDueAt: Date | null;
+        paymentNote: string | null;
+        totalAmount: Prisma.Decimal | null;
+        paymentCollectedAt: Date | null;
+        paymentCollectedById: string | null;
+        paymentCollectedByName: string | null;
+        paymentConfirmedAt: Date | null;
+        paymentConfirmedById: string | null;
+        paymentConfirmedByName: string | null;
+        confirmationEmailSentAt: Date | null;
+        pickupReminderSentAt: Date | null;
+        lateBooking: boolean;
+        paxSequence: number;
+        parentBookingId: string | null;
+        movedFromBusId: string | null;
+        emailDate: Date | null;
+    }[]>;
+    collectBookingPayment(id: string, dto: CollectBookingPaymentDto, actor: AuthenticatedUser): Promise<{
+        updatedAt: Date;
+        id: string;
+        createdAt: Date;
+        hotelId: string | null;
+        tourName: string | null;
+        tourType: import("@prisma/client").$Enums.TourType | null;
+        totalPax: number;
+        latitude: number | null;
+        longitude: number | null;
+        status: import("@prisma/client").$Enums.BookingStatus;
+        createdWho: string | null;
+        assignmentId: string | null;
+        notes: string | null;
+        currency: string;
+        tourId: string | null;
+        bookingRef: string;
+        confirmationCode: string | null;
+        source: string | null;
+        channel: import("@prisma/client").$Enums.BookingProvider;
+        address: string | null;
+        startingDate: Date | null;
+        customerName: string | null;
+        hotelName: string;
+        phone: string;
+        mail: string | null;
+        paxDetail: string | null;
+        payment: import("@prisma/client").$Enums.PaymentStatus | null;
+        isNoShow: boolean;
+        noShowReason: string | null;
+        extra: Prisma.JsonValue | null;
+        departureTime: string | null;
+        rawDataId: string | null;
+        hotelCommissionPercent: Prisma.Decimal | null;
         customerUserId: string | null;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         payLater: boolean;
@@ -100,6 +185,7 @@ export declare class BookingService {
         updatedAt: Date;
         id: string;
         createdAt: Date;
+        hotelId: string | null;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -128,6 +214,7 @@ export declare class BookingService {
         extra: Prisma.JsonValue | null;
         departureTime: string | null;
         rawDataId: string | null;
+        hotelCommissionPercent: Prisma.Decimal | null;
         customerUserId: string | null;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         payLater: boolean;
@@ -244,6 +331,7 @@ export declare class BookingService {
         updatedAt: Date;
         id: string;
         createdAt: Date;
+        hotelId: string | null;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -272,6 +360,7 @@ export declare class BookingService {
         extra: Prisma.JsonValue | null;
         departureTime: string | null;
         rawDataId: string | null;
+        hotelCommissionPercent: Prisma.Decimal | null;
         customerUserId: string | null;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         payLater: boolean;
@@ -315,6 +404,7 @@ export declare class BookingService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -343,6 +433,7 @@ export declare class BookingService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -385,6 +476,7 @@ export declare class BookingService {
         updatedAt: Date;
         id: string;
         createdAt: Date;
+        hotelId: string | null;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -413,6 +505,7 @@ export declare class BookingService {
         extra: Prisma.JsonValue | null;
         departureTime: string | null;
         rawDataId: string | null;
+        hotelCommissionPercent: Prisma.Decimal | null;
         customerUserId: string | null;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         payLater: boolean;
@@ -533,6 +626,7 @@ export declare class BookingService {
         updatedAt: Date;
         id: string;
         createdAt: Date;
+        hotelId: string | null;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -561,6 +655,7 @@ export declare class BookingService {
         extra: Prisma.JsonValue | null;
         departureTime: string | null;
         rawDataId: string | null;
+        hotelCommissionPercent: Prisma.Decimal | null;
         customerUserId: string | null;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         payLater: boolean;
@@ -585,6 +680,7 @@ export declare class BookingService {
         updatedAt: Date;
         id: string;
         createdAt: Date;
+        hotelId: string | null;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -613,6 +709,7 @@ export declare class BookingService {
         extra: Prisma.JsonValue | null;
         departureTime: string | null;
         rawDataId: string | null;
+        hotelCommissionPercent: Prisma.Decimal | null;
         customerUserId: string | null;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         payLater: boolean;
@@ -633,6 +730,8 @@ export declare class BookingService {
         movedFromBusId: string | null;
         emailDate: Date | null;
     }>;
+    private resolveHotelForBooking;
+    private linkHotelIfMissing;
     private assertCancelAllowed;
     getCancellationWindowHours(): Promise<number>;
     updateCancellationWindow(hours: number, actorId?: string | null): Promise<{
@@ -643,6 +742,7 @@ export declare class BookingService {
         updatedAt: Date;
         id: string;
         createdAt: Date;
+        hotelId: string | null;
         tourName: string | null;
         tourType: import("@prisma/client").$Enums.TourType | null;
         totalPax: number;
@@ -671,6 +771,7 @@ export declare class BookingService {
         extra: Prisma.JsonValue | null;
         departureTime: string | null;
         rawDataId: string | null;
+        hotelCommissionPercent: Prisma.Decimal | null;
         customerUserId: string | null;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         payLater: boolean;

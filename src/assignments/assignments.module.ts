@@ -5,6 +5,7 @@ import { AutoDispatchCron } from './auto-dispatch.cron';
 import { TourReminderCron } from './tour-reminder.cron';
 import { PickupReminderCron } from './pickup-reminder.cron';
 import { WaitingListCron } from './waiting-list.cron';
+import { DispatchReadinessCron } from './dispatch-readiness.cron';
 import { AuditModule } from '@/audit/audit.module';
 import { LeavesModule } from '@/leaves/leaves.module';
 import { AccountingModule } from '@/accounting/accounting.module';
@@ -26,6 +27,7 @@ import { MailModule } from '@/mail/mail.module';
     TourReminderCron,
     PickupReminderCron,
     WaitingListCron,
+    DispatchReadinessCron,
   ],
   exports: [AssignmentsService],
 })

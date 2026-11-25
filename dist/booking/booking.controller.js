@@ -55,6 +55,9 @@ let BookingController = class BookingController {
             .getCancellationWindowHours()
             .then((hours) => ({ hours }));
     }
+    findMine(actor) {
+        return this.bookingService.findMine(actor);
+    }
     updateCancellationWindow(dto, actor) {
         return this.bookingService.updateCancellationWindow(dto.hours, actor.id);
     }
@@ -142,6 +145,13 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "getCancellationWindow", null);
+__decorate([
+    (0, common_1.Get)('mine'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "findMine", null);
 __decorate([
     (0, common_1.Put)('cancellation-window'),
     (0, permissions_decorator_1.Permissions)('booking.update'),

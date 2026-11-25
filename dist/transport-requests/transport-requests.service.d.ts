@@ -6,6 +6,8 @@ import { NotificationService } from "../notifications/notification.service";
 import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { AutoCrewService } from "../queues/auto-crew.service";
 import { MailService } from "../mail/mail.service";
+import { DispatchPolicyService } from "../dispatch-policy/dispatch-policy.service";
+import { GuideConfirmationService } from "../guide-confirmation/guide-confirmation.service";
 import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 import { AssignTransportRequestDto, CancelTransportRequestDto, DeclineTransportRequestDto, OverrideTransportRequestDto, QueryTransportRequestDto, SendTransportRequestDto, UpdateProviderAssignmentModeDto, UpdateTransportRequestSettingsDto } from './dto/transport-request.dto';
 declare const DEFAULT_SETTINGS: {
@@ -24,9 +26,11 @@ export declare class TransportRequestsService {
     private readonly gateway;
     private readonly autoCrew;
     private readonly mail;
+    private readonly dispatchPolicy;
+    private readonly guideConfirmation;
     private readonly logger;
     private runningScheduledTick;
-    constructor(prisma: PrismaService, audit: AuditService, leaves: LeavesService, notificationService: NotificationService, gateway: NotificationsGateway, autoCrew: AutoCrewService, mail: MailService);
+    constructor(prisma: PrismaService, audit: AuditService, leaves: LeavesService, notificationService: NotificationService, gateway: NotificationsGateway, autoCrew: AutoCrewService, mail: MailService, dispatchPolicy: DispatchPolicyService, guideConfirmation: GuideConfirmationService);
     private include;
     list(query: QueryTransportRequestDto, actor: AuthenticatedUser): Promise<{
         id: string;
@@ -60,8 +64,12 @@ export declare class TransportRequestsService {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: Prisma.JsonArray | {
             bookingRef: any;
@@ -146,8 +154,12 @@ export declare class TransportRequestsService {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: Prisma.JsonArray | {
             bookingRef: any;
@@ -199,8 +211,12 @@ export declare class TransportRequestsService {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: Prisma.JsonArray | {
             bookingRef: any;
@@ -252,8 +268,12 @@ export declare class TransportRequestsService {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: Prisma.JsonArray | {
             bookingRef: any;
@@ -305,8 +325,12 @@ export declare class TransportRequestsService {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: Prisma.JsonArray | {
             bookingRef: any;
@@ -358,8 +382,12 @@ export declare class TransportRequestsService {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: Prisma.JsonArray | {
             bookingRef: any;
@@ -411,8 +439,12 @@ export declare class TransportRequestsService {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: Prisma.JsonArray | {
             bookingRef: any;
@@ -464,8 +496,12 @@ export declare class TransportRequestsService {
             brand: string | null;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
+            email: string;
         } | null;
         pickups: Prisma.JsonArray | {
             bookingRef: any;
@@ -530,6 +566,26 @@ export declare class TransportRequestsService {
         autoAssigned: number;
         warned: number;
     }>;
+    prepareTomorrow(dateInput?: string, actor?: AuthenticatedUser): Promise<{
+        date: string;
+        buses: number;
+        crewAssigned: number;
+        guideRequestsSent: number;
+        companyGuidesAutoConfirmed: number;
+        providersReserved: number;
+        providerRequestsSent: number;
+        autoAssigned: number;
+        providerUnavailable: number;
+        freelanceAwaiting: number;
+        missing: Array<{
+            assignmentId: string;
+            code: string | null;
+            tourName: string | null;
+            issues: string[];
+        }>;
+    }>;
+    private prepareRange;
+    private reloadAssignment;
     private pickExternalProvider;
     private warnProviderBeforeDeadline;
     private warnNoProvider;
@@ -550,6 +606,7 @@ export declare class TransportRequestsService {
     private assertProviderAccess;
     private resolveProviderId;
     private toView;
+    private sendProviderEmail;
     private notifyProvider;
     private notifyAdmins;
     private busyDriverIds;

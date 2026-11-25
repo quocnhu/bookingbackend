@@ -44,6 +44,9 @@ let TransportRequestsController = class TransportRequestsController {
     getCandidates(assignmentId, actor) {
         return this.service.getCandidates(assignmentId, actor);
     }
+    prepare(date, actor) {
+        return this.service.prepareTomorrow(date, actor);
+    }
     send(id, dto, actor) {
         return this.service.send(id, dto, actor);
     }
@@ -128,6 +131,15 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], TransportRequestsController.prototype, "getCandidates", null);
+__decorate([
+    (0, common_1.Post)('prepare'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Body)('date')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], TransportRequestsController.prototype, "prepare", null);
 __decorate([
     (0, common_1.Post)(':id/send'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),

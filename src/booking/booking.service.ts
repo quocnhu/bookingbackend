@@ -50,6 +50,10 @@ import {
   cancelDeadline,
 } from '@/common/constants/cancellation';
 import {
+  isUnpaidPayPalBooking,
+  unpaidCancelAt,
+} from '@/common/utils/unpaid-booking.util';
+import {
   buildEmailUpdateData,
   EmailFields,
   hasBookingChanges,
@@ -266,6 +270,7 @@ export class BookingService {
           `Applied amendment to booking ${bookingRef} (${data.source})`,
         );
       }
+      await this.linkHotelIfMissing(booking.id);
 
       // An amendment can move the passenger to another day — the trip it sits
       // on must follow, otherwise the bus keeps the old date.
@@ -310,6 +315,7 @@ export class BookingService {
         createdWho: _createdWho,
       },
     });
+    await this.linkHotelIfMissing(booking.id);
     await this.auditService.log({
       entityType: 'Booking',
       entityId: booking.id,
@@ -375,6 +381,9 @@ export class BookingService {
       return;
     }
     if (!booking.assignmentId && booking.startingDate) {
+      // An unpaid online booking must not occupy a bus or crew. The PayPal
+      // capture path re-enqueues the assignment once the money is confirmed.
+      if (isUnpaidPayPalBooking(booking)) return;
       if (!booking.lateBooking) {
         const seal = await this.dispatchPolicy.getSealInfo(
           booking.startingDate,
@@ -534,9 +543,24 @@ export class BookingService {
     query: QueryBookingDto,
     actor: AuthenticatedUser,
   ): Promise<PaginatedResult<any>> {
-    const { page, limit, status, channel, payment, tourId, assignmentId } =
-      query;
+    const {
+      page,
+      limit,
+      status,
+      channel,
+      payment,
+      unpaid,
+      tourId,
+      assignmentId,
+    } = query;
     const where: any = {};
+    if (unpaid) {
+      where.channel = BookingProvider.WEBSITE;
+      where.payment = PaymentStatus.PENDING;
+      where.paymentMethod = PaymentMethod.PAYPAL;
+      where.payLater = false;
+      where.status = { not: BookingStatus.CANCELED };
+    }
     if (status) where.status = status;
     if (channel) where.channel = channel;
     if (payment) where.payment = payment;
@@ -572,6 +596,72 @@ export class BookingService {
       this.prisma.booking.count({ where }),
     ]);
     return { items, total, page, limit };
+  }
+
+  /**
+   * The signed-in customer's own bookings. Used by the public "My bookings"
+   * page so a customer can finish an unpaid PayPal booking inside the grace
+   * window instead of creating a duplicate.
+   */
+  async findMine(actor: AuthenticatedUser) {
+    if (!actor?.id) throw new ForbiddenException('Please sign in');
+    const mode = await this.dispatchPolicy.getMode();
+    const bookings = await this.prisma.booking.findMany({
+      where: { customerUserId: actor.id, parentBookingId: null },
+      include: {
+        tour: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            type: true,
+            durationDays: true,
+            thumbnailUrl: true,
+          },
+        },
+        assignment: { select: { id: true, code: true, status: true } },
+        payments: {
+          where: { provider: 'PAYPAL' },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            status: true,
+            providerOrderId: true,
+            providerCaptureId: true,
+            amount: true,
+            currency: true,
+            providerAmount: true,
+            providerCurrency: true,
+            createdAt: true,
+            paidAt: true,
+            note: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return bookings.map((booking) => {
+      const unpaid = isUnpaidPayPalBooking(booking);
+      const cutoffAt = booking.startingDate
+        ? this.dispatchPolicy.cutoffFor(
+            booking.startingDate,
+            mode.cutoffTime,
+          )
+        : null;
+      const autoCancelAt = unpaid
+        ? unpaidCancelAt(booking.createdAt, cutoffAt)
+        : null;
+      return {
+        ...booking,
+        unpaid,
+        autoCancelAt: autoCancelAt?.toISOString() ?? null,
+        canRetryPayment: unpaid
+          ? Date.now() < (autoCancelAt?.getTime() ?? 0)
+          : false,
+      };
+    });
   }
 
   /**
@@ -999,6 +1089,10 @@ export class BookingService {
     const seal = dto.startingDate
       ? await this.dispatchPolicy.getSealInfo(dto.startingDate)
       : null;
+    const hotel = await this.resolveHotelForBooking(
+      (dto as any).hotelId,
+      dto.hotelName,
+    );
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -1006,6 +1100,8 @@ export class BookingService {
           ...dto,
           bookingRef,
           lateBooking: !!(seal?.sealed || (dto as any).lateBooking),
+          hotelId: hotel?.id ?? null,
+          hotelCommissionPercent: hotel?.commissionPercent ?? null,
         };
         if (dto.startingDate) data.startingDate = new Date(dto.startingDate);
         if (!data.payment) {
@@ -1426,6 +1522,19 @@ export class BookingService {
 
     const data: any = { ...dtoFields };
 
+    if (dto.hotelId !== undefined) {
+      const hotel = await this.resolveHotelForBooking(
+        dto.hotelId,
+        dto.hotelName ?? before.hotelName,
+      );
+      data.hotelId = hotel?.id ?? null;
+      data.hotelCommissionPercent = hotel?.commissionPercent ?? null;
+    } else if (dto.hotelName !== undefined) {
+      const hotel = await this.resolveHotelForBooking(null, dto.hotelName);
+      data.hotelId = hotel?.id ?? null;
+      data.hotelCommissionPercent = hotel?.commissionPercent ?? null;
+    }
+
     if (dto.startingDate) data.startingDate = new Date(dto.startingDate);
     // Never persist orphan ASSIGNED: a hand-flipped ASSIGNED without a bus
     // used to hide the row from both tables. Coerce to PENDING and let the
@@ -1445,6 +1554,56 @@ export class BookingService {
     });
     await this.postWrite(booking);
     return booking;
+  }
+
+  /** Find the Hotel record for a booking — explicit id first, then name match. */
+  private async resolveHotelForBooking(
+    hotelId?: string | null,
+    hotelName?: string | null,
+  ) {
+    const id = (hotelId ?? '').trim();
+    if (id) {
+      const hotel = await this.prisma.hotel.findFirst({
+        where: { id, isActive: true },
+      });
+      if (!hotel) {
+        throw new BadRequestException('Hotel not found or inactive');
+      }
+      return hotel;
+    }
+    const name = (hotelName ?? '').trim();
+    if (!name) return null;
+    return this.prisma.hotel.findFirst({
+      where: {
+        name: { equals: name, mode: 'insensitive' },
+        isActive: true,
+      },
+    });
+  }
+
+  /** Email/manual upsert path: link the hotel by name when no id was sent. */
+  private async linkHotelIfMissing(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { id: true, hotelId: true, hotelName: true },
+    });
+    if (!booking || booking.hotelId) return;
+    const name = booking.hotelName?.trim();
+    if (!name) return;
+    const hotel = await this.prisma.hotel.findFirst({
+      where: {
+        name: { equals: name, mode: 'insensitive' },
+        isActive: true,
+      },
+    });
+    if (!hotel) return;
+    await this.prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        hotelId: hotel.id,
+        hotelCommissionPercent: hotel.commissionPercent,
+      },
+    });
   }
 
   /**

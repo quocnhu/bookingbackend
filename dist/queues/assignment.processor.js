@@ -21,6 +21,7 @@ const auto_crew_service_1 = require("./auto-crew.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
 const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
 const queue_constants_1 = require("./queue.constants");
+const unpaid_booking_util_1 = require("../common/utils/unpaid-booking.util");
 const BUS_MAX_PAX = 12;
 function toDateKey(d) {
     return d.toISOString().split('T')[0];
@@ -55,6 +56,8 @@ let AssignmentProcessor = AssignmentProcessor_1 = class AssignmentProcessor exte
             return { skipped: true, reason: 'BOOKING_NOT_FOUND' };
         if (booking.status === client_1.BookingStatus.CANCELED)
             return { skipped: true, reason: 'CANCELED' };
+        if ((0, unpaid_booking_util_1.isUnpaidPayPalBooking)(booking))
+            return { skipped: true, reason: 'PAYMENT_PENDING' };
         if (booking.assignmentId)
             return {
                 skipped: true,

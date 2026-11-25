@@ -22,6 +22,7 @@ const assignment_queue_1 = require("../queues/assignment.queue");
 const mail_service_1 = require("../mail/mail.service");
 const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
 const cancellation_1 = require("../common/constants/cancellation");
+const unpaid_booking_util_1 = require("../common/utils/unpaid-booking.util");
 const email_merge_util_1 = require("./email-merge.util");
 const raw_data_entity_1 = require("../raw-data/raw-data.entity");
 const TOUR_MATCH_MIN_SCORE = 0.5;
@@ -157,6 +158,7 @@ let BookingService = class BookingService {
             if (isAmendment) {
                 this.logger.log(`Applied amendment to booking ${bookingRef} (${data.source})`);
             }
+            await this.linkHotelIfMissing(booking.id);
             if (booking.assignmentId &&
                 this.dateChanged(existing.startingDate, booking.startingDate)) {
                 await this.board.syncDatesFromBookings(booking.assignmentId);
@@ -185,6 +187,7 @@ let BookingService = class BookingService {
                 createdWho: _createdWho,
             },
         });
+        await this.linkHotelIfMissing(booking.id);
         await this.auditService.log({
             entityType: 'Booking',
             entityId: booking.id,
@@ -219,6 +222,8 @@ let BookingService = class BookingService {
             return;
         }
         if (!booking.assignmentId && booking.startingDate) {
+            if ((0, unpaid_booking_util_1.isUnpaidPayPalBooking)(booking))
+                return;
             if (!booking.lateBooking) {
                 const seal = await this.dispatchPolicy.getSealInfo(booking.startingDate);
                 if (seal.sealed) {
@@ -323,8 +328,15 @@ let BookingService = class BookingService {
         return `${prefixCode}-${(0, node_crypto_1.randomUUID)()}`;
     }
     async findAll(query, actor) {
-        const { page, limit, status, channel, payment, tourId, assignmentId } = query;
+        const { page, limit, status, channel, payment, unpaid, tourId, assignmentId, } = query;
         const where = {};
+        if (unpaid) {
+            where.channel = client_1.BookingProvider.WEBSITE;
+            where.payment = client_1.PaymentStatus.PENDING;
+            where.paymentMethod = client_1.PaymentMethod.PAYPAL;
+            where.payLater = false;
+            where.status = { not: client_1.BookingStatus.CANCELED };
+        }
         if (status)
             where.status = status;
         if (channel)
@@ -364,6 +376,64 @@ let BookingService = class BookingService {
             this.prisma.booking.count({ where }),
         ]);
         return { items, total, page, limit };
+    }
+    async findMine(actor) {
+        if (!actor?.id)
+            throw new common_1.ForbiddenException('Please sign in');
+        const mode = await this.dispatchPolicy.getMode();
+        const bookings = await this.prisma.booking.findMany({
+            where: { customerUserId: actor.id, parentBookingId: null },
+            include: {
+                tour: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        type: true,
+                        durationDays: true,
+                        thumbnailUrl: true,
+                    },
+                },
+                assignment: { select: { id: true, code: true, status: true } },
+                payments: {
+                    where: { provider: 'PAYPAL' },
+                    orderBy: { createdAt: 'desc' },
+                    take: 5,
+                    select: {
+                        id: true,
+                        status: true,
+                        providerOrderId: true,
+                        providerCaptureId: true,
+                        amount: true,
+                        currency: true,
+                        providerAmount: true,
+                        providerCurrency: true,
+                        createdAt: true,
+                        paidAt: true,
+                        note: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
+        return bookings.map((booking) => {
+            const unpaid = (0, unpaid_booking_util_1.isUnpaidPayPalBooking)(booking);
+            const cutoffAt = booking.startingDate
+                ? this.dispatchPolicy.cutoffFor(booking.startingDate, mode.cutoffTime)
+                : null;
+            const autoCancelAt = unpaid
+                ? (0, unpaid_booking_util_1.unpaidCancelAt)(booking.createdAt, cutoffAt)
+                : null;
+            return {
+                ...booking,
+                unpaid,
+                autoCancelAt: autoCancelAt?.toISOString() ?? null,
+                canRetryPayment: unpaid
+                    ? Date.now() < (autoCancelAt?.getTime() ?? 0)
+                    : false,
+            };
+        });
     }
     async collectBookingPayment(id, dto, actor) {
         const booking = await this.prisma.booking.findUnique({
@@ -691,12 +761,15 @@ let BookingService = class BookingService {
         const seal = dto.startingDate
             ? await this.dispatchPolicy.getSealInfo(dto.startingDate)
             : null;
+        const hotel = await this.resolveHotelForBooking(dto.hotelId, dto.hotelName);
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
                 const data = {
                     ...dto,
                     bookingRef,
                     lateBooking: !!(seal?.sealed || dto.lateBooking),
+                    hotelId: hotel?.id ?? null,
+                    hotelCommissionPercent: hotel?.commissionPercent ?? null,
                 };
                 if (dto.startingDate)
                     data.startingDate = new Date(dto.startingDate);
@@ -1020,6 +1093,16 @@ let BookingService = class BookingService {
             await this.assertCancelAllowed(before, overrideCancelWindow, actor);
         }
         const data = { ...dtoFields };
+        if (dto.hotelId !== undefined) {
+            const hotel = await this.resolveHotelForBooking(dto.hotelId, dto.hotelName ?? before.hotelName);
+            data.hotelId = hotel?.id ?? null;
+            data.hotelCommissionPercent = hotel?.commissionPercent ?? null;
+        }
+        else if (dto.hotelName !== undefined) {
+            const hotel = await this.resolveHotelForBooking(null, dto.hotelName);
+            data.hotelId = hotel?.id ?? null;
+            data.hotelCommissionPercent = hotel?.commissionPercent ?? null;
+        }
         if (dto.startingDate)
             data.startingDate = new Date(dto.startingDate);
         if (data.status === client_1.BookingStatus.ASSIGNED && !before.assignmentId) {
@@ -1035,6 +1118,53 @@ let BookingService = class BookingService {
         });
         await this.postWrite(booking);
         return booking;
+    }
+    async resolveHotelForBooking(hotelId, hotelName) {
+        const id = (hotelId ?? '').trim();
+        if (id) {
+            const hotel = await this.prisma.hotel.findFirst({
+                where: { id, isActive: true },
+            });
+            if (!hotel) {
+                throw new common_1.BadRequestException('Hotel not found or inactive');
+            }
+            return hotel;
+        }
+        const name = (hotelName ?? '').trim();
+        if (!name)
+            return null;
+        return this.prisma.hotel.findFirst({
+            where: {
+                name: { equals: name, mode: 'insensitive' },
+                isActive: true,
+            },
+        });
+    }
+    async linkHotelIfMissing(bookingId) {
+        const booking = await this.prisma.booking.findUnique({
+            where: { id: bookingId },
+            select: { id: true, hotelId: true, hotelName: true },
+        });
+        if (!booking || booking.hotelId)
+            return;
+        const name = booking.hotelName?.trim();
+        if (!name)
+            return;
+        const hotel = await this.prisma.hotel.findFirst({
+            where: {
+                name: { equals: name, mode: 'insensitive' },
+                isActive: true,
+            },
+        });
+        if (!hotel)
+            return;
+        await this.prisma.booking.update({
+            where: { id: booking.id },
+            data: {
+                hotelId: hotel.id,
+                hotelCommissionPercent: hotel.commissionPercent,
+            },
+        });
     }
     async assertCancelAllowed(booking, override, actor) {
         const hours = await this.getCancellationWindowHours();

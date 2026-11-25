@@ -20,6 +20,7 @@ const assignments_service_1 = require("./assignments.service");
 const auto_dispatch_cron_1 = require("./auto-dispatch.cron");
 const pickup_reminder_cron_1 = require("./pickup-reminder.cron");
 const accounting_service_1 = require("../accounting/accounting.service");
+const guide_confirmation_service_1 = require("../guide-confirmation/guide-confirmation.service");
 const accounting_dto_1 = require("../accounting/dto/accounting.dto");
 const assignment_dto_1 = require("./dto/assignment.dto");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
@@ -31,11 +32,13 @@ let AssignmentsController = class AssignmentsController {
     autoDispatchCron;
     pickupReminderCron;
     accountingService;
-    constructor(assignmentsService, autoDispatchCron, pickupReminderCron, accountingService) {
+    guideConfirmation;
+    constructor(assignmentsService, autoDispatchCron, pickupReminderCron, accountingService, guideConfirmation) {
         this.assignmentsService = assignmentsService;
         this.autoDispatchCron = autoDispatchCron;
         this.pickupReminderCron = pickupReminderCron;
         this.accountingService = accountingService;
+        this.guideConfirmation = guideConfirmation;
     }
     findAll(query, actor) {
         return this.assignmentsService.findAll(query, actor);
@@ -49,14 +52,21 @@ let AssignmentsController = class AssignmentsController {
     setBoardOrigin(dto) {
         return this.assignmentsService.setBoardOrigin(dto.origin);
     }
-    dispatchAllBoard(date) {
-        if (!date)
-            return this.assignmentsService.dispatchAllBoard();
+    dispatchAllBoard(date, override, actor) {
+        if (!date) {
+            return this.assignmentsService.dispatchAllBoard(undefined, {
+                override,
+                actor,
+            });
+        }
         const parsed = new Date(date);
         if (Number.isNaN(parsed.getTime())) {
             throw new common_1.BadRequestException('Invalid dispatch date');
         }
-        return this.assignmentsService.dispatchAllBoard(parsed);
+        return this.assignmentsService.dispatchAllBoard(parsed, {
+            override,
+            actor,
+        });
     }
     getBoardSeal(date) {
         if (!date) {
@@ -73,6 +83,12 @@ let AssignmentsController = class AssignmentsController {
     }
     updateAutoDispatchSettings(dto, actor) {
         return this.autoDispatchCron.updateSettings(dto, actor.id);
+    }
+    getDispatchWindow() {
+        return this.assignmentsService.getDispatchOpenTime();
+    }
+    updateDispatchWindow(dto, actor) {
+        return this.assignmentsService.updateDispatchOpenTime(dto, actor.id);
     }
     getRecallCutoff() {
         return this.assignmentsService.getRecallCutoff();
@@ -94,6 +110,15 @@ let AssignmentsController = class AssignmentsController {
     }
     findMyAssignments(actor) {
         return this.assignmentsService.findMyAssignments(actor);
+    }
+    confirmGuideAssignment(id, actor) {
+        return this.guideConfirmation.confirm(id, actor);
+    }
+    declineGuideAssignment(id, reason, actor) {
+        return this.guideConfirmation.decline(id, actor, reason);
+    }
+    resendGuideConfirmation(id) {
+        return this.guideConfirmation.request(id, { reminder: true });
     }
     findMyCalendar(actor, year, month) {
         return this.assignmentsService.findMyCalendar(actor, year ? +year : undefined, month ? +month : undefined);
@@ -119,8 +144,8 @@ let AssignmentsController = class AssignmentsController {
     update(id, dto, actor) {
         return this.assignmentsService.update(id, dto, actor);
     }
-    updateStatus(id, dto) {
-        return this.assignmentsService.updateStatus(id, dto);
+    updateStatus(id, dto, actor) {
+        return this.assignmentsService.updateStatus(id, dto, actor);
     }
     reorderBookings(id, dto, actor) {
         return this.assignmentsService.reorderBookings(id, dto.bookingIds, actor);
@@ -199,8 +224,10 @@ __decorate([
     (0, common_1.Post)('board/dispatch-all'),
     (0, permissions_decorator_1.Permissions)('assignment.update'),
     __param(0, (0, common_1.Body)('date')),
+    __param(1, (0, common_1.Body)('override')),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Boolean, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "dispatchAllBoard", null);
 __decorate([
@@ -227,6 +254,22 @@ __decorate([
     __metadata("design:paramtypes", [assignment_dto_1.UpdateAutoDispatchDto, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "updateAutoDispatchSettings", null);
+__decorate([
+    (0, common_1.Get)('board/dispatch-window'),
+    (0, permissions_decorator_1.Permissions)('assignment.read'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "getDispatchWindow", null);
+__decorate([
+    (0, common_1.Put)('board/dispatch-window'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [assignment_dto_1.UpdateDispatchWindowDto, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "updateDispatchWindow", null);
 __decorate([
     (0, common_1.Get)('board/recall-cutoff'),
     (0, permissions_decorator_1.Permissions)('assignment.read'),
@@ -282,6 +325,31 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "findMyAssignments", null);
+__decorate([
+    (0, common_1.Post)(':id/guide-confirm'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "confirmGuideAssignment", null);
+__decorate([
+    (0, common_1.Post)(':id/guide-decline'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('reason')),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "declineGuideAssignment", null);
+__decorate([
+    (0, common_1.Post)(':id/guide-confirmation/resend'),
+    (0, permissions_decorator_1.Permissions)('assignment.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AssignmentsController.prototype, "resendGuideConfirmation", null);
 __decorate([
     (0, common_1.Get)('my-calendar'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
@@ -363,8 +431,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('assignment.update'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, assignment_dto_1.UpdateAssignmentStatusDto]),
+    __metadata("design:paramtypes", [String, assignment_dto_1.UpdateAssignmentStatusDto, Object]),
     __metadata("design:returntype", void 0)
 ], AssignmentsController.prototype, "updateStatus", null);
 __decorate([
@@ -500,6 +569,7 @@ exports.AssignmentsController = AssignmentsController = __decorate([
     __metadata("design:paramtypes", [assignments_service_1.AssignmentsService,
         auto_dispatch_cron_1.AutoDispatchCron,
         pickup_reminder_cron_1.PickupReminderCron,
-        accounting_service_1.AccountingService])
+        accounting_service_1.AccountingService,
+        guide_confirmation_service_1.GuideConfirmationService])
 ], AssignmentsController);
 //# sourceMappingURL=assignments.controller.js.map

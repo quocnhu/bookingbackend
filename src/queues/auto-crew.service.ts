@@ -2,12 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   AssignmentExecutionMode,
   AssignmentStatus,
+  GuideHoldStatus,
   GuideType,
   RoleType,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { LeavesService } from '@/leaves/leaves.service';
 import { AuditService } from '@/audit/audit.service';
+import { GuideConfirmationService } from '@/guide-confirmation/guide-confirmation.service';
 
 /**
  * Auto-crew (the "assign guide + driver" step in bookingflow.md):
@@ -25,6 +27,7 @@ export class AutoCrewService {
     private readonly prisma: PrismaService,
     private readonly leaves: LeavesService,
     private readonly audit: AuditService,
+    private readonly guideConfirmation: GuideConfirmationService,
   ) {}
 
   /** Assign an available guide + driver to a bus if it does not yet have a full crew. */
@@ -99,6 +102,15 @@ export class AutoCrewService {
         where: { id: assignment.id },
         data: updates,
       });
+      if (updates.guideId) {
+        void this.guideConfirmation
+          .request(assignment.id)
+          .catch((error) =>
+            this.logger.warn(
+              `Guide confirmation request failed for ${assignment.code ?? assignment.id}: ${(error as Error).message}`,
+            ),
+          );
+      }
       await this.audit.log({
         entityType: 'Assignment',
         entityId: assignment.id,
@@ -204,6 +216,17 @@ export class AutoCrewService {
       if (busy.has(u.id)) continue;
       const onLeave = await this.leaves.hasLeaveConflict(u.id, start, end);
       if (onLeave) continue;
+      if (role === RoleType.TOUR_GUIDE) {
+        const onHold = await this.prisma.guideHold.count({
+          where: {
+            guideId: u.id,
+            status: GuideHoldStatus.ACTIVE,
+            startDate: { lte: end },
+            endDate: { gte: start },
+          },
+        });
+        if (onHold > 0) continue;
+      }
 
       const isCompany = !!u.provider?.isCompany;
       if (role === RoleType.DRIVER) {

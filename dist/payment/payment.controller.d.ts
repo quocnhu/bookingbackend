@@ -47,6 +47,7 @@ export declare class PaymentController {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -75,6 +76,7 @@ export declare class PaymentController {
             extra: import("@prisma/client/runtime/library").JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: import("@prisma/client/runtime/library").Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;

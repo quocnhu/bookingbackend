@@ -46,6 +46,9 @@ const transport_requests_module_1 = require("./transport-requests/transport-requ
 const accounting_module_1 = require("./accounting/accounting.module");
 const payment_module_1 = require("./payment/payment.module");
 const partners_module_1 = require("./partners/partners.module");
+const guide_confirmation_module_1 = require("./guide-confirmation/guide-confirmation.module");
+const guide_holds_module_1 = require("./guide-holds/guide-holds.module");
+const hotels_module_1 = require("./hotels/hotels.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -86,6 +89,9 @@ exports.AppModule = AppModule = __decorate([
             accounting_module_1.AccountingModule,
             payment_module_1.PaymentModule,
             partners_module_1.PartnersModule,
+            guide_confirmation_module_1.GuideConfirmationModule,
+            guide_holds_module_1.GuideHoldsModule,
+            hotels_module_1.HotelsModule,
             serve_static_1.ServeStaticModule.forRoot({
                 rootPath: (0, storage_1.uploadRootPath)(),
                 serveRoot: '/uploads',

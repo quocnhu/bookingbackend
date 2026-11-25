@@ -19,6 +19,7 @@ enum RoleType {
   TOUR_GUIDE
   DRIVER
   TRANSPORT_PROVIDER
+  HOTEL
   CUSTOMER
 }
 
@@ -175,6 +176,13 @@ enum LeaveStatus {
   REJECTED
 }
 
+// A manager-created reservation for a tour guide (no leave approval flow).
+// Active holds make the guide unavailable for overlapping assignments.
+enum GuideHoldStatus {
+  ACTIVE
+  RELEASED
+}
+
 // ─── RBAC — ROLES & PERMISSIONS (PROCESS_FLOW section 2.3) ─────────────
 model Role {
   id          String           @id @default(uuid())
@@ -250,6 +258,9 @@ model User {
   providerId String?
   provider   TransportationProvider? @relation(fields: [providerId], references: [id])
 
+  hotelId String? @unique
+  hotel   Hotel?  @relation(fields: [hotelId], references: [id], onDelete: SetNull)
+
   driverProfile DriverProfile?
   guideProfile  GuideProfile?
 
@@ -259,9 +270,12 @@ model User {
   reportVerifies    Assignment[] @relation("ReportVerifier")
 
   // Leave management & sessions
-  leaves         UserLeave[]
-  reviewedLeaves UserLeave[]    @relation("LeaveReviewedBy")
-  sessions       UserSession[]
+  leaves              UserLeave[]
+  reviewedLeaves      UserLeave[]  @relation("LeaveReviewedBy")
+  guideHolds          GuideHold[]  @relation("GuideHolds")
+  createdGuideHolds   GuideHold[]  @relation("GuideHoldCreatedBy")
+  releasedGuideHolds  GuideHold[]  @relation("GuideHoldReleasedBy")
+  sessions            UserSession[]
   auditLogs      AuditLog[]
   authActivities AuthActivity[]
 
@@ -308,6 +322,29 @@ model UserLeave {
   @@index([userId, startDate, endDate])
 }
 
+model GuideHold {
+  id        String          @id @default(uuid())
+  guideId   String
+  guide     User            @relation("GuideHolds", fields: [guideId], references: [id], onDelete: Cascade)
+  startDate DateTime
+  endDate   DateTime
+  note      String?         @db.Text
+  status    GuideHoldStatus @default(ACTIVE)
+
+  createdById String?
+  createdBy   User?   @relation("GuideHoldCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  releasedById String?
+  releasedBy   User?   @relation("GuideHoldReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
+  releasedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([guideId, startDate, endDate])
+  @@index([status, startDate, endDate])
+}
+
 model UserSession {
   id     String @id @default(uuid())
   userId String
@@ -343,6 +380,21 @@ model GuideProfile {
   type      GuideType @default(FREELANCE)
   languages String[]
   rating    Float     @default(5.0)
+}
+
+model Hotel {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  contactName       String?
+  phone             String?
+  email             String?
+  address           String?
+  commissionPercent Decimal  @default(0) @db.Decimal(5, 2)
+  isActive          Boolean  @default(true)
+  users             User[]
+  bookings          Booking[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 // ─── COMPANY PROFILE (digital signature / annual settlement printing) ──────────
@@ -593,6 +645,10 @@ model Booking {
 
   customerName String?
   hotelName    String
+  hotelId      String?
+  hotel        Hotel?  @relation(fields: [hotelId], references: [id], onDelete: SetNull)
+  // Hotel commission rate snapshot (percent) taken when the booking is linked.
+  hotelCommissionPercent Decimal? @db.Decimal(5, 2)
   phone        String
   mail         String?
   totalPax     Int            @default(0)
@@ -680,6 +736,7 @@ model Booking {
   @@index([customerUserId])
   @@index([payment, payLater])
   @@index([parentBookingId])
+  @@index([hotelId])
 }
 
 model BookingPayment {
@@ -798,6 +855,13 @@ model Assignment {
   // Customer pre-pickup reminder
   pickupReminderMode       PickupReminderMode @default(AUTO)
   pickupReminderLastSentAt DateTime?
+
+  // Guide assignment confirmation (email notification + portal confirm/decline)
+  guideConfirmationRequestedAt DateTime?
+  guideConfirmationEmailSentAt DateTime?
+  guideConfirmedAt             DateTime?
+  guideDeclinedAt              DateTime?
+  guideDeclineReason           String?   @db.Text
 
   tourReport TourReport?
 

@@ -12,6 +12,7 @@ const audit_module_1 = require("../audit/audit.module");
 const mail_module_1 = require("../mail/mail.module");
 const payment_controller_1 = require("./payment.controller");
 const payment_service_1 = require("./payment.service");
+const unpaid_booking_cleanup_service_1 = require("./unpaid-booking-cleanup.service");
 let PaymentModule = class PaymentModule {
 };
 exports.PaymentModule = PaymentModule;
@@ -19,7 +20,7 @@ exports.PaymentModule = PaymentModule = __decorate([
     (0, common_1.Module)({
         imports: [audit_module_1.AuditModule, mail_module_1.MailModule],
         controllers: [payment_controller_1.PaymentController],
-        providers: [payment_service_1.PaymentService],
+        providers: [payment_service_1.PaymentService, unpaid_booking_cleanup_service_1.UnpaidBookingCleanupService],
         exports: [payment_service_1.PaymentService],
     })
 ], PaymentModule);

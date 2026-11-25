@@ -32,6 +32,7 @@ export declare class UpdateAssignmentDto {
 }
 export declare class UpdateAssignmentStatusDto {
     status: AssignmentStatus;
+    override?: boolean;
 }
 export declare class SetBoardOriginDto {
     origin: AssignmentOrigin;
@@ -41,6 +42,9 @@ export declare class UpdateAutoDispatchDto {
     cron?: string;
 }
 export declare class UpdateRecallCutoffDto {
+    time: string;
+}
+export declare class UpdateDispatchWindowDto {
     time: string;
 }
 export declare class UpdatePickupReminderSettingsDto {

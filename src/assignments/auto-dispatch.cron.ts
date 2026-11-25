@@ -44,10 +44,11 @@ export interface AutoDispatchSettings {
  * registered dynamically through `SchedulerRegistry`, so changes apply at
  * runtime without a restart.
  *
- * At each run (default 23:00 Asia/Ho_Chi_Minh):
+ * At each run (default 21:00 Asia/Ho_Chi_Minh):
  * 1. Fill in missing crew (guide + driver) for upcoming trips.
  * 2. Dispatch all ready trips that start the NEXT day (AUTO mode only —
- *    MANUAL never auto-dispatches; admin dispatches by hand).
+ *    MANUAL never auto-dispatches; the admin must dispatch by hand before 21:00).
+ * The run defines the cutoff, so it bypasses the manual dispatch window guard.
  * Disabling the switch skips the whole scheduled run.
  */
 @Injectable()
@@ -96,6 +97,13 @@ export class AutoDispatchCron implements OnModuleInit {
 
     if (input.cron !== undefined) {
       this.validateCron(input.cron);
+      const { openTime } = await this.dispatchPolicy.getMode();
+      const newCutoff = this.dispatchPolicy.cronToCutoff(input.cron.trim());
+      if (!this.dispatchPolicy.windowOrderIsValid(openTime, newCutoff)) {
+        throw new BadRequestException(
+          `Auto-dispatch cutoff ${newCutoff} must be after the ${openTime} dispatch opening time.`,
+        );
+      }
     }
 
     const updates: Array<{ key: string; value: string }> = [];
@@ -206,7 +214,7 @@ export class AutoDispatchCron implements OnModuleInit {
       new CronTime(cron.trim(), AUTO_DISPATCH_TIMEZONE);
     } catch {
       throw new BadRequestException(
-        `Invalid cron expression "${cron}". Example: "0 23 * * *" (daily at 23:00).`,
+        `Invalid cron expression "${cron}". Example: "0 21 * * *" (daily at 21:00).`,
       );
     }
   }
@@ -256,17 +264,19 @@ export class AutoDispatchCron implements OnModuleInit {
       where: { key: 'assignMode' },
     });
     if (modeRow?.value === AssignmentOrigin.MANUAL) {
-      this.logger.log('Manual mode — skipping auto-dispatch (admin dispatches by hand)');
+      this.logger.log('Manual mode — skipping auto-dispatch (admin must dispatch by 21:00)');
       return;
     }
 
     const today = this.dispatchPolicy.todayHcm();
     const tomorrow = this.dispatchPolicy.addDays(today.start, 1);
     try {
-      const dispatch =
-        await this.assignmentsService.dispatchAllBoard(tomorrow);
+      const dispatch = await this.assignmentsService.dispatchAllBoard(
+        tomorrow,
+        { ignoreWindow: true },
+      );
       this.logger.log(
-        `Auto dispatch (${this.dispatchPolicy.dayKey(tomorrow)}): dispatched=${dispatch.dispatched}, skipped=${dispatch.skipped}, skippedOnLeave=${dispatch.skippedOnLeave}`,
+        `Auto dispatch (${this.dispatchPolicy.dayKey(tomorrow)}): dispatched=${dispatch.dispatched}, skipped=${dispatch.skipped}, skippedOnLeave=${dispatch.skippedOnLeave}, skippedUnpaid=${dispatch.skippedUnpaid}, skippedUnconfirmed=${dispatch.skippedUnconfirmed}, skippedProvider=${dispatch.skippedProvider}`,
       );
     } catch (error) {
       this.logger.error('Auto dispatch failed', (error as Error).stack);

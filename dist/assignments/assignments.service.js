@@ -25,8 +25,10 @@ const leaves_service_1 = require("../leaves/leaves.service");
 const storage_1 = require("../storage");
 const drive_service_1 = require("../drive/drive.service");
 const mail_service_1 = require("../mail/mail.service");
+const guide_confirmation_service_1 = require("../guide-confirmation/guide-confirmation.service");
 const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
 const storage_key_util_1 = require("../common/utils/storage-key.util");
+const unpaid_booking_util_1 = require("../common/utils/unpaid-booking.util");
 const BOARD_LOOKBACK_DAYS = 30;
 const RECALL_CUTOFF_KEY = 'recallCutoffTime';
 const DEFAULT_RECALL_CUTOFF = '06:00';
@@ -42,8 +44,9 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
     drive;
     mail;
     dispatchPolicy;
+    guideConfirmation;
     logger = new common_1.Logger(AssignmentsService_1.name);
-    constructor(prisma, auditService, board, notificationService, gateway, leavesService, storage, drive, mail, dispatchPolicy) {
+    constructor(prisma, auditService, board, notificationService, gateway, leavesService, storage, drive, mail, dispatchPolicy, guideConfirmation) {
         this.prisma = prisma;
         this.auditService = auditService;
         this.board = board;
@@ -54,6 +57,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         this.drive = drive;
         this.mail = mail;
         this.dispatchPolicy = dispatchPolicy;
+        this.guideConfirmation = guideConfirmation;
     }
     include = {
         bookings: {
@@ -71,7 +75,14 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         vehicle: true,
         provider: true,
         driver: { select: { id: true, name: true, email: true } },
-        guide: { select: { id: true, name: true, email: true } },
+        guide: {
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                guideProfile: { select: { type: true } },
+            },
+        },
         reportVerifier: { select: { id: true, name: true, email: true } },
         partner: {
             select: {
@@ -143,13 +154,55 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                         client_1.AssignmentStatus.VERIFYING,
                     ],
                 },
-                startDate: { gte: startOfToday },
+                endDate: { gte: startOfToday },
             },
-            select: { guideId: true, driverId: true },
+            select: {
+                id: true,
+                code: true,
+                status: true,
+                startDate: true,
+                endDate: true,
+                guideId: true,
+                driverId: true,
+            },
         });
         const busyGuides = new Set(active.map((a) => a.guideId).filter((x) => !!x));
         const busyDrivers = new Set(active.map((a) => a.driverId).filter((x) => !!x));
+        const guideTrips = new Map();
+        const driverTrips = new Map();
+        for (const trip of active) {
+            if (trip.guideId) {
+                const rows = guideTrips.get(trip.guideId) ?? [];
+                rows.push(trip);
+                guideTrips.set(trip.guideId, rows);
+            }
+            if (trip.driverId) {
+                const rows = driverTrips.get(trip.driverId) ?? [];
+                rows.push(trip);
+                driverTrips.set(trip.driverId, rows);
+            }
+        }
         const leaveMap = await this.fetchLeaveMap();
+        const holds = await this.prisma.guideHold.findMany({
+            where: {
+                status: client_1.GuideHoldStatus.ACTIVE,
+                endDate: { gte: startOfToday },
+            },
+            select: {
+                id: true,
+                guideId: true,
+                startDate: true,
+                endDate: true,
+                note: true,
+            },
+            orderBy: { startDate: 'asc' },
+        });
+        const holdMap = new Map();
+        for (const hold of holds) {
+            const rows = holdMap.get(hold.guideId) ?? [];
+            rows.push(hold);
+            holdMap.set(hold.guideId, rows);
+        }
         const users = await this.prisma.user.findMany({
             where: {
                 isActive: true,
@@ -176,7 +229,9 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             languages: u.guideProfile?.languages ?? [],
             rating: u.guideProfile?.rating ?? null,
             isBusy: busyGuides.has(u.id),
+            assignments: guideTrips.get(u.id) ?? [],
             leaves: leaveMap.get(u.id) ?? [],
+            holds: holdMap.get(u.id) ?? [],
         }));
         const drivers = users
             .filter((u) => u.role === client_1.RoleType.DRIVER)
@@ -189,6 +244,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 ? { id: u.provider.id, name: u.provider.name }
                 : null,
             isBusy: busyDrivers.has(u.id),
+            assignments: driverTrips.get(u.id) ?? [],
             leaves: leaveMap.get(u.id) ?? [],
         }));
         return { guides, drivers };
@@ -292,6 +348,27 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             paidToName: a.paymentLines?.[0]?.payableTo?.name ?? null,
         });
         const leaveMap = await this.fetchLeaveMap();
+        const holds = await this.prisma.guideHold.findMany({
+            where: {
+                status: client_1.GuideHoldStatus.ACTIVE,
+                startDate: { lte: effectiveTo },
+                endDate: { gte: from },
+            },
+            select: {
+                id: true,
+                guideId: true,
+                startDate: true,
+                endDate: true,
+                note: true,
+            },
+            orderBy: { startDate: 'asc' },
+        });
+        const holdMap = new Map();
+        for (const hold of holds) {
+            const rows = holdMap.get(hold.guideId) ?? [];
+            rows.push(hold);
+            holdMap.set(hold.guideId, rows);
+        }
         const guides = users
             .filter((u) => u.role === client_1.RoleType.TOUR_GUIDE)
             .map((u) => ({
@@ -302,6 +379,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             rating: u.guideProfile?.rating ?? null,
             assignments: (byGuide.get(u.id) ?? []).map(toMember),
             leaves: leaveMap.get(u.id) ?? [],
+            holds: holdMap.get(u.id) ?? [],
         }));
         const drivers = users
             .filter((u) => u.role === client_1.RoleType.DRIVER)
@@ -318,8 +396,24 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         }));
         return { from, to, guides, drivers };
     }
-    async dispatchAllBoard(targetDate) {
+    async dispatchAllBoard(targetDate, options) {
+        const override = !!options?.override;
+        if (override && options?.actor?.role !== client_1.RoleType.ADMIN) {
+            throw new common_1.ForbiddenException('Only an administrator can override dispatch readiness');
+        }
         const range = this.dispatchPolicy.dayRange(targetDate ?? new Date());
+        if (!options?.ignoreWindow) {
+            const window = await this.dispatchPolicy.windowFor(range.start);
+            if (!window.open) {
+                const label = new Intl.DateTimeFormat('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    timeZone: 'Asia/Ho_Chi_Minh',
+                }).format(range.start);
+                throw new common_1.BadRequestException(`Cannot dispatch ${label} — dispatch is open ${window.openTime}–${window.cutoffTime} HCM on the day before departure.`);
+            }
+        }
         const items = await this.prisma.assignment.findMany({
             where: {
                 status: {
@@ -336,26 +430,73 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 id: true,
                 guideId: true,
                 driverId: true,
+                vehicleId: true,
+                providerId: true,
+                provider: { select: { isCompany: true } },
+                providerRequestStatus: true,
+                guideDeclinedAt: true,
+                guideConfirmedAt: true,
+                guideConfirmationRequestedAt: true,
+                guide: {
+                    select: { guideProfile: { select: { type: true } } },
+                },
                 executionMode: true,
                 partnerStatus: true,
                 startDate: true,
                 endDate: true,
+                bookings: {
+                    where: { status: { not: client_1.BookingStatus.CANCELED } },
+                    select: {
+                        id: true,
+                        channel: true,
+                        status: true,
+                        payment: true,
+                        paymentMethod: true,
+                        payLater: true,
+                    },
+                },
             },
         });
         if (items.length === 0)
-            return { dispatched: 0, skipped: 0, skippedOnLeave: 0 };
+            return {
+                dispatched: 0,
+                skipped: 0,
+                skippedOnLeave: 0,
+                skippedUnpaid: 0,
+                skippedUnconfirmed: 0,
+                skippedProvider: 0,
+            };
+        const externalProvider = (a) => !!a.providerId && a.provider?.isCompany === false;
+        const providerBlocked = (a) => externalProvider(a) &&
+            (!a.driverId ||
+                !a.vehicleId ||
+                (!override && a.providerRequestStatus !== client_1.TransportRequestStatus.ASSIGNED));
+        const providerBlockedCount = items.filter(providerBlocked).length;
         const withCrew = items.filter((a) => {
+            if (providerBlocked(a))
+                return false;
             if (this.isOutsourced(a))
                 return false;
             if (a.executionMode === client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY) {
                 return !!a.driverId;
             }
-            return !!a.guideId && !!a.driverId;
+            return !!a.guideId && !!a.driverId && !a.guideDeclinedAt;
         });
-        const skipped = items.length - withCrew.length;
+        const skipped = items.length - withCrew.length - providerBlockedCount;
+        const collectable = withCrew.filter((a) => !a.bookings.some((booking) => (0, unpaid_booking_util_1.isUnpaidPayPalBooking)(booking)));
+        const skippedUnpaid = withCrew.length - collectable.length;
+        const guideNeedsConfirmation = (a) => !!a.guideId &&
+            (a.guide?.guideProfile?.type ?? client_1.GuideType.FREELANCE) ===
+                client_1.GuideType.FREELANCE &&
+            !a.guideConfirmedAt &&
+            !a.guideDeclinedAt;
+        const confirmable = override
+            ? collectable
+            : collectable.filter((a) => !guideNeedsConfirmation(a));
+        const skippedUnconfirmed = collectable.length - confirmable.length;
         const ready = [];
         let skippedOnLeave = 0;
-        for (const a of withCrew) {
+        for (const a of confirmable) {
             try {
                 await this.assertCrewAvailableForDates(a.guideId, a.driverId, a.startDate, a.endDate, a.id);
                 ready.push(a);
@@ -364,8 +505,38 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 skippedOnLeave += 1;
             }
         }
-        if (ready.length === 0)
-            return { dispatched: 0, skipped, skippedOnLeave };
+        if (ready.length === 0) {
+            const skipNotes = [
+                skipped > 0 ? `${skipped} missing crew/outsourced` : '',
+                skippedOnLeave > 0 ? `${skippedOnLeave} crew on leave/held` : '',
+                skippedUnpaid > 0 ? `${skippedUnpaid} unpaid PayPal` : '',
+                skippedUnconfirmed > 0 ? `${skippedUnconfirmed} freelance unconfirmed` : '',
+                providerBlockedCount > 0 ? `${providerBlockedCount} provider incomplete` : '',
+            ]
+                .filter(Boolean)
+                .join(', ');
+            await this.notifyAdminsOfDispatch('No buses dispatched', `No bus for ${new Intl.DateTimeFormat('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                timeZone: 'Asia/Ho_Chi_Minh',
+            }).format(range.start)} was ready.${skipNotes ? ` Check: ${skipNotes}.` : ''}`, {
+                dispatched: 0,
+                skipped,
+                skippedOnLeave,
+                skippedUnpaid,
+                skippedUnconfirmed,
+                skippedProvider: providerBlockedCount,
+            });
+            this.gateway.notifyAll('transport:refresh', { action: 'DISPATCH_ALL' });
+            return {
+                dispatched: 0,
+                skipped,
+                skippedOnLeave,
+                skippedUnpaid,
+                skippedUnconfirmed,
+                skippedProvider: providerBlockedCount,
+            };
+        }
         const ids = ready.map((a) => a.id);
         await this.prisma.$transaction([
             this.prisma.assignment.updateMany({
@@ -377,13 +548,50 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 data: { status: client_1.BookingStatus.ASSIGNED },
             }),
         ]);
+        const dispatchedAssignments = await this.prisma.assignment.findMany({
+            where: { id: { in: ids } },
+            include: this.include,
+        });
+        for (const assignment of dispatchedAssignments) {
+            await this.sendStatusNotifications(assignment, client_1.AssignmentStatus.PENDING, client_1.AssignmentStatus.DISPATCHED, { skipAdminNotifications: true });
+        }
+        const skipNotes = [
+            skipped > 0 ? `${skipped} missing crew/outsourced` : '',
+            skippedOnLeave > 0 ? `${skippedOnLeave} crew on leave/held` : '',
+            skippedUnpaid > 0 ? `${skippedUnpaid} unpaid PayPal` : '',
+            skippedUnconfirmed > 0 ? `${skippedUnconfirmed} freelance unconfirmed` : '',
+            providerBlockedCount > 0 ? `${providerBlockedCount} provider incomplete` : '',
+        ]
+            .filter(Boolean)
+            .join(', ');
+        await this.notifyAdminsOfDispatch(`Dispatched ${ids.length} bus(es)`, `${ids.length} bus(es) for ${new Intl.DateTimeFormat('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            timeZone: 'Asia/Ho_Chi_Minh',
+        }).format(range.start)} have been confirmed.${skipNotes ? ` Skipped: ${skipNotes}.` : ''}`, { kind: 'DISPATCH_SUMMARY', dispatched: ids.length, skipped, skippedOnLeave, skippedUnpaid, skippedUnconfirmed, skippedProvider: providerBlockedCount });
+        this.gateway.notifyAll('transport:refresh', { action: 'DISPATCH_ALL' });
         await this.auditService.log({
             entityType: 'Assignment',
             entityId: ids.join(','),
             action: 'DISPATCH_ALL',
-            afterData: { count: ids.length, skipped, skippedOnLeave },
+            afterData: {
+                count: ids.length,
+                skipped,
+                skippedOnLeave,
+                skippedUnpaid,
+                skippedUnconfirmed,
+                skippedProvider: providerBlockedCount,
+                override,
+            },
         });
-        return { dispatched: ids.length, skipped, skippedOnLeave };
+        return {
+            dispatched: ids.length,
+            skipped,
+            skippedOnLeave,
+            skippedUnpaid,
+            skippedUnconfirmed,
+            skippedProvider: providerBlockedCount,
+        };
     }
     async getBoardMode() {
         const row = await this.prisma.systemSetting.upsert({
@@ -425,6 +633,42 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             entityType: 'SystemSetting',
             entityId: RECALL_CUTOFF_KEY,
             action: 'UPDATE_RECALL_CUTOFF',
+            beforeData: before,
+            afterData: after,
+            changedBy: actorId ?? null,
+        });
+        return after;
+    }
+    async getDispatchOpenTime() {
+        const row = await this.prisma.systemSetting.upsert({
+            where: { key: dispatch_policy_service_1.DISPATCH_OPEN_KEY },
+            update: {},
+            create: { key: dispatch_policy_service_1.DISPATCH_OPEN_KEY, value: dispatch_policy_service_1.DEFAULT_DISPATCH_OPEN },
+        });
+        return {
+            time: HHMM_PATTERN.test(row.value) ? row.value : dispatch_policy_service_1.DEFAULT_DISPATCH_OPEN,
+        };
+    }
+    async updateDispatchOpenTime(dto, actorId) {
+        const time = (dto.time ?? '').trim();
+        if (!HHMM_PATTERN.test(time)) {
+            throw new common_1.BadRequestException(`Invalid dispatch opening time "${dto.time}". Use HH:mm (e.g. "12:00").`);
+        }
+        const { cutoffTime } = await this.dispatchPolicy.getMode();
+        if (!this.dispatchPolicy.windowOrderIsValid(time, cutoffTime)) {
+            throw new common_1.BadRequestException(`Dispatch must open before the ${cutoffTime} cutoff.`);
+        }
+        const before = await this.getDispatchOpenTime();
+        await this.prisma.systemSetting.upsert({
+            where: { key: dispatch_policy_service_1.DISPATCH_OPEN_KEY },
+            update: { value: time },
+            create: { key: dispatch_policy_service_1.DISPATCH_OPEN_KEY, value: time },
+        });
+        const after = { time };
+        await this.auditService.log({
+            entityType: 'SystemSetting',
+            entityId: dispatch_policy_service_1.DISPATCH_OPEN_KEY,
+            action: 'UPDATE_DISPATCH_OPEN_TIME',
             beforeData: before,
             afterData: after,
             changedBy: actorId ?? null,
@@ -482,6 +726,26 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 });
                 const who = user?.name ?? user?.email ?? userId;
                 throw new common_1.BadRequestException(`${who} is on leave during this date range and cannot be assigned as ${label}.`);
+            }
+            if (label === 'guide') {
+                const hold = await this.prisma.guideHold.findFirst({
+                    where: {
+                        guideId: userId,
+                        status: client_1.GuideHoldStatus.ACTIVE,
+                        startDate: { lte: end },
+                        endDate: { gte: start },
+                    },
+                    select: { id: true, startDate: true, endDate: true, note: true },
+                });
+                if (hold) {
+                    const user = await this.prisma.user.findUnique({
+                        where: { id: userId },
+                        select: { name: true, email: true },
+                    });
+                    const who = user?.name ?? user?.email ?? userId;
+                    const fmt = (d) => new Date(d).toLocaleDateString('en-GB');
+                    throw new common_1.BadRequestException(`${who} is on hold from ${fmt(hold.startDate)} to ${fmt(hold.endDate)}${hold.note ? ` (${hold.note})` : ''} and cannot be assigned as ${label}. Release the hold first.`);
+                }
             }
         }
         await this.assertCrewNoOverlap(guideId, driverId, start, end, excludeAssignmentId);
@@ -810,6 +1074,11 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             action: 'CREATE',
             afterData: assignment,
         });
+        if (assignment.guideId) {
+            void this.guideConfirmation
+                .request(assignment.id)
+                .catch((error) => this.logger.warn(`Guide confirmation request failed: ${error.message}`));
+        }
         return this.findOne(assignment.id);
     }
     async update(id, dto, actor) {
@@ -828,7 +1097,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             throw new common_1.BadRequestException('Use the partner handoff action to send a trip to a partner agency.');
         }
         if (dto.startDate !== undefined || dto.endDate !== undefined) {
-            await this.assertNotSealed(before.startDate, 'change the trip dates');
+            await this.assertNotSealed(before.startDate, 'change the trip dates', before.status);
         }
         const startDate = dto.startDate
             ? new Date(dto.startDate)
@@ -871,6 +1140,16 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             beforeData: before,
             afterData: assignment,
         });
+        if (before.guideId !== assignment.guideId) {
+            if (assignment.guideId) {
+                void this.guideConfirmation
+                    .request(id, { actorId: actor?.id ?? null })
+                    .catch((error) => this.logger.warn(`Guide confirmation request failed: ${error.message}`));
+            }
+            else {
+                await this.guideConfirmation.reset(id);
+            }
+        }
         this.gateway.notifyAll('board:refresh', {
             assignmentId: id,
             action: 'update',
@@ -879,17 +1158,26 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         await this.notifyAssignmentUpdated(before, updated, actor);
         return updated;
     }
-    assertDispatchableToday(assignment) {
-        const today = this.dispatchPolicy.todayHcm();
-        const tomorrow = this.dispatchPolicy.dayRange(this.dispatchPolicy.addDays(today.start, 1));
-        const start = new Date(assignment.startDate);
-        const end = new Date(assignment.endDate ?? assignment.startDate);
-        if (start.getTime() > tomorrow.end.getTime() || end.getTime() < today.start.getTime()) {
-            const label = `${start.getDate()}/${start.getMonth() + 1}/${start.getFullYear()}`;
-            throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" (starts ${label}) — only today's and tomorrow's departures can be dispatched.`);
+    async assertDispatchableWindow(assignment) {
+        const window = await this.dispatchPolicy.windowFor(assignment.startDate);
+        if (!window.open) {
+            const label = new Intl.DateTimeFormat('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                timeZone: 'Asia/Ho_Chi_Minh',
+            }).format(new Date(assignment.startDate));
+            throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" (${label}) — dispatch is open ${window.openTime}–${window.cutoffTime} HCM on the day before departure.`);
         }
     }
-    async assertNotSealed(startDate, action) {
+    async assertNotSealed(startDate, action, status) {
+        const lockedStatuses = [
+            client_1.AssignmentStatus.DISPATCHED,
+            client_1.AssignmentStatus.VERIFYING,
+            client_1.AssignmentStatus.COMPLETED,
+        ];
+        if (status && lockedStatuses.includes(status)) {
+            throw new common_1.ConflictException(`This bus is dispatched and sealed. You cannot ${action} — recall it to PENDING first if you need to change it.`);
+        }
         const info = await this.dispatchPolicy.getSealInfo(startDate);
         if (info.sealed) {
             throw new common_1.ConflictException(`This day was sealed at ${info.cutoffTime}. You cannot ${action} after the seal — use the Waiting List and place late bookings on an open bus instead.`);
@@ -898,7 +1186,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
     async getSealInfo(date) {
         return this.dispatchPolicy.getSealInfo(date);
     }
-    assertCrewAssigned(assignment) {
+    assertCrewAssigned(assignment, allowProviderOverride = false) {
         if (this.isOutsourced(assignment)) {
             throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" — it is handled by the partner agency.`);
         }
@@ -908,10 +1196,35 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             !assignment.guideId) {
             missing.push('tour guide');
         }
+        if (assignment.executionMode !==
+            client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY &&
+            assignment.guideId &&
+            assignment.guideDeclinedAt) {
+            throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" — the tour guide declined this assignment. Reassign a guide or confirm on their behalf first.`);
+        }
         if (!assignment.driverId)
             missing.push('driver');
+        const externalProvider = !!assignment.providerId && assignment.provider?.isCompany === false;
+        if (externalProvider && !assignment.vehicleId)
+            missing.push('vehicle');
         if (missing.length > 0) {
             throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" — assign a ${missing.join(' and ')} first.`);
+        }
+        if (externalProvider &&
+            !allowProviderOverride &&
+            assignment.providerRequestStatus !== client_1.TransportRequestStatus.ASSIGNED) {
+            throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" — the transport provider has not assigned a driver and vehicle yet.`);
+        }
+    }
+    assertFreelanceGuideConfirmed(assignment, allowOverride = false) {
+        if (allowOverride || !assignment.guideId || assignment.guideDeclinedAt) {
+            return;
+        }
+        const type = assignment.guide?.guideProfile?.type ?? client_1.GuideType.FREELANCE;
+        if (type !== client_1.GuideType.FREELANCE)
+            return;
+        if (!assignment.guideConfirmedAt) {
+            throw new common_1.BadRequestException(`Cannot dispatch "${assignment.code ?? 'Bus'}" — the freelance tour guide has not confirmed yet. Wait for confirmation, reassign, or use the admin override.`);
         }
     }
     async assertRecallAllowed(assignment) {
@@ -986,14 +1299,14 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             kind: 'ASSIGNMENT_UPDATED',
             assignmentId: after.id,
             changed: changes,
-            url: '/dispatch-board',
+            url: '/bookings?tab=assignments',
         });
         if (removed.size > 0) {
             await this.notifyUserIds([...removed], 'Removed from tour', `${summary}. You are no longer assigned to this trip.`, {
                 kind: 'ASSIGNMENT_UPDATED',
                 assignmentId: after.id,
                 changed: changes,
-                url: '/dispatch-board',
+                url: '/bookings?tab=assignments',
             });
         }
     }
@@ -1023,10 +1336,13 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         }).format(new Date(assignment.startDate));
         return `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${when}${crew ? ` · ${crew}` : ''}`;
     }
-    async updateStatus(id, dto) {
+    async updateStatus(id, dto, actor) {
         const before = await this.findOne(id);
         if (dto.status === before.status)
             return before;
+        if (dto.override && actor?.role !== client_1.RoleType.ADMIN) {
+            throw new common_1.ForbiddenException('Only an administrator can override dispatch readiness');
+        }
         if (before.status === client_1.AssignmentStatus.WAITING_LIST) {
             throw new common_1.BadRequestException('Waiting-list buses are placed onto a real bus by moving their bookings on the Dispatch Board. They cannot change status directly.');
         }
@@ -1034,9 +1350,23 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             throw new common_1.BadRequestException('WAITING_LIST is reserved for late bookings created after the dispatch seal.');
         }
         if (dto.status === client_1.AssignmentStatus.DISPATCHED) {
-            this.assertDispatchableToday(before);
-            this.assertCrewAssigned(before);
+            await this.assertDispatchableWindow(before);
+            this.assertCrewAssigned(before, !!dto.override);
+            this.assertFreelanceGuideConfirmed(before, !!dto.override);
             await this.assertCrewAvailableForDates(before.guideId, before.driverId, before.startDate, before.endDate, id);
+            const unpaid = await this.prisma.booking.count({
+                where: {
+                    assignmentId: id,
+                    status: { not: client_1.BookingStatus.CANCELED },
+                    channel: client_1.BookingProvider.WEBSITE,
+                    payment: client_1.PaymentStatus.PENDING,
+                    paymentMethod: client_1.PaymentMethod.PAYPAL,
+                    payLater: false,
+                },
+            });
+            if (unpaid > 0) {
+                throw new common_1.BadRequestException('This bus has an unpaid PayPal booking. Complete the payment or cancel the booking before dispatch.');
+            }
         }
         if (before.status === client_1.AssignmentStatus.DISPATCHED &&
             dto.status === client_1.AssignmentStatus.PENDING) {
@@ -1082,7 +1412,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         });
         return this.findOne(id);
     }
-    async sendStatusNotifications(assignment, fromStatus, toStatus) {
+    async sendStatusNotifications(assignment, fromStatus, toStatus, options) {
         const code = assignment.code ?? 'Bus';
         const tour = assignment.tourName ?? '';
         const startLabel = new Intl.DateTimeFormat('en-GB', {
@@ -1097,16 +1427,19 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             let type;
             let title;
             let body;
+            let url = '/bookings?tab=assignments';
             switch (toStatus) {
                 case client_1.AssignmentStatus.DISPATCHED:
                     type = client_1.NotificationType.ASSIGNED;
                     title = `✅ ${code} — confirmed`;
                     body = `Trip ${tour} on ${startLabel} is confirmed. Check your schedule and pickup details before departure.`;
+                    url = userId === assignment.guideId ? '/tour-guide/my-trips' : '/driver/my-trips';
                     break;
                 case client_1.AssignmentStatus.TRANSFERRED:
                     type = client_1.NotificationType.TRANSFERRED;
                     title = `🔄 ${code} — Changed`;
                     body = `Trip ${tour} has a new bus/seat. Check the new pickup schedule.`;
+                    url = userId === assignment.guideId ? '/tour-guide/my-trips' : '/driver/my-trips';
                     break;
                 case client_1.AssignmentStatus.VERIFYING:
                     type = client_1.NotificationType.GENERAL;
@@ -1127,6 +1460,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                     type = client_1.NotificationType.ASSIGNED;
                     title = `📋 ${code} — Draft assigned`;
                     body = `Trip ${tour} has been assigned a bus. Waiting for confirmation.`;
+                    url = userId === assignment.guideId ? '/tour-guide/my-trips' : '/driver/my-trips';
                     break;
                 default:
                     type = client_1.NotificationType.GENERAL;
@@ -1137,17 +1471,64 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 assignmentId: assignment.id,
                 fromStatus,
                 toStatus,
+                kind: 'DISPATCH_STATUS',
+                url,
             });
             result.push(notif);
             this.gateway.notifyUser(userId, 'notification', notif);
         }
+        if (toStatus === client_1.AssignmentStatus.DISPATCHED) {
+            if (assignment.providerId) {
+                const providerUsers = await this.prisma.user.findMany({
+                    where: {
+                        providerId: assignment.providerId,
+                        role: client_1.RoleType.TRANSPORT_PROVIDER,
+                        isActive: true,
+                    },
+                    select: { id: true },
+                });
+                for (const user of providerUsers) {
+                    const notif = await this.notificationService.create(user.id, client_1.NotificationType.ASSIGNED, `✅ ${code} — transport confirmed`, `${tour} on ${startLabel} has been dispatched. The driver and vehicle on this route are confirmed.`, {
+                        assignmentId: assignment.id,
+                        kind: 'DISPATCH_STATUS',
+                        url: '/transport-provider/requests',
+                    });
+                    result.push(notif);
+                    this.gateway.notifyUser(user.id, 'notification', notif);
+                }
+            }
+            if (!options?.skipAdminNotifications) {
+                await this.notifyAdminsOfDispatch(`✅ ${code} — dispatched`, `${tour || code} on ${startLabel} has been confirmed.`, { assignmentId: assignment.id });
+            }
+            this.gateway.notifyAll('transport:refresh', {
+                assignmentId: assignment.id,
+                action: 'DISPATCHED',
+            });
+        }
         return result;
+    }
+    async notifyAdminsOfDispatch(title, body, data) {
+        const admins = await this.prisma.user.findMany({
+            where: {
+                role: { in: [client_1.RoleType.ADMIN, client_1.RoleType.OFFICE] },
+                isActive: true,
+            },
+            select: { id: true },
+        });
+        for (const admin of admins) {
+            const notif = await this.notificationService.create(admin.id, client_1.NotificationType.GENERAL, title, body, {
+                ...data,
+                kind: 'DISPATCH_SUMMARY',
+                url: '/bookings?tab=assignments',
+            });
+            this.gateway.notifyUser(admin.id, 'notification', notif);
+        }
     }
     async assignBookings(id, dto, actor) {
         const assignment = await this.findOne(id);
         this.assertDetailsUnlocked(assignment, actor);
         if (assignment.status !== client_1.AssignmentStatus.WAITING_LIST) {
-            await this.assertNotSealed(assignment.startDate, 'add bookings to a bus');
+            await this.assertNotSealed(assignment.startDate, 'add bookings to a bus', assignment.status);
         }
         const bookingsToAssign = await this.prisma.booking.findMany({
             where: { id: { in: dto.bookingIds } },
@@ -1223,7 +1604,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         const assignment = await this.findOne(id);
         this.assertDetailsUnlocked(assignment, actor);
         if (assignment.status !== client_1.AssignmentStatus.WAITING_LIST) {
-            await this.assertNotSealed(assignment.startDate, 'remove bookings from a bus');
+            await this.assertNotSealed(assignment.startDate, 'remove bookings from a bus', assignment.status);
         }
         const booking = await this.prisma.booking.findUnique({
             where: { id: bookingId },
@@ -1249,7 +1630,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
     async reorderBookings(id, bookingIds, actor) {
         const assignment = await this.findOne(id);
         this.assertDetailsUnlocked(assignment, actor);
-        await this.assertNotSealed(assignment.startDate, 'reorder passengers');
+        await this.assertNotSealed(assignment.startDate, 'reorder passengers', assignment.status);
         const result = await this.board.reorder(id, bookingIds);
         if (result.error)
             throw new common_1.BadRequestException(result.error);
@@ -1267,8 +1648,8 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         this.assertDetailsUnlocked(fromAssignment, actor);
         this.assertDetailsUnlocked(toAssignment, actor);
         if (fromAssignment.status !== client_1.AssignmentStatus.WAITING_LIST) {
-            await this.assertNotSealed(fromAssignment.startDate, 'move bookings');
-            await this.assertNotSealed(toAssignment.startDate, 'move bookings');
+            await this.assertNotSealed(fromAssignment.startDate, 'move bookings', fromAssignment.status);
+            await this.assertNotSealed(toAssignment.startDate, 'move bookings', toAssignment.status);
         }
         else {
             const opensAt = this.dispatchPolicy.latePlacementOpenAt(toAssignment.startDate);
@@ -1443,7 +1824,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         const assignment = await this.findOne(assignmentId);
         this.assertDetailsUnlocked(assignment, actor);
         if (assignment.status !== client_1.AssignmentStatus.WAITING_LIST) {
-            await this.assertNotSealed(assignment.startDate, 'change the trip dates');
+            await this.assertNotSealed(assignment.startDate, 'change the trip dates', assignment.status);
         }
         const bookings = await this.prisma.booking.findMany({
             where: { assignmentId },
@@ -2175,7 +2556,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
         if (!assignment)
             throw new common_1.NotFoundException('Assignment not found');
         if (assignment.status !== client_1.AssignmentStatus.WAITING_LIST) {
-            await this.assertNotSealed(assignment.startDate, 'delete a bus');
+            await this.assertNotSealed(assignment.startDate, 'delete a bus', assignment.status);
         }
         const [paymentLines, partnerPayment] = await Promise.all([
             this.prisma.paymentPeriodLine.count({ where: { assignmentId: id } }),
@@ -2221,6 +2602,7 @@ exports.AssignmentsService = AssignmentsService = AssignmentsService_1 = __decor
         notifications_gateway_1.NotificationsGateway,
         leaves_service_1.LeavesService, Object, drive_service_1.DriveService,
         mail_service_1.MailService,
-        dispatch_policy_service_1.DispatchPolicyService])
+        dispatch_policy_service_1.DispatchPolicyService,
+        guide_confirmation_service_1.GuideConfirmationService])
 ], AssignmentsService);
 //# sourceMappingURL=assignments.service.js.map

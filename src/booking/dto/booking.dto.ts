@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -106,6 +106,10 @@ export class CreateBookingDto {
   @IsString()
   @Length(1, 200)
   hotelName: string;
+
+  @IsOptional()
+  @IsString()
+  hotelId?: string;
 
   @IsNotEmpty()
   @IsString()
@@ -219,6 +223,10 @@ export class CreateWebsiteBookingDto {
   @IsString()
   @Length(1, 200)
   hotelName: string;
+
+  @IsOptional()
+  @IsString()
+  hotelId?: string;
 
   @IsNotEmpty()
   @IsString()
@@ -359,6 +367,10 @@ export class UpdateBookingDto {
 
   @IsOptional()
   @IsString()
+  hotelId?: string;
+
+  @IsOptional()
+  @IsString()
   @Matches(/^[+]?[\d\s\-()]{7,20}$/)
   phone?: string;
 
@@ -450,6 +462,13 @@ export class QueryBookingDto extends PaginationDto {
   @IsOptional()
   @IsEnum(PaymentStatus)
   payment?: PaymentStatus;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === true || value === 'true' || value === '1',
+  )
+  @IsBoolean()
+  unpaid?: boolean;
 
   @IsOptional()
   @IsString()

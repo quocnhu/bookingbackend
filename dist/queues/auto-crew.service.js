@@ -16,15 +16,18 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const leaves_service_1 = require("../leaves/leaves.service");
 const audit_service_1 = require("../audit/audit.service");
+const guide_confirmation_service_1 = require("../guide-confirmation/guide-confirmation.service");
 let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
     prisma;
     leaves;
     audit;
+    guideConfirmation;
     logger = new common_1.Logger(AutoCrewService_1.name);
-    constructor(prisma, leaves, audit) {
+    constructor(prisma, leaves, audit, guideConfirmation) {
         this.prisma = prisma;
         this.leaves = leaves;
         this.audit = audit;
+        this.guideConfirmation = guideConfirmation;
     }
     async assignCrewForBus(assignmentId) {
         const assignment = await this.prisma.assignment.findUnique({
@@ -74,6 +77,11 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
                 where: { id: assignment.id },
                 data: updates,
             });
+            if (updates.guideId) {
+                void this.guideConfirmation
+                    .request(assignment.id)
+                    .catch((error) => this.logger.warn(`Guide confirmation request failed for ${assignment.code ?? assignment.id}: ${error.message}`));
+            }
             await this.audit.log({
                 entityType: 'Assignment',
                 entityId: assignment.id,
@@ -153,6 +161,18 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
             const onLeave = await this.leaves.hasLeaveConflict(u.id, start, end);
             if (onLeave)
                 continue;
+            if (role === client_1.RoleType.TOUR_GUIDE) {
+                const onHold = await this.prisma.guideHold.count({
+                    where: {
+                        guideId: u.id,
+                        status: client_1.GuideHoldStatus.ACTIVE,
+                        startDate: { lte: end },
+                        endDate: { gte: start },
+                    },
+                });
+                if (onHold > 0)
+                    continue;
+            }
             const isCompany = !!u.provider?.isCompany;
             if (role === client_1.RoleType.DRIVER) {
                 if (onlyCompany && !isCompany)
@@ -222,6 +242,7 @@ exports.AutoCrewService = AutoCrewService = AutoCrewService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         leaves_service_1.LeavesService,
-        audit_service_1.AuditService])
+        audit_service_1.AuditService,
+        guide_confirmation_service_1.GuideConfirmationService])
 ], AutoCrewService);
 //# sourceMappingURL=auto-crew.service.js.map

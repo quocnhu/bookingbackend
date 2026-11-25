@@ -35,6 +35,7 @@ export declare class RolesService {
                 userType: string | null;
                 storageQuotaMb: number;
                 providerId: string | null;
+                hotelId: string | null;
             };
         } & {
             userId: string;
@@ -86,6 +87,7 @@ export declare class RolesService {
                 userType: string | null;
                 storageQuotaMb: number;
                 providerId: string | null;
+                hotelId: string | null;
             };
         } & {
             userId: string;

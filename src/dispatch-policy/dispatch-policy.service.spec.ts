@@ -20,52 +20,72 @@ describe('DispatchPolicyService', () => {
     jest.useRealTimers();
   });
 
-  it('computes the 23:00 HCM cutoff on the day before departure', () => {
+  it('computes the 21:00 HCM cutoff on the day before departure', () => {
     const service = serviceWith({});
     expect(
       service.cutoffFor('2026-11-23T00:00:00.000Z').toISOString(),
-    ).toBe('2026-11-22T16:00:00.000Z');
+    ).toBe('2026-11-22T14:00:00.000Z');
   });
 
-  it('seals auto-mode dates only after the cutoff', async () => {
+  it('opens the dispatch window at 12:00 and closes it at 21:00 HCM', () => {
+    const service = serviceWith({});
+    const departure = '2026-11-23T00:00:00.000Z';
+
+    jest.setSystemTime(new Date('2026-11-22T04:59:00.000Z'));
+    expect(service.dispatchWindow(departure).open).toBe(false);
+
+    jest.setSystemTime(new Date('2026-11-22T05:00:00.000Z'));
+    expect(service.dispatchWindow(departure).open).toBe(true);
+
+    jest.setSystemTime(new Date('2026-11-22T14:00:00.000Z'));
+    expect(service.dispatchWindow(departure).open).toBe(true);
+
+    jest.setSystemTime(new Date('2026-11-22T14:01:00.000Z'));
+    expect(service.dispatchWindow(departure).open).toBe(false);
+  });
+
+  it('uses the stored dispatch opening time', async () => {
     const service = serviceWith({
+      dispatchOpenTime: '10:00',
+      autoDispatchCron: '0 21 * * *',
+    });
+    const departure = '2026-11-23T00:00:00.000Z';
+
+    jest.setSystemTime(new Date('2026-11-22T02:59:00.000Z'));
+    expect((await service.getSealInfo(departure)).windowOpen).toBe(false);
+
+    jest.setSystemTime(new Date('2026-11-22T03:00:00.000Z'));
+    const info = await service.getSealInfo(departure);
+    expect(info.openTime).toBe('10:00');
+    expect(info.windowOpen).toBe(true);
+  });
+
+  it('rejects an opening time at or after the cutoff', () => {
+    const service = serviceWith({});
+    expect(service.windowOrderIsValid('12:00', '21:00')).toBe(true);
+    expect(service.windowOrderIsValid('21:00', '21:00')).toBe(false);
+    expect(service.windowOrderIsValid('22:00', '21:00')).toBe(false);
+  });
+
+  it('seals the date at the cutoff in both Manual and Auto mode', async () => {
+    const departure = '2026-11-23T00:00:00.000Z';
+    const auto = serviceWith({
       assignMode: AssignmentOrigin.AUTO_ASSIGN,
       autoDispatchEnabled: 'true',
-      autoDispatchCron: '0 23 * * *',
-      autoModeActivatedAt: '2026-11-01T00:00:00.000Z',
+      autoDispatchCron: '0 21 * * *',
     });
-
-    jest.setSystemTime(new Date('2026-11-22T15:59:00.000Z'));
-    expect(
-      (await service.getSealInfo('2026-11-23T00:00:00.000Z')).sealed,
-    ).toBe(false);
-
-    jest.setSystemTime(new Date('2026-11-22T16:01:00.000Z'));
-    expect(
-      (await service.getSealInfo('2026-11-23T00:00:00.000Z')).sealed,
-    ).toBe(true);
-  });
-
-  it('does not seal manual mode or auto mode enabled after the cutoff', async () => {
-    jest.setSystemTime(new Date('2026-11-22T16:30:00.000Z'));
-
     const manual = serviceWith({
       assignMode: AssignmentOrigin.MANUAL,
-      autoDispatchEnabled: 'true',
-      autoDispatchCron: '0 23 * * *',
+      autoDispatchEnabled: 'false',
+      autoDispatchCron: '0 21 * * *',
     });
-    expect(
-      (await manual.getSealInfo('2026-11-23T00:00:00.000Z')).sealed,
-    ).toBe(false);
 
-    const enabledLate = serviceWith({
-      assignMode: AssignmentOrigin.AUTO_ASSIGN,
-      autoDispatchEnabled: 'true',
-      autoDispatchCron: '0 23 * * *',
-      autoModeActivatedAt: '2026-11-22T16:10:00.000Z',
-    });
-    expect(
-      (await enabledLate.getSealInfo('2026-11-23T00:00:00.000Z')).sealed,
-    ).toBe(false);
+    jest.setSystemTime(new Date('2026-11-22T13:59:00.000Z'));
+    expect((await auto.getSealInfo(departure)).sealed).toBe(false);
+    expect((await manual.getSealInfo(departure)).sealed).toBe(false);
+
+    jest.setSystemTime(new Date('2026-11-22T14:01:00.000Z'));
+    expect((await auto.getSealInfo(departure)).sealed).toBe(true);
+    expect((await manual.getSealInfo(departure)).sealed).toBe(true);
   });
 });

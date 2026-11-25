@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FinalizeAssignmentDto = exports.VerifyTourReportDto = exports.EvidenceImageDto = exports.SubmitTourReportDto = exports.QueryAssignmentDto = exports.MoveBookingDto = exports.ReorderBookingsDto = exports.AssignBookingsDto = exports.ReturnPartnerHandoffDto = exports.ConfirmPartnerHandoffDto = exports.UpdatePickupReminderModeDto = exports.UpdatePickupReminderSettingsDto = exports.UpdateRecallCutoffDto = exports.UpdateAutoDispatchDto = exports.SetBoardOriginDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
+exports.FinalizeAssignmentDto = exports.VerifyTourReportDto = exports.EvidenceImageDto = exports.SubmitTourReportDto = exports.QueryAssignmentDto = exports.MoveBookingDto = exports.ReorderBookingsDto = exports.AssignBookingsDto = exports.ReturnPartnerHandoffDto = exports.ConfirmPartnerHandoffDto = exports.UpdatePickupReminderModeDto = exports.UpdatePickupReminderSettingsDto = exports.UpdateDispatchWindowDto = exports.UpdateRecallCutoffDto = exports.UpdateAutoDispatchDto = exports.SetBoardOriginDto = exports.UpdateAssignmentStatusDto = exports.UpdateAssignmentDto = exports.CreateAssignmentDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
@@ -176,12 +176,18 @@ __decorate([
 ], UpdateAssignmentDto.prototype, "tripNotes", void 0);
 class UpdateAssignmentStatusDto {
     status;
+    override;
 }
 exports.UpdateAssignmentStatusDto = UpdateAssignmentStatusDto;
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.AssignmentStatus),
     __metadata("design:type", String)
 ], UpdateAssignmentStatusDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateAssignmentStatusDto.prototype, "override", void 0);
 class SetBoardOriginDto {
     origin;
 }
@@ -213,6 +219,14 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateRecallCutoffDto.prototype, "time", void 0);
+class UpdateDispatchWindowDto {
+    time;
+}
+exports.UpdateDispatchWindowDto = UpdateDispatchWindowDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateDispatchWindowDto.prototype, "time", void 0);
 class UpdatePickupReminderSettingsDto {
     enabled;
     time;

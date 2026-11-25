@@ -1,4 +1,5 @@
 import { PrismaService } from "../prisma/prisma.service";
+import { DispatchReadinessRow } from './dispatch-readiness.template';
 export type MailSendResult = {
     sent: boolean;
     reason?: string;
@@ -30,6 +31,16 @@ export declare class MailService {
         message: string;
         reference?: string | null;
         actionLabel?: string | null;
+        actionUrl?: string | null;
+    }): Promise<{
+        sent: number;
+        reason?: string;
+    }>;
+    sendDispatchReadiness(input: {
+        to: string[];
+        dateKey: string;
+        dateLabel: string;
+        rows: DispatchReadinessRow[];
         actionUrl?: string | null;
     }): Promise<{
         sent: number;

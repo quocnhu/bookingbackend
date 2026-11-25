@@ -37,6 +37,9 @@ import { TransportRequestsModule } from './transport-requests/transport-requests
 import { AccountingModule } from './accounting/accounting.module';
 import { PaymentModule } from './payment/payment.module';
 import { PartnersModule } from './partners/partners.module';
+import { GuideConfirmationModule } from './guide-confirmation/guide-confirmation.module';
+import { GuideHoldsModule } from './guide-holds/guide-holds.module';
+import { HotelsModule } from './hotels/hotels.module';
 
 @Module({
   imports: [
@@ -74,6 +77,9 @@ import { PartnersModule } from './partners/partners.module';
     AccountingModule,
     PaymentModule,
     PartnersModule,
+    GuideConfirmationModule,
+    GuideHoldsModule,
+    HotelsModule,
     ServeStaticModule.forRoot({
       rootPath: uploadRootPath(),
       serveRoot: '/uploads',

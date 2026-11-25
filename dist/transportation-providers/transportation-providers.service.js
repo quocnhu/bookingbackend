@@ -92,8 +92,8 @@ let TransportationProvidersService = class TransportationProvidersService {
         if (actor?.role === client_1.RoleType.ADMIN)
             return;
         const hcm = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-        if (hcm.getHours() >= 22) {
-            throw new common_1.BadRequestException('Driver roster is frozen after 22:00 — changes resume tomorrow morning.');
+        if (hcm.getHours() >= 21) {
+            throw new common_1.BadRequestException('Driver roster is frozen after 21:00 — changes resume tomorrow morning.');
         }
     }
     async findAll(actor) {

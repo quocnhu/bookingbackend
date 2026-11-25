@@ -17,6 +17,7 @@ import { AssignmentsService } from './assignments.service';
 import { AutoDispatchCron } from './auto-dispatch.cron';
 import { PickupReminderCron } from './pickup-reminder.cron';
 import { AccountingService } from '@/accounting/accounting.service';
+import { GuideConfirmationService } from '@/guide-confirmation/guide-confirmation.service';
 import { CreateSettlementDto } from '@/accounting/dto/accounting.dto';
 import {
   AssignBookingsDto,
@@ -32,6 +33,7 @@ import {
   UpdateAssignmentDto,
   UpdateAssignmentStatusDto,
   UpdateAutoDispatchDto,
+  UpdateDispatchWindowDto,
   UpdatePickupReminderModeDto,
   UpdatePickupReminderSettingsDto,
   UpdateRecallCutoffDto,
@@ -54,6 +56,7 @@ export class AssignmentsController {
     private readonly autoDispatchCron: AutoDispatchCron,
     private readonly pickupReminderCron: PickupReminderCron,
     private readonly accountingService: AccountingService,
+    private readonly guideConfirmation: GuideConfirmationService,
   ) {}
 
   @Get()
@@ -85,13 +88,25 @@ export class AssignmentsController {
 
   @Post('board/dispatch-all')
   @Permissions('assignment.update')
-  dispatchAllBoard(@Body('date') date?: string) {
-    if (!date) return this.assignmentsService.dispatchAllBoard();
+  dispatchAllBoard(
+    @Body('date') date?: string,
+    @Body('override') override?: boolean,
+    @CurrentUser() actor?: AuthenticatedUser,
+  ) {
+    if (!date) {
+      return this.assignmentsService.dispatchAllBoard(undefined, {
+        override,
+        actor,
+      });
+    }
     const parsed = new Date(date);
     if (Number.isNaN(parsed.getTime())) {
       throw new BadRequestException('Invalid dispatch date');
     }
-    return this.assignmentsService.dispatchAllBoard(parsed);
+    return this.assignmentsService.dispatchAllBoard(parsed, {
+      override,
+      actor,
+    });
   }
 
   @Get('board/seal')
@@ -120,6 +135,21 @@ export class AssignmentsController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.autoDispatchCron.updateSettings(dto, actor.id);
+  }
+
+  @Get('board/dispatch-window')
+  @Permissions('assignment.read')
+  getDispatchWindow() {
+    return this.assignmentsService.getDispatchOpenTime();
+  }
+
+  @Put('board/dispatch-window')
+  @Permissions('assignment.update')
+  updateDispatchWindow(
+    @Body() dto: UpdateDispatchWindowDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.assignmentsService.updateDispatchOpenTime(dto, actor.id);
   }
 
   @Get('board/recall-cutoff')
@@ -170,6 +200,29 @@ export class AssignmentsController {
   @Get('my-assignments')
   findMyAssignments(@CurrentUser() actor: AuthenticatedUser) {
     return this.assignmentsService.findMyAssignments(actor);
+  }
+
+  @Post(':id/guide-confirm')
+  confirmGuideAssignment(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.guideConfirmation.confirm(id, actor);
+  }
+
+  @Post(':id/guide-decline')
+  declineGuideAssignment(
+    @Param('id') id: string,
+    @Body('reason') reason: string | undefined,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.guideConfirmation.decline(id, actor, reason);
+  }
+
+  @Post(':id/guide-confirmation/resend')
+  @Permissions('assignment.update')
+  resendGuideConfirmation(@Param('id') id: string) {
+    return this.guideConfirmation.request(id, { reminder: true });
   }
 
   @Get('my-calendar')
@@ -254,8 +307,9 @@ export class AssignmentsController {
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateAssignmentStatusDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.assignmentsService.updateStatus(id, dto);
+    return this.assignmentsService.updateStatus(id, dto, actor);
   }
 
   @Post(':id/bookings/reorder')

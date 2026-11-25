@@ -494,6 +494,12 @@ const ROLES: SeedRole[] = [
       "route-price.create",
       "route-price.update"
     ]
+  },
+  {
+    "name": "HOTEL",
+    "description": "Hotel partner — own bookings and commission",
+    "isSystem": false,
+    "permissions": []
   }
 ];
 

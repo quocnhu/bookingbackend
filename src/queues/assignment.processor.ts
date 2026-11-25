@@ -16,6 +16,7 @@ import { NotificationsGateway } from '@/notifications/notifications.gateway';
 import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
 import { ASSIGN_QUEUE } from './queue.constants';
 import { AssignJobData } from './assignment.queue';
+import { isUnpaidPayPalBooking } from '@/common/utils/unpaid-booking.util';
 
 /** A trip (bus) carrying at most 12 passengers — per bookingflow.md. */
 const BUS_MAX_PAX = 12;
@@ -63,6 +64,8 @@ export class AssignmentProcessor extends WorkerHost {
     if (!booking) return { skipped: true, reason: 'BOOKING_NOT_FOUND' };
     if (booking.status === BookingStatus.CANCELED)
       return { skipped: true, reason: 'CANCELED' };
+    if (isUnpaidPayPalBooking(booking))
+      return { skipped: true, reason: 'PAYMENT_PENDING' };
     if (booking.assignmentId)
       return {
         skipped: true,
@@ -96,12 +99,12 @@ export class AssignmentProcessor extends WorkerHost {
     }
 
     // AUTO and MANUAL share the same booking → bus + crew logic.
-    // The toggle does NOT gate assignment here — it only gates the 23:00
+    // The toggle does NOT gate assignment here — it only gates the 21:00
     // next-day auto-dispatch cron (see auto-dispatch.cron.ts). Every booking with a
     // start date finds/shares a bus or inits a new one, then auto-fills crew.
     // EXTENSION POINT (auto/manual): add per-booking overrides here as needed,
     // e.g. per-tour mode (SystemSetting key `assignMode:<tourId>`), auto-assign
-    // time windows (only auto-run 03:00–23:00), VIP-channel auto-pass, or
+    // time windows (only auto-run 12:00–21:00), VIP-channel auto-pass, or
     // admin-approval before a new bus is created. Return
     // `{ skipped: true, reason: '<REASON>' }` to leave the booking PENDING.
 

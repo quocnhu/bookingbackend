@@ -987,6 +987,21 @@ async function main() {
     `✅ Seeded TRANSPORT_PROVIDER role (${PROVIDER_ROLE_PERMISSIONS.filter((c) => permissionMap.has(c)).length} permissions)`,
   );
 
+  // 3.6 HOTEL role — one account per hotel, scoped to its own bookings.
+  const hotelRole = await prisma.role.upsert({
+    where: { name: 'HOTEL' },
+    update: {},
+    create: {
+      name: 'HOTEL',
+      description: 'Hotel partner — own bookings and commission',
+      isSystem: false,
+    },
+  });
+  await prisma.rolePermission.deleteMany({
+    where: { roleId: hotelRole.id },
+  });
+  console.log(`✅ Seeded HOTEL role`);
+
   // 4. Default admin user
   const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@booking.local';
   const passwordHash = await bcrypt.hash(

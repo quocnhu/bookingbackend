@@ -64,17 +64,17 @@ export class TransportationProvidersService {
     return actor!.providerId;
   }
 
-  /** Driver roster freezes at 22:00 Vietnam time daily — providers must finish
-   *  assigning drivers before 23:00 so the next-day auto crew+dispatch runs on a
+  /** Driver roster freezes at 21:00 Vietnam time daily — providers must finish
+   *  assigning drivers before the dispatch cutoff so tomorrow's buses run on a
    *  settled roster. ADMIN stays exempt for emergencies. */
   private assertBeforeRosterFreeze(actor?: AuthenticatedUser) {
     if (actor?.role === RoleType.ADMIN) return;
     const hcm = new Date(
       new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }),
     );
-    if (hcm.getHours() >= 22) {
+    if (hcm.getHours() >= 21) {
       throw new BadRequestException(
-        'Driver roster is frozen after 22:00 — changes resume tomorrow morning.',
+        'Driver roster is frozen after 21:00 — changes resume tomorrow morning.',
       );
     }
   }

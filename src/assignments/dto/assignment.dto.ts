@@ -130,6 +130,15 @@ export class UpdateAssignmentDto {
 export class UpdateAssignmentStatusDto {
   @IsEnum(AssignmentStatus)
   status: AssignmentStatus;
+
+  /**
+   * ADMIN only: dispatch even if a freelance guide has not confirmed or an
+   * external provider request has not been marked ASSIGNED yet. A driver (and
+   * vehicle for external providers) is still required.
+   */
+  @IsOptional()
+  @IsBoolean()
+  override?: boolean;
 }
 
 /** Enable/disable the creation source for all assignments on the Dispatch Board (Manual / Auto). */
@@ -151,6 +160,12 @@ export class UpdateAutoDispatchDto {
 
 /** Recall cutoff time (HH:mm) on the departure day. */
 export class UpdateRecallCutoffDto {
+  @IsString()
+  time: string;
+}
+
+/** Dispatch window opening time (HH:mm) on the day before departure. */
+export class UpdateDispatchWindowDto {
   @IsString()
   time: string;
 }

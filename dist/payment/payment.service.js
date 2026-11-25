@@ -17,17 +17,24 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const schedule_1 = require("@nestjs/schedule");
 const mail_service_1 = require("../mail/mail.service");
+const assignment_queue_1 = require("../queues/assignment.queue");
+const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
+const unpaid_booking_util_1 = require("../common/utils/unpaid-booking.util");
 const currency_util_1 = require("./currency.util");
 let PaymentService = PaymentService_1 = class PaymentService {
     prisma;
     audit;
     mail;
+    assignmentQueue;
+    dispatchPolicy;
     logger = new common_1.Logger(PaymentService_1.name);
     tokenCache = null;
-    constructor(prisma, audit, mail) {
+    constructor(prisma, audit, mail, assignmentQueue, dispatchPolicy) {
         this.prisma = prisma;
         this.audit = audit;
         this.mail = mail;
+        this.assignmentQueue = assignmentQueue;
+        this.dispatchPolicy = dispatchPolicy;
     }
     get mode() {
         return (process.env.PAYPAL_MODE ?? 'sandbox').toLowerCase() === 'live'
@@ -219,6 +226,30 @@ let PaymentService = PaymentService_1 = class PaymentService {
         }
         return body;
     }
+    async getPayPalOrder(orderId) {
+        const token = await this.accessToken();
+        const res = await fetch(`${this.baseUrl}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(20_000),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (res.status === 404 ||
+            body?.name === 'RESOURCE_NOT_FOUND' ||
+            body?.details?.[0]?.issue === 'ORDER_NOT_FOUND') {
+            return null;
+        }
+        if (!res.ok) {
+            this.logger.error(`PayPal order lookup ${orderId} failed: ${res.status} ${JSON.stringify(body)}`);
+            throw new common_1.BadGatewayException(body?.message ||
+                body?.details?.[0]?.description ||
+                'PayPal request failed');
+        }
+        return body;
+    }
     async bookingForCustomer(bookingId, actor) {
         const booking = await this.prisma.booking.findUnique({
             where: { id: bookingId },
@@ -237,6 +268,9 @@ let PaymentService = PaymentService_1 = class PaymentService {
             actor.role !== client_1.RoleType.OFFICE &&
             booking.customerUserId !== actor.id) {
             throw new common_1.UnauthorizedException('This booking does not belong to you');
+        }
+        if (booking.status === client_1.BookingStatus.CANCELED) {
+            throw new common_1.ConflictException('This booking has been cancelled. Please book again.');
         }
         if (booking.channel !== client_1.BookingProvider.WEBSITE) {
             throw new common_1.BadRequestException('PayPal is only available for website bookings');
@@ -270,6 +304,14 @@ let PaymentService = PaymentService_1 = class PaymentService {
         this.assertConfigured();
         await this.expireStalePayPalPayments();
         const booking = await this.bookingForCustomer(bookingId, actor);
+        const mode = await this.dispatchPolicy.getMode();
+        const cutoffAt = booking.startingDate
+            ? this.dispatchPolicy.cutoffFor(booking.startingDate, mode.cutoffTime)
+            : null;
+        const paymentDeadline = (0, unpaid_booking_util_1.unpaidCancelAt)(booking.createdAt, cutoffAt);
+        if (Date.now() > paymentDeadline.getTime()) {
+            throw new common_1.BadRequestException('The payment window for this booking has closed. Please book again.');
+        }
         const reusable = booking.payments.find((p) => p.status === client_1.PaymentRecordStatus.PENDING &&
             p.providerOrderId &&
             Date.now() - new Date(p.createdAt).getTime() < 3 * 60 * 60 * 1000);
@@ -437,6 +479,11 @@ let PaymentService = PaymentService_1 = class PaymentService {
             changedBy: null,
         });
         void this.mail.sendBookingConfirmation(payment.bookingId);
+        if (payment.booking.startingDate &&
+            !payment.booking.assignmentId &&
+            payment.booking.status !== client_1.BookingStatus.CANCELED) {
+            await this.assignmentQueue.enqueue(payment.bookingId);
+        }
         return updated;
     }
     async capturePayPalOrder(bookingId, orderId, actor, note) {
@@ -484,6 +531,94 @@ let PaymentService = PaymentService_1 = class PaymentService {
             paymentId: updated.id,
             orderId,
             captureId: capture.id ?? null,
+        };
+    }
+    async reconcileUnpaidBooking(bookingId) {
+        if (!this.isConfigured()) {
+            return {
+                paid: false,
+                safeToCancel: false,
+                pendingApproval: false,
+                checkedOrders: 0,
+            };
+        }
+        const booking = await this.prisma.booking.findUnique({
+            where: { id: bookingId },
+            include: {
+                payments: {
+                    where: { provider: 'PAYPAL' },
+                    orderBy: { createdAt: 'desc' },
+                    take: 10,
+                },
+            },
+        });
+        if (!booking) {
+            return {
+                paid: false,
+                safeToCancel: true,
+                pendingApproval: false,
+                checkedOrders: 0,
+            };
+        }
+        if (booking.payment === client_1.PaymentStatus.PAID ||
+            booking.payments.some((payment) => payment.status === client_1.PaymentRecordStatus.PAID)) {
+            return {
+                paid: true,
+                safeToCancel: false,
+                pendingApproval: false,
+                checkedOrders: 0,
+            };
+        }
+        let checkedOrders = 0;
+        let pendingApproval = false;
+        for (const payment of booking.payments) {
+            if (!payment.providerOrderId)
+                continue;
+            checkedOrders += 1;
+            let order;
+            try {
+                order = await this.getPayPalOrder(payment.providerOrderId);
+            }
+            catch (error) {
+                this.logger.warn(`PayPal reconcile lookup failed for ${payment.providerOrderId}: ${error.message}`);
+                return {
+                    paid: false,
+                    safeToCancel: false,
+                    pendingApproval,
+                    checkedOrders,
+                };
+            }
+            if (!order)
+                continue;
+            if (order.status === 'COMPLETED') {
+                const capture = this.captureDetails(order);
+                if (!capture || capture.status !== 'COMPLETED') {
+                    return {
+                        paid: false,
+                        safeToCancel: false,
+                        pendingApproval,
+                        checkedOrders,
+                    };
+                }
+                await this.markCaptured(payment.id, capture, order, 'Paid with PayPal (reconciled)');
+                return {
+                    paid: true,
+                    safeToCancel: false,
+                    pendingApproval: false,
+                    checkedOrders,
+                };
+            }
+            if (order?.status === 'APPROVED') {
+                const age = Date.now() - new Date(payment.createdAt).getTime();
+                if (age < 3.25 * 60 * 60 * 1000)
+                    pendingApproval = true;
+            }
+        }
+        return {
+            paid: false,
+            safeToCancel: !pendingApproval,
+            pendingApproval,
+            checkedOrders,
         };
     }
     async recordOtaRemittance(bookingId, dto, actor) {
@@ -680,6 +815,8 @@ exports.PaymentService = PaymentService = PaymentService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_service_1.AuditService,
-        mail_service_1.MailService])
+        mail_service_1.MailService,
+        assignment_queue_1.AssignmentQueue,
+        dispatch_policy_service_1.DispatchPolicyService])
 ], PaymentService);
 //# sourceMappingURL=payment.service.js.map

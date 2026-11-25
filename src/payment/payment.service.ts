@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import {
   BookingProvider,
+  BookingStatus,
   PaymentMethod,
   PaymentRecordStatus,
   PaymentStatus,
@@ -23,6 +24,11 @@ import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interf
 import { QueryBookingPaymentsDto } from './dto/payment.dto';
 import { Interval } from '@nestjs/schedule';
 import { MailService } from '@/mail/mail.service';
+import { AssignmentQueue } from '@/queues/assignment.queue';
+import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
+import {
+  unpaidCancelAt,
+} from '@/common/utils/unpaid-booking.util';
 import {
   convertBookingAmount,
   DEFAULT_VND_PER_USD,
@@ -47,6 +53,8 @@ export class PaymentService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly assignmentQueue: AssignmentQueue,
+    private readonly dispatchPolicy: DispatchPolicyService,
   ) {}
 
   private get mode(): 'sandbox' | 'live' {
@@ -274,6 +282,46 @@ export class PaymentService {
     return body as T;
   }
 
+  /**
+   * Read one PayPal order. A 404 / RESOURCE_NOT_FOUND means PayPal no longer
+   * knows the order (expired or purged): it cannot have been charged, so the
+   * unpaid cleanup can treat it as safe to cancel. Other failures still throw
+   * and the cleanup fails closed.
+   */
+  private async getPayPalOrder(orderId: string): Promise<any | null> {
+    const token = await this.accessToken();
+    const res = await fetch(
+      `${this.baseUrl}/v2/checkout/orders/${encodeURIComponent(orderId)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(20_000),
+      },
+    );
+    const body = await res.json().catch(() => ({}));
+    if (
+      res.status === 404 ||
+      body?.name === 'RESOURCE_NOT_FOUND' ||
+      body?.details?.[0]?.issue === 'ORDER_NOT_FOUND'
+    ) {
+      return null;
+    }
+    if (!res.ok) {
+      this.logger.error(
+        `PayPal order lookup ${orderId} failed: ${res.status} ${JSON.stringify(body)}`,
+      );
+      throw new BadGatewayException(
+        body?.message ||
+          body?.details?.[0]?.description ||
+          'PayPal request failed',
+      );
+    }
+    return body;
+  }
+
   private async bookingForCustomer(
     bookingId: string,
     actor: AuthenticatedUser,
@@ -296,6 +344,11 @@ export class PaymentService {
       booking.customerUserId !== actor.id
     ) {
       throw new UnauthorizedException('This booking does not belong to you');
+    }
+    if (booking.status === BookingStatus.CANCELED) {
+      throw new ConflictException(
+        'This booking has been cancelled. Please book again.',
+      );
     }
     if (booking.channel !== BookingProvider.WEBSITE) {
       throw new BadRequestException(
@@ -344,6 +397,16 @@ export class PaymentService {
     this.assertConfigured();
     await this.expireStalePayPalPayments();
     const booking = await this.bookingForCustomer(bookingId, actor);
+    const mode = await this.dispatchPolicy.getMode();
+    const cutoffAt = booking.startingDate
+      ? this.dispatchPolicy.cutoffFor(booking.startingDate, mode.cutoffTime)
+      : null;
+    const paymentDeadline = unpaidCancelAt(booking.createdAt, cutoffAt);
+    if (Date.now() > paymentDeadline.getTime()) {
+      throw new BadRequestException(
+        'The payment window for this booking has closed. Please book again.',
+      );
+    }
 
     const reusable = booking.payments.find(
       (p) =>
@@ -540,6 +603,15 @@ export class PaymentService {
     // Payment is confirmed: send the booking-confirmation template to the
     // tourist. Idempotent per booking (capture + webhook can race).
     void this.mail.sendBookingConfirmation(payment.bookingId);
+    // The booking was held off the board while unpaid; now that the money is
+    // confirmed it can join a bus / get crew like any other booking.
+    if (
+      payment.booking.startingDate &&
+      !payment.booking.assignmentId &&
+      payment.booking.status !== BookingStatus.CANCELED
+    ) {
+      await this.assignmentQueue.enqueue(payment.bookingId);
+    }
     return updated;
   }
 
@@ -610,6 +682,120 @@ export class PaymentService {
       paymentId: updated.id,
       orderId,
       captureId: capture.id ?? null,
+    };
+  }
+
+  /**
+   * Reconcile an unpaid booking with PayPal before the cleanup job cancels it.
+   *
+   * - COMPLETED order → mark the booking PAID (lost capture response / power cut).
+   * - APPROVED but still capturable → wait, never cancel.
+   * - CREATED / VOIDED / expired APPROVED → the customer was not charged.
+   * - PayPal unreachable → fail closed: do not cancel this run.
+   */
+  async reconcileUnpaidBooking(bookingId: string): Promise<{
+    paid: boolean;
+    safeToCancel: boolean;
+    pendingApproval: boolean;
+    checkedOrders: number;
+  }> {
+    if (!this.isConfigured()) {
+      return {
+        paid: false,
+        safeToCancel: false,
+        pendingApproval: false,
+        checkedOrders: 0,
+      };
+    }
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        payments: {
+          where: { provider: 'PAYPAL' },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+      },
+    });
+    if (!booking) {
+      return {
+        paid: false,
+        safeToCancel: true,
+        pendingApproval: false,
+        checkedOrders: 0,
+      };
+    }
+    if (
+      booking.payment === PaymentStatus.PAID ||
+      booking.payments.some(
+        (payment) => payment.status === PaymentRecordStatus.PAID,
+      )
+    ) {
+      return {
+        paid: true,
+        safeToCancel: false,
+        pendingApproval: false,
+        checkedOrders: 0,
+      };
+    }
+
+    let checkedOrders = 0;
+    let pendingApproval = false;
+    for (const payment of booking.payments) {
+      if (!payment.providerOrderId) continue;
+      checkedOrders += 1;
+      let order: any;
+      try {
+        order = await this.getPayPalOrder(payment.providerOrderId);
+      } catch (error) {
+        this.logger.warn(
+          `PayPal reconcile lookup failed for ${payment.providerOrderId}: ${(error as Error).message}`,
+        );
+        return {
+          paid: false,
+          safeToCancel: false,
+          pendingApproval,
+          checkedOrders,
+        };
+      }
+      if (!order) continue;
+
+      if (order.status === 'COMPLETED') {
+        const capture = this.captureDetails(order);
+        if (!capture || capture.status !== 'COMPLETED') {
+          return {
+            paid: false,
+            safeToCancel: false,
+            pendingApproval,
+            checkedOrders,
+          };
+        }
+        await this.markCaptured(
+          payment.id,
+          capture,
+          order,
+          'Paid with PayPal (reconciled)',
+        );
+        return {
+          paid: true,
+          safeToCancel: false,
+          pendingApproval: false,
+          checkedOrders,
+        };
+      }
+
+      if (order?.status === 'APPROVED') {
+        // PayPal approvals expire after ~3 hours; keep a small safety margin.
+        const age = Date.now() - new Date(payment.createdAt).getTime();
+        if (age < 3.25 * 60 * 60 * 1000) pendingApproval = true;
+      }
+    }
+
+    return {
+      paid: false,
+      safeToCancel: !pendingApproval,
+      pendingApproval,
+      checkedOrders,
     };
   }
 

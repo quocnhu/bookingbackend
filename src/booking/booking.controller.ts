@@ -114,6 +114,15 @@ export class BookingController {
       .then((hours) => ({ hours }));
   }
 
+  /**
+   * The signed-in customer's own bookings (public "My bookings" page).
+   * Ownership-checked in the service; no booking.read permission is needed.
+   */
+  @Get('mine')
+  findMine(@CurrentUser() actor: AuthenticatedUser) {
+    return this.bookingService.findMine(actor);
+  }
+
   @Put('cancellation-window')
   @Permissions('booking.update')
   updateCancellationWindow(

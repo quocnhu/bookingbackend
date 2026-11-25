@@ -14,6 +14,7 @@ const auto_dispatch_cron_1 = require("./auto-dispatch.cron");
 const tour_reminder_cron_1 = require("./tour-reminder.cron");
 const pickup_reminder_cron_1 = require("./pickup-reminder.cron");
 const waiting_list_cron_1 = require("./waiting-list.cron");
+const dispatch_readiness_cron_1 = require("./dispatch-readiness.cron");
 const audit_module_1 = require("../audit/audit.module");
 const leaves_module_1 = require("../leaves/leaves.module");
 const accounting_module_1 = require("../accounting/accounting.module");
@@ -38,6 +39,7 @@ exports.AssignmentsModule = AssignmentsModule = __decorate([
             tour_reminder_cron_1.TourReminderCron,
             pickup_reminder_cron_1.PickupReminderCron,
             waiting_list_cron_1.WaitingListCron,
+            dispatch_readiness_cron_1.DispatchReadinessCron,
         ],
         exports: [assignments_service_1.AssignmentsService],
     })

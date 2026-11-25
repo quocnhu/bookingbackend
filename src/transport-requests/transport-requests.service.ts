@@ -9,6 +9,7 @@ import { Cron } from '@nestjs/schedule';
 import {
   AssignmentExecutionMode,
   AssignmentStatus,
+  GuideType,
   NotificationType,
   Prisma,
   ProviderAssignmentMode,
@@ -22,6 +23,9 @@ import { NotificationService } from '@/notifications/notification.service';
 import { NotificationsGateway } from '@/notifications/notifications.gateway';
 import { AutoCrewService } from '@/queues/auto-crew.service';
 import { MailService } from '@/mail/mail.service';
+import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
+import { GuideConfirmationService } from '@/guide-confirmation/guide-confirmation.service';
+import { isUnpaidPayPalBooking } from '@/common/utils/unpaid-booking.util';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 import {
   AssignTransportRequestDto,
@@ -51,7 +55,7 @@ const DEFAULT_SETTINGS = {
   enabled: true,
   sendDaysBefore: 2,
   sendTime: '08:00',
-  deadlineTime: '23:00',
+  deadlineTime: '21:00',
   minLeadHours: 3,
 };
 
@@ -76,7 +80,14 @@ const assignmentInclude = {
     select: { id: true, name: true, isCompany: true, assignmentMode: true },
   },
   driver: { select: { id: true, name: true, email: true, providerId: true } },
-  guide: { select: { id: true, name: true } },
+  guide: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      guideProfile: { select: { type: true } },
+    },
+  },
 } satisfies Prisma.AssignmentInclude;
 
 type AssignmentView = Prisma.AssignmentGetPayload<{
@@ -96,6 +107,8 @@ export class TransportRequestsService {
     private readonly gateway: NotificationsGateway,
     private readonly autoCrew: AutoCrewService,
     private readonly mail: MailService,
+    private readonly dispatchPolicy: DispatchPolicyService,
+    private readonly guideConfirmation: GuideConfirmationService,
   ) {}
 
   private include = assignmentInclude;
@@ -317,7 +330,7 @@ export class TransportRequestsService {
       throw new BadRequestException('Invalid deadline');
     }
     if (deadline.getTime() <= Date.now()) {
-      // Manual send after the standard 23:00 deadline (e.g. the first provider
+      // Manual send after the standard 21:00 deadline (e.g. the first provider
       // failed): give the replacement a short window up to departure.
       const now = Date.now();
       const tripStart = new Date(assignment.startDate).getTime();
@@ -388,6 +401,11 @@ export class TransportRequestsService {
           url: '/transport-provider/requests',
         },
       );
+      await this.sendProviderEmail(previousProviderId, {
+        title: 'Route no longer available',
+        message: `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} was reassigned by the travel agent and is no longer available to you.`,
+        reference: updated.code ?? updated.id,
+      });
     }
     const suggestion = await this.suggestionText(updated);
     await this.notifyProvider(
@@ -401,6 +419,11 @@ export class TransportRequestsService {
         url: '/transport-provider/requests',
       },
     );
+    await this.sendProviderEmail(providerId, {
+      title: 'New transport request',
+      message: `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} · ${updated.totalPax} pax. ${suggestion} Deadline ${this.formatDateTime(deadline)}. Log in to assign a driver and vehicle or decline.`,
+      reference: updated.code ?? updated.id,
+    });
     this.gateway.notifyAll('transport:refresh', { assignmentId: updated.id });
     return this.toView(updated);
   }
@@ -441,6 +464,11 @@ export class TransportRequestsService {
           url: '/transport-provider/requests',
         },
       );
+      await this.sendProviderEmail(assignment.providerId, {
+        title: 'Transport request cancelled',
+        message: `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} was cancelled by the travel agent.`,
+        reference: updated.code ?? updated.id,
+      });
     }
     this.gateway.notifyAll('transport:refresh', { assignmentId: updated.id });
     return this.toView(updated);
@@ -480,6 +508,11 @@ export class TransportRequestsService {
           url: '/transport-provider/requests',
         },
       );
+      await this.sendProviderEmail(previousProviderId, {
+        title: 'Route no longer available',
+        message: `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${this.formatDateTime(assignment.startDate)} was reassigned by the travel agent and is no longer available to you.`,
+        reference: assignment.code ?? assignment.id,
+      });
     }
     const updated = await this.loadAssignment(assignmentId);
     await this.notifyProvider(
@@ -493,6 +526,11 @@ export class TransportRequestsService {
         url: '/transport-provider/requests',
       },
     );
+    await this.sendProviderEmail(providerId, {
+      title: 'Transport request assigned',
+      message: `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} was assigned by the travel agent. Log in to review the driver, vehicle and route.`,
+      reference: updated.code ?? updated.id,
+    });
     this.gateway.notifyAll('transport:refresh', { assignmentId: updated.id });
     return this.toView(updated);
   }
@@ -952,6 +990,248 @@ export class TransportRequestsService {
   }
 
   /**
+   * Prepare a departure day without dispatching: fill missing crew (company
+   * first), send guide confirmation requests (freelance) / auto-confirm
+   * company guides, and send/reserve transport provider requests for buses
+   * that still have no driver. Safe to run repeatedly; available all day.
+   */
+  async prepareTomorrow(dateInput?: string, actor?: AuthenticatedUser) {
+    const range = this.prepareRange(dateInput);
+    const dateKey = this.dispatchPolicy.dayKey(range.start);
+    const settings = await this.getSettings();
+    const now = new Date();
+
+    const assignments = await this.prisma.assignment.findMany({
+      where: {
+        status: {
+          in: [
+            AssignmentStatus.PENDING,
+            AssignmentStatus.DRAFT_ASSIGNED,
+            AssignmentStatus.TRANSFERRED,
+          ],
+        },
+        executionMode: { not: AssignmentExecutionMode.OUTSOURCED_PARTNER },
+        startDate: { gte: range.start, lte: range.end },
+        bookings: { some: {} },
+      },
+      include: this.include,
+      orderBy: { startDate: 'asc' },
+      take: 200,
+    });
+
+    const summary = {
+      date: dateKey,
+      buses: assignments.length,
+      crewAssigned: 0,
+      guideRequestsSent: 0,
+      companyGuidesAutoConfirmed: 0,
+      providersReserved: 0,
+      providerRequestsSent: 0,
+      autoAssigned: 0,
+      providerUnavailable: 0,
+      freelanceAwaiting: 0,
+      missing: [] as Array<{
+        assignmentId: string;
+        code: string | null;
+        tourName: string | null;
+        issues: string[];
+      }>,
+    };
+
+    for (const booked of assignments) {
+      let current: AssignmentView | null = booked;
+      let guideJustAssigned = false;
+      const needsGuide =
+        current.executionMode !==
+        AssignmentExecutionMode.COMPANY_DRIVER_ONLY;
+
+      // 1. Fill missing crew (company/OFFICIAL guide + company driver first).
+      if ((needsGuide && !current.guideId) || !current.driverId) {
+        try {
+          const crew = await this.autoCrew.assignCrewForBus(current.id);
+          if (crew.assigned) {
+            summary.crewAssigned += 1;
+            guideJustAssigned = !!crew.updates?.guideId;
+            current = await this.reloadAssignment(current.id);
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Prepare auto-crew failed for ${booked.code ?? booked.id}: ${(error as Error).message}`,
+          );
+        }
+      }
+      if (!current) continue;
+
+      // 2. Guide confirmation: company guides auto-confirm; freelance guides
+      //    get the request once. A guide just assigned by auto-crew already has
+      //    its request in flight, so do not send a duplicate here.
+      if (
+        !guideJustAssigned &&
+        current.guideId &&
+        !current.guideConfirmedAt &&
+        !current.guideDeclinedAt
+      ) {
+        const guideType =
+          current.guide?.guideProfile?.type ?? GuideType.FREELANCE;
+        if (guideType === GuideType.OFFICIAL) {
+          const changed =
+            await this.guideConfirmation.ensureCompanyGuideConfirmed(
+              current.id,
+            );
+          if (changed) {
+            summary.companyGuidesAutoConfirmed += 1;
+            current = await this.reloadAssignment(current.id);
+          }
+        } else if (!current.guideConfirmationRequestedAt) {
+          const result = await this.guideConfirmation.request(current.id);
+          if (result.requested) summary.guideRequestsSent += 1;
+          current = await this.reloadAssignment(current.id);
+        }
+      }
+      if (!current) continue;
+
+      // 3. Transport provider: only when the bus still has no driver.
+      if (!current.driverId) {
+        if (!settings.enabled) {
+          continue;
+        }
+        let provider = current.provider;
+        if (!provider || provider.isCompany) {
+          const picked = await this.pickExternalProvider(current);
+          if (!picked) {
+            summary.providerUnavailable += 1;
+            await this.warnNoProvider(current);
+            continue;
+          }
+          current = await this.prisma.assignment.update({
+            where: { id: current.id },
+            data: {
+              providerId: picked.id,
+              providerRequestStatus: TransportRequestStatus.NOT_REQUIRED,
+              providerWarningAt: null,
+              providerViewedAt: null,
+              providerRespondedAt: null,
+              providerDeadline: null,
+            },
+            include: this.include,
+          });
+          provider = current.provider;
+          summary.providersReserved += 1;
+        }
+
+        if (
+          provider &&
+          provider.isCompany === false &&
+          current.providerRequestStatus === TransportRequestStatus.NOT_REQUIRED
+        ) {
+          let deadline = this.computeDeadline(current.startDate, settings);
+          if (deadline.getTime() <= now.getTime()) {
+            // Explicit prepare click after the standard deadline: give the
+            // provider a short fallback window up to departure.
+            const tripStart = new Date(current.startDate).getTime();
+            const leadMs = Math.max(1, settings.minLeadHours) * 60 * 60 * 1000;
+            const fallback = Math.min(
+              now.getTime() + leadMs,
+              tripStart,
+            );
+            if (fallback <= now.getTime()) {
+              continue;
+            }
+            deadline = new Date(fallback);
+          }
+          await this.sendInternal(current, settings, deadline);
+          summary.providerRequestsSent += 1;
+          current = await this.reloadAssignment(current.id);
+          if (
+            current?.provider?.assignmentMode ===
+            ProviderAssignmentMode.FULLY_AUTO
+          ) {
+            const didAssign = await this.tryAutoAssignInternal(current.id);
+            if (didAssign) summary.autoAssigned += 1;
+            current = await this.reloadAssignment(current.id);
+          }
+        }
+      }
+    }
+
+    // 4. Final readiness list (what still needs a human).
+    const finalRows = await this.prisma.assignment.findMany({
+      where: { id: { in: assignments.map((a) => a.id) } },
+      include: this.include,
+    });
+    for (const row of finalRows) {
+      const issues: string[] = [];
+      const needsGuide =
+        row.executionMode !== AssignmentExecutionMode.COMPANY_DRIVER_ONLY;
+      if (needsGuide && !row.guideId) issues.push('No tour guide');
+      if (needsGuide && row.guideId) {
+        const guideType =
+          row.guide?.guideProfile?.type ?? GuideType.FREELANCE;
+        if (row.guideDeclinedAt) issues.push('Guide declined');
+        if (
+          guideType === GuideType.FREELANCE &&
+          !row.guideConfirmedAt &&
+          !row.guideDeclinedAt
+        ) {
+          issues.push('Freelance guide not confirmed');
+          summary.freelanceAwaiting += 1;
+        }
+      }
+      if (!row.driverId) issues.push('No driver');
+      if (row.bookings.some((booking) => isUnpaidPayPalBooking(booking))) {
+        issues.push('Unpaid PayPal booking');
+      }
+      const external =
+        !!row.providerId && row.provider?.isCompany === false;
+      if (external) {
+        if (!row.vehicleId) issues.push('No vehicle');
+        if (row.providerRequestStatus !== TransportRequestStatus.ASSIGNED) {
+          issues.push('Provider request not assigned');
+        }
+      }
+      if (issues.length > 0) {
+        summary.missing.push({
+          assignmentId: row.id,
+          code: row.code ?? null,
+          tourName: row.tourName ?? null,
+          issues: Array.from(new Set(issues)),
+        });
+      }
+    }
+
+    await this.audit.log({
+      entityType: 'Assignment',
+      entityId: `PREPARE_${dateKey}`,
+      action: 'PREPARE_DEPARTURE_DAY',
+      afterData: summary as unknown as Prisma.InputJsonValue,
+      changedBy: actor?.id ?? null,
+    });
+    this.gateway.notifyAll('board:refresh', { action: 'prepare_day' });
+    return summary;
+  }
+
+  private prepareRange(dateInput?: string) {
+    if (dateInput?.trim()) {
+      const date = new Date(dateInput);
+      if (Number.isNaN(date.getTime())) {
+        throw new BadRequestException('Invalid prepare date');
+      }
+      return this.dispatchPolicy.dayRange(date);
+    }
+    const today = this.dispatchPolicy.todayHcm();
+    return this.dispatchPolicy.dayRange(
+      this.dispatchPolicy.addDays(today.start, 1),
+    );
+  }
+
+  private async reloadAssignment(id: string) {
+    return this.prisma.assignment.findUnique({
+      where: { id },
+      include: this.include,
+    });
+  }
+
+  /**
    * Reserve one external provider for the bus: never the company fleet, and
    * at most one bus per provider per departure date (least busy first).
    */
@@ -1148,6 +1428,11 @@ export class TransportRequestsService {
           url: '/transport-provider/requests',
         },
       );
+      await this.sendProviderEmail(assignment.providerId, {
+        title: 'New transport request',
+        message: `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${this.formatDateTime(assignment.startDate)} · ${assignment.totalPax} pax. ${suggestion} Deadline ${this.formatDateTime(deadline)}. Log in to assign a driver and vehicle or decline.`,
+        reference: assignment.code ?? assignment.id,
+      });
     }
     this.gateway.notifyAll('transport:refresh', {
       assignmentId: assignment.id,
@@ -1641,6 +1926,37 @@ export class TransportRequestsService {
       providerDeclineReason: a.providerDeclineReason,
       providerAssignmentMode: a.provider?.assignmentMode ?? null,
     };
+  }
+
+  /** Email the provider accounts for their own routes (they log in to respond). */
+  private async sendProviderEmail(
+    providerId: string,
+    input: { title: string; message: string; reference?: string | null },
+  ) {
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: RoleType.TRANSPORT_PROVIDER,
+        providerId,
+        isActive: true,
+      },
+      select: { email: true },
+    });
+    const emails = users
+      .map((user) => (user.email ?? '').trim())
+      .filter((email) => email.length > 0);
+    if (emails.length === 0) return;
+    const frontend = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+    await this.mail.sendTransportAlert({
+      to: emails,
+      title: input.title,
+      message: input.message,
+      reference: input.reference ?? null,
+      actionLabel: 'Open transport requests',
+      actionUrl: `${frontend}/transport-provider/requests`,
+    });
   }
 
   private async notifyProvider(

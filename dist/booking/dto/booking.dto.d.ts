@@ -14,6 +14,7 @@ export declare class CreateBookingDto {
     departureTime?: string;
     customerName: string;
     hotelName: string;
+    hotelId?: string;
     phone: string;
     mail?: string;
     totalPax: number;
@@ -42,6 +43,7 @@ export declare class CreateWebsiteBookingDto {
     departureTime?: string;
     customerName: string;
     hotelName: string;
+    hotelId?: string;
     phone: string;
     mail: string;
     totalPax: number;
@@ -75,6 +77,7 @@ export declare class UpdateBookingDto {
     departureTime?: string;
     customerName?: string;
     hotelName?: string;
+    hotelId?: string;
     phone?: string;
     mail?: string;
     totalPax?: number;
@@ -100,6 +103,7 @@ export declare class QueryBookingDto extends PaginationDto {
     status?: BookingStatus;
     channel?: BookingProvider;
     payment?: PaymentStatus;
+    unpaid?: boolean;
     tourId?: string;
     assignmentId?: string;
 }

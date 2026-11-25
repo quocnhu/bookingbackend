@@ -28,6 +28,7 @@ class CreateBookingDto {
     departureTime;
     customerName;
     hotelName;
+    hotelId;
     phone;
     mail;
     totalPax;
@@ -120,6 +121,11 @@ __decorate([
     (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "hotelName", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "hotelId", void 0);
 __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
@@ -234,6 +240,7 @@ class CreateWebsiteBookingDto {
     departureTime;
     customerName;
     hotelName;
+    hotelId;
     phone;
     mail;
     totalPax;
@@ -278,6 +285,11 @@ __decorate([
     (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], CreateWebsiteBookingDto.prototype, "hotelName", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateWebsiteBookingDto.prototype, "hotelId", void 0);
 __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.IsString)(),
@@ -394,6 +406,7 @@ class UpdateBookingDto {
     departureTime;
     customerName;
     hotelName;
+    hotelId;
     phone;
     mail;
     totalPax;
@@ -463,6 +476,11 @@ __decorate([
     (0, class_validator_1.Length)(1, 200),
     __metadata("design:type", String)
 ], UpdateBookingDto.prototype, "hotelName", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateBookingDto.prototype, "hotelId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
@@ -572,6 +590,7 @@ class QueryBookingDto extends pagination_dto_1.PaginationDto {
     status;
     channel;
     payment;
+    unpaid;
     tourId;
     assignmentId;
 }
@@ -591,6 +610,12 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.PaymentStatus),
     __metadata("design:type", String)
 ], QueryBookingDto.prototype, "payment", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => value === undefined ? undefined : value === true || value === 'true' || value === '1'),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], QueryBookingDto.prototype, "unpaid", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

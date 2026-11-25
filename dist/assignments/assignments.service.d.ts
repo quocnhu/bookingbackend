@@ -1,6 +1,6 @@
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
-import { AssignBookingsDto, ConfirmPartnerHandoffDto, CreateAssignmentDto, FinalizeAssignmentDto, QueryAssignmentDto, ReturnPartnerHandoffDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, UpdatePickupReminderModeDto, UpdateRecallCutoffDto, VerifyTourReportDto } from './dto/assignment.dto';
+import { AssignBookingsDto, ConfirmPartnerHandoffDto, CreateAssignmentDto, FinalizeAssignmentDto, QueryAssignmentDto, ReturnPartnerHandoffDto, SubmitTourReportDto, UpdateAssignmentDto, UpdateAssignmentStatusDto, UpdateDispatchWindowDto, UpdatePickupReminderModeDto, UpdateRecallCutoffDto, VerifyTourReportDto } from './dto/assignment.dto';
 import { PaginatedResult } from "../common/dto/pagination.dto";
 import { AssignmentOrigin, Prisma } from '@prisma/client';
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
@@ -11,6 +11,7 @@ import { LeavesService } from "../leaves/leaves.service";
 import type { FileStorage } from "../storage";
 import { DriveService } from "../drive/drive.service";
 import { MailService } from "../mail/mail.service";
+import { GuideConfirmationService } from "../guide-confirmation/guide-confirmation.service";
 import { DispatchPolicyService } from "../dispatch-policy/dispatch-policy.service";
 export declare class AssignmentsService {
     private readonly prisma;
@@ -23,8 +24,9 @@ export declare class AssignmentsService {
     private readonly drive;
     private readonly mail;
     private readonly dispatchPolicy;
+    private readonly guideConfirmation;
     private readonly logger;
-    constructor(prisma: PrismaService, auditService: AuditService, board: AssignmentBoardService, notificationService: NotificationService, gateway: NotificationsGateway, leavesService: LeavesService, storage: FileStorage, drive: DriveService, mail: MailService, dispatchPolicy: DispatchPolicyService);
+    constructor(prisma: PrismaService, auditService: AuditService, board: AssignmentBoardService, notificationService: NotificationService, gateway: NotificationsGateway, leavesService: LeavesService, storage: FileStorage, drive: DriveService, mail: MailService, dispatchPolicy: DispatchPolicyService, guideConfirmation: GuideConfirmationService);
     private include;
     findBoard(actor: AuthenticatedUser): Promise<any[]>;
     getBoardCrew(): Promise<{
@@ -36,12 +38,28 @@ export declare class AssignmentsService {
             languages: string[];
             rating: number | null;
             isBusy: boolean;
+            assignments: {
+                id: string;
+                code: string | null;
+                startDate: Date;
+                endDate: Date;
+                driverId: string | null;
+                guideId: string | null;
+                status: import("@prisma/client").$Enums.AssignmentStatus;
+            }[];
             leaves: {
                 id: string;
                 userId: string;
                 startDate: Date;
                 endDate: Date;
                 status: import("@prisma/client").$Enums.LeaveStatus;
+            }[];
+            holds: {
+                id: string;
+                startDate: Date;
+                endDate: Date;
+                guideId: string;
+                note: string | null;
             }[];
         }[];
         drivers: {
@@ -54,6 +72,15 @@ export declare class AssignmentsService {
                 name: string;
             } | null;
             isBusy: boolean;
+            assignments: {
+                id: string;
+                code: string | null;
+                startDate: Date;
+                endDate: Date;
+                driverId: string | null;
+                guideId: string | null;
+                status: import("@prisma/client").$Enums.AssignmentStatus;
+            }[];
             leaves: {
                 id: string;
                 userId: string;
@@ -92,6 +119,13 @@ export declare class AssignmentsService {
                 endDate: Date;
                 status: import("@prisma/client").$Enums.LeaveStatus;
             }[];
+            holds: {
+                id: string;
+                startDate: Date;
+                endDate: Date;
+                guideId: string;
+                note: string | null;
+            }[];
         }[];
         drivers: {
             id: string;
@@ -123,10 +157,17 @@ export declare class AssignmentsService {
             }[];
         }[];
     }>;
-    dispatchAllBoard(targetDate?: Date | string): Promise<{
+    dispatchAllBoard(targetDate?: Date | string, options?: {
+        override?: boolean;
+        actor?: AuthenticatedUser;
+        ignoreWindow?: boolean;
+    }): Promise<{
         dispatched: number;
         skipped: number;
         skippedOnLeave: number;
+        skippedUnpaid: number;
+        skippedUnconfirmed: number;
+        skippedProvider: number;
     }>;
     getBoardMode(): Promise<{
         mode: AssignmentOrigin;
@@ -135,6 +176,12 @@ export declare class AssignmentsService {
         time: string;
     }>;
     updateRecallCutoff(dto: UpdateRecallCutoffDto, actorId?: string | null): Promise<{
+        time: string;
+    }>;
+    getDispatchOpenTime(): Promise<{
+        time: string;
+    }>;
+    updateDispatchOpenTime(dto: UpdateDispatchWindowDto, actorId?: string | null): Promise<{
         time: string;
     }>;
     setBoardOrigin(origin: AssignmentOrigin): Promise<{
@@ -213,6 +260,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -241,6 +289,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -267,6 +316,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -345,6 +397,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     updatePickupReminderMode(id: string, dto: UpdatePickupReminderModeDto, actor: AuthenticatedUser): Promise<{
         id: string;
@@ -422,6 +479,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -450,6 +508,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -476,6 +535,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -554,6 +616,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     update(id: string, dto: UpdateAssignmentDto, actor?: AuthenticatedUser): Promise<{
         vehicle: {
@@ -621,6 +688,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -649,6 +717,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -675,6 +744,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -753,17 +825,23 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
-    private assertDispatchableToday;
+    private assertDispatchableWindow;
     private assertNotSealed;
     getSealInfo(date: string): Promise<import("@/dispatch-policy/dispatch-policy.service").SealInfo>;
     private assertCrewAssigned;
+    private assertFreelanceGuideConfirmed;
     private assertRecallAllowed;
     private assertDispatchedUpdateAllowed;
     private notifyAssignmentUpdated;
     private notifyUserIds;
     private buildAssignmentSummary;
-    updateStatus(id: string, dto: UpdateAssignmentStatusDto): Promise<{
+    updateStatus(id: string, dto: UpdateAssignmentStatusDto, actor?: AuthenticatedUser): Promise<{
         vehicle: {
             id: string;
             providerId: string;
@@ -829,6 +907,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -857,6 +936,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -883,6 +963,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -961,8 +1044,14 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     private sendStatusNotifications;
+    private notifyAdminsOfDispatch;
     assignBookings(id: string, dto: AssignBookingsDto, actor?: AuthenticatedUser): Promise<{
         vehicle: {
             id: string;
@@ -1029,6 +1118,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1057,6 +1147,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -1083,6 +1174,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -1161,6 +1255,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     removeBooking(id: string, bookingId: string, actor?: AuthenticatedUser): Promise<{
         vehicle: {
@@ -1228,6 +1327,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1256,6 +1356,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -1282,6 +1383,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -1360,6 +1464,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     reorderBookings(id: string, bookingIds: string[], actor?: AuthenticatedUser): Promise<{
         vehicle: {
@@ -1427,6 +1536,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1455,6 +1565,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -1481,6 +1592,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -1559,6 +1673,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     moveBooking(fromAssignmentId: string, bookingId: string, toAssignmentId: string, actor?: AuthenticatedUser): Promise<{
         vehicle: {
@@ -1626,6 +1745,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1654,6 +1774,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -1680,6 +1801,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -1758,6 +1882,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     private confirmLateBookings;
     private notifyMoveBooking;
@@ -1828,6 +1957,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -1856,6 +1986,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -1882,6 +2013,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -1960,6 +2094,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     confirmPartnerHandoff(id: string, dto: ConfirmPartnerHandoffDto, actor: AuthenticatedUser): Promise<{
         vehicle: {
@@ -2027,6 +2166,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -2055,6 +2195,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -2081,6 +2222,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -2159,6 +2303,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     returnPartnerHandoff(id: string, dto: ReturnPartnerHandoffDto, actor: AuthenticatedUser): Promise<{
         vehicle: {
@@ -2226,6 +2375,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -2254,6 +2404,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -2280,6 +2431,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -2358,6 +2512,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     submitTourReport(id: string, dto: SubmitTourReportDto, actor: AuthenticatedUser): Promise<{
         updatedAt: Date;
@@ -2473,6 +2632,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -2501,6 +2661,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -2527,6 +2688,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -2605,6 +2769,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     finalize(id: string, dto: FinalizeAssignmentDto, actor: AuthenticatedUser): Promise<{
         vehicle: {
@@ -2672,6 +2841,7 @@ export declare class AssignmentsService {
             updatedAt: Date;
             id: string;
             createdAt: Date;
+            hotelId: string | null;
             tourName: string | null;
             tourType: import("@prisma/client").$Enums.TourType | null;
             totalPax: number;
@@ -2700,6 +2870,7 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -2726,6 +2897,9 @@ export declare class AssignmentsService {
             email: string;
         } | null;
         guide: {
+            guideProfile: {
+                type: import("@prisma/client").$Enums.GuideType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
@@ -2804,6 +2978,11 @@ export declare class AssignmentsService {
         createdWho: string | null;
         pickupReminderMode: import("@prisma/client").$Enums.PickupReminderMode;
         pickupReminderLastSentAt: Date | null;
+        guideConfirmationRequestedAt: Date | null;
+        guideConfirmationEmailSentAt: Date | null;
+        guideConfirmedAt: Date | null;
+        guideDeclinedAt: Date | null;
+        guideDeclineReason: string | null;
     }>;
     findMyAssignments(actor: AuthenticatedUser): Promise<any[]>;
     findMyCalendar(actor: AuthenticatedUser, year?: number, month?: number): Promise<{

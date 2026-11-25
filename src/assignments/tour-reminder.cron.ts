@@ -26,16 +26,16 @@ export class TourReminderCron {
     private readonly gateway: NotificationsGateway,
   ) {}
 
-  @Cron('0 23 * * *', { timeZone: HCM_TIMEZONE })
+  @Cron('0 20 * * *', { timeZone: HCM_TIMEZONE })
   async scheduled() {
     try {
       const result = await this.sendTomorrowReminders();
       this.logger.log(
-        `23:00 tour reminders: scanned=${result.scanned}, notified=${result.notified}, missingCrew=${result.missingCrew}`,
+        `20:00 tour reminders: scanned=${result.scanned}, notified=${result.notified}, missingCrew=${result.missingCrew}`,
       );
     } catch (error) {
       this.logger.error(
-        '23:00 tour reminders failed',
+        '20:00 tour reminders failed',
         (error as Error).stack,
       );
     }
@@ -68,7 +68,7 @@ export class TourReminderCron {
 
     const result = await this.autoCrew.assignMissingCrew(1);
     this.logger.log(
-      `23:00 crew fill: scanned=${result.scanned}, guide+${result.guideAssigned}, driver+${result.driverAssigned}`,
+      `20:00 crew fill: scanned=${result.scanned}, guide+${result.guideAssigned}, driver+${result.driverAssigned}`,
     );
   }
 
@@ -93,6 +93,7 @@ export class TourReminderCron {
         tourName: true,
         startDate: true,
         totalPax: true,
+        executionMode: true,
         guideId: true,
         driverId: true,
         pickupInfo: true,
@@ -109,7 +110,12 @@ export class TourReminderCron {
 
     for (const assignment of assignments) {
       const missing: string[] = [];
-      if (!assignment.guideId) missing.push('tour guide');
+      if (
+        !assignment.guideId &&
+        assignment.executionMode !== AssignmentExecutionMode.COMPANY_DRIVER_ONLY
+      ) {
+        missing.push('tour guide');
+      }
       if (!assignment.driverId) missing.push('driver');
 
       if (missing.length > 0) {
@@ -219,7 +225,7 @@ export class TourReminderCron {
         {
           kind,
           assignmentId,
-          url: '/dispatch-board',
+          url: '/bookings?tab=assignments',
         },
       );
       this.gateway.notifyUser(user.id, 'notification', notification);

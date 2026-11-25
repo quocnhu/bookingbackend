@@ -36,10 +36,10 @@ let TourReminderCron = TourReminderCron_1 = class TourReminderCron {
     async scheduled() {
         try {
             const result = await this.sendTomorrowReminders();
-            this.logger.log(`23:00 tour reminders: scanned=${result.scanned}, notified=${result.notified}, missingCrew=${result.missingCrew}`);
+            this.logger.log(`20:00 tour reminders: scanned=${result.scanned}, notified=${result.notified}, missingCrew=${result.missingCrew}`);
         }
         catch (error) {
-            this.logger.error('23:00 tour reminders failed', error.stack);
+            this.logger.error('20:00 tour reminders failed', error.stack);
         }
     }
     async sendTomorrowReminders(targetDate) {
@@ -67,7 +67,7 @@ let TourReminderCron = TourReminderCron_1 = class TourReminderCron {
         if ((enabled?.value ?? 'true').toLowerCase() === 'false')
             return;
         const result = await this.autoCrew.assignMissingCrew(1);
-        this.logger.log(`23:00 crew fill: scanned=${result.scanned}, guide+${result.guideAssigned}, driver+${result.driverAssigned}`);
+        this.logger.log(`20:00 crew fill: scanned=${result.scanned}, guide+${result.guideAssigned}, driver+${result.driverAssigned}`);
     }
     async sendRemindersForDate(targetDate) {
         const start = this.startOfDay(targetDate);
@@ -90,6 +90,7 @@ let TourReminderCron = TourReminderCron_1 = class TourReminderCron {
                 tourName: true,
                 startDate: true,
                 totalPax: true,
+                executionMode: true,
                 guideId: true,
                 driverId: true,
                 pickupInfo: true,
@@ -104,8 +105,10 @@ let TourReminderCron = TourReminderCron_1 = class TourReminderCron {
         let missingCrew = 0;
         for (const assignment of assignments) {
             const missing = [];
-            if (!assignment.guideId)
+            if (!assignment.guideId &&
+                assignment.executionMode !== client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY) {
                 missing.push('tour guide');
+            }
             if (!assignment.driverId)
                 missing.push('driver');
             if (missing.length > 0) {
@@ -175,7 +178,7 @@ let TourReminderCron = TourReminderCron_1 = class TourReminderCron {
             const notification = await this.notificationService.create(user.id, client_1.NotificationType.GENERAL, title, body, {
                 kind,
                 assignmentId,
-                url: '/dispatch-board',
+                url: '/bookings?tab=assignments',
             });
             this.gateway.notifyUser(user.id, 'notification', notification);
         }
@@ -219,7 +222,7 @@ let TourReminderCron = TourReminderCron_1 = class TourReminderCron {
 };
 exports.TourReminderCron = TourReminderCron;
 __decorate([
-    (0, schedule_1.Cron)('0 23 * * *', { timeZone: HCM_TIMEZONE }),
+    (0, schedule_1.Cron)('0 20 * * *', { timeZone: HCM_TIMEZONE }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)

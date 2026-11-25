@@ -21,6 +21,9 @@ const notification_service_1 = require("../notifications/notification.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
 const auto_crew_service_1 = require("../queues/auto-crew.service");
 const mail_service_1 = require("../mail/mail.service");
+const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
+const guide_confirmation_service_1 = require("../guide-confirmation/guide-confirmation.service");
+const unpaid_booking_util_1 = require("../common/utils/unpaid-booking.util");
 const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const HCM_OFFSET_MINUTES = 7 * 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -36,7 +39,7 @@ const DEFAULT_SETTINGS = {
     enabled: true,
     sendDaysBefore: 2,
     sendTime: '08:00',
-    deadlineTime: '23:00',
+    deadlineTime: '21:00',
     minLeadHours: 3,
 };
 const RECALL_CUTOFF_KEY = 'recallCutoffTime';
@@ -57,7 +60,14 @@ const assignmentInclude = {
         select: { id: true, name: true, isCompany: true, assignmentMode: true },
     },
     driver: { select: { id: true, name: true, email: true, providerId: true } },
-    guide: { select: { id: true, name: true } },
+    guide: {
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            guideProfile: { select: { type: true } },
+        },
+    },
 };
 let TransportRequestsService = TransportRequestsService_1 = class TransportRequestsService {
     prisma;
@@ -67,9 +77,11 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
     gateway;
     autoCrew;
     mail;
+    dispatchPolicy;
+    guideConfirmation;
     logger = new common_1.Logger(TransportRequestsService_1.name);
     runningScheduledTick = false;
-    constructor(prisma, audit, leaves, notificationService, gateway, autoCrew, mail) {
+    constructor(prisma, audit, leaves, notificationService, gateway, autoCrew, mail, dispatchPolicy, guideConfirmation) {
         this.prisma = prisma;
         this.audit = audit;
         this.leaves = leaves;
@@ -77,6 +89,8 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
         this.gateway = gateway;
         this.autoCrew = autoCrew;
         this.mail = mail;
+        this.dispatchPolicy = dispatchPolicy;
+        this.guideConfirmation = guideConfirmation;
     }
     include = assignmentInclude;
     async list(query, actor) {
@@ -313,6 +327,11 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
                 status: client_1.TransportRequestStatus.CANCELLED,
                 url: '/transport-provider/requests',
             });
+            await this.sendProviderEmail(previousProviderId, {
+                title: 'Route no longer available',
+                message: `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} was reassigned by the travel agent and is no longer available to you.`,
+                reference: updated.code ?? updated.id,
+            });
         }
         const suggestion = await this.suggestionText(updated);
         await this.notifyProvider(providerId, 'New transport request', `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} · ${updated.totalPax} pax. ${suggestion} Deadline ${this.formatDateTime(deadline)}.`, {
@@ -320,6 +339,11 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
             assignmentId: updated.id,
             status: updated.providerRequestStatus,
             url: '/transport-provider/requests',
+        });
+        await this.sendProviderEmail(providerId, {
+            title: 'New transport request',
+            message: `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} · ${updated.totalPax} pax. ${suggestion} Deadline ${this.formatDateTime(deadline)}. Log in to assign a driver and vehicle or decline.`,
+            reference: updated.code ?? updated.id,
         });
         this.gateway.notifyAll('transport:refresh', { assignmentId: updated.id });
         return this.toView(updated);
@@ -351,6 +375,11 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
                 status: updated.providerRequestStatus,
                 url: '/transport-provider/requests',
             });
+            await this.sendProviderEmail(assignment.providerId, {
+                title: 'Transport request cancelled',
+                message: `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} was cancelled by the travel agent.`,
+                reference: updated.code ?? updated.id,
+            });
         }
         this.gateway.notifyAll('transport:refresh', { assignmentId: updated.id });
         return this.toView(updated);
@@ -379,6 +408,11 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
                 status: client_1.TransportRequestStatus.CANCELLED,
                 url: '/transport-provider/requests',
             });
+            await this.sendProviderEmail(previousProviderId, {
+                title: 'Route no longer available',
+                message: `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${this.formatDateTime(assignment.startDate)} was reassigned by the travel agent and is no longer available to you.`,
+                reference: assignment.code ?? assignment.id,
+            });
         }
         const updated = await this.loadAssignment(assignmentId);
         await this.notifyProvider(providerId, 'Driver & vehicle assigned', `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} was assigned by the travel agent.`, {
@@ -386,6 +420,11 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
             assignmentId: updated.id,
             status: updated.providerRequestStatus,
             url: '/transport-provider/requests',
+        });
+        await this.sendProviderEmail(providerId, {
+            title: 'Transport request assigned',
+            message: `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} was assigned by the travel agent. Log in to review the driver, vehicle and route.`,
+            reference: updated.code ?? updated.id,
         });
         this.gateway.notifyAll('transport:refresh', { assignmentId: updated.id });
         return this.toView(updated);
@@ -745,6 +784,204 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
         }
         return { sent, expired, autoAssigned, warned };
     }
+    async prepareTomorrow(dateInput, actor) {
+        const range = this.prepareRange(dateInput);
+        const dateKey = this.dispatchPolicy.dayKey(range.start);
+        const settings = await this.getSettings();
+        const now = new Date();
+        const assignments = await this.prisma.assignment.findMany({
+            where: {
+                status: {
+                    in: [
+                        client_1.AssignmentStatus.PENDING,
+                        client_1.AssignmentStatus.DRAFT_ASSIGNED,
+                        client_1.AssignmentStatus.TRANSFERRED,
+                    ],
+                },
+                executionMode: { not: client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER },
+                startDate: { gte: range.start, lte: range.end },
+                bookings: { some: {} },
+            },
+            include: this.include,
+            orderBy: { startDate: 'asc' },
+            take: 200,
+        });
+        const summary = {
+            date: dateKey,
+            buses: assignments.length,
+            crewAssigned: 0,
+            guideRequestsSent: 0,
+            companyGuidesAutoConfirmed: 0,
+            providersReserved: 0,
+            providerRequestsSent: 0,
+            autoAssigned: 0,
+            providerUnavailable: 0,
+            freelanceAwaiting: 0,
+            missing: [],
+        };
+        for (const booked of assignments) {
+            let current = booked;
+            let guideJustAssigned = false;
+            const needsGuide = current.executionMode !==
+                client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY;
+            if ((needsGuide && !current.guideId) || !current.driverId) {
+                try {
+                    const crew = await this.autoCrew.assignCrewForBus(current.id);
+                    if (crew.assigned) {
+                        summary.crewAssigned += 1;
+                        guideJustAssigned = !!crew.updates?.guideId;
+                        current = await this.reloadAssignment(current.id);
+                    }
+                }
+                catch (error) {
+                    this.logger.warn(`Prepare auto-crew failed for ${booked.code ?? booked.id}: ${error.message}`);
+                }
+            }
+            if (!current)
+                continue;
+            if (!guideJustAssigned &&
+                current.guideId &&
+                !current.guideConfirmedAt &&
+                !current.guideDeclinedAt) {
+                const guideType = current.guide?.guideProfile?.type ?? client_1.GuideType.FREELANCE;
+                if (guideType === client_1.GuideType.OFFICIAL) {
+                    const changed = await this.guideConfirmation.ensureCompanyGuideConfirmed(current.id);
+                    if (changed) {
+                        summary.companyGuidesAutoConfirmed += 1;
+                        current = await this.reloadAssignment(current.id);
+                    }
+                }
+                else if (!current.guideConfirmationRequestedAt) {
+                    const result = await this.guideConfirmation.request(current.id);
+                    if (result.requested)
+                        summary.guideRequestsSent += 1;
+                    current = await this.reloadAssignment(current.id);
+                }
+            }
+            if (!current)
+                continue;
+            if (!current.driverId) {
+                if (!settings.enabled) {
+                    continue;
+                }
+                let provider = current.provider;
+                if (!provider || provider.isCompany) {
+                    const picked = await this.pickExternalProvider(current);
+                    if (!picked) {
+                        summary.providerUnavailable += 1;
+                        await this.warnNoProvider(current);
+                        continue;
+                    }
+                    current = await this.prisma.assignment.update({
+                        where: { id: current.id },
+                        data: {
+                            providerId: picked.id,
+                            providerRequestStatus: client_1.TransportRequestStatus.NOT_REQUIRED,
+                            providerWarningAt: null,
+                            providerViewedAt: null,
+                            providerRespondedAt: null,
+                            providerDeadline: null,
+                        },
+                        include: this.include,
+                    });
+                    provider = current.provider;
+                    summary.providersReserved += 1;
+                }
+                if (provider &&
+                    provider.isCompany === false &&
+                    current.providerRequestStatus === client_1.TransportRequestStatus.NOT_REQUIRED) {
+                    let deadline = this.computeDeadline(current.startDate, settings);
+                    if (deadline.getTime() <= now.getTime()) {
+                        const tripStart = new Date(current.startDate).getTime();
+                        const leadMs = Math.max(1, settings.minLeadHours) * 60 * 60 * 1000;
+                        const fallback = Math.min(now.getTime() + leadMs, tripStart);
+                        if (fallback <= now.getTime()) {
+                            continue;
+                        }
+                        deadline = new Date(fallback);
+                    }
+                    await this.sendInternal(current, settings, deadline);
+                    summary.providerRequestsSent += 1;
+                    current = await this.reloadAssignment(current.id);
+                    if (current?.provider?.assignmentMode ===
+                        client_1.ProviderAssignmentMode.FULLY_AUTO) {
+                        const didAssign = await this.tryAutoAssignInternal(current.id);
+                        if (didAssign)
+                            summary.autoAssigned += 1;
+                        current = await this.reloadAssignment(current.id);
+                    }
+                }
+            }
+        }
+        const finalRows = await this.prisma.assignment.findMany({
+            where: { id: { in: assignments.map((a) => a.id) } },
+            include: this.include,
+        });
+        for (const row of finalRows) {
+            const issues = [];
+            const needsGuide = row.executionMode !== client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY;
+            if (needsGuide && !row.guideId)
+                issues.push('No tour guide');
+            if (needsGuide && row.guideId) {
+                const guideType = row.guide?.guideProfile?.type ?? client_1.GuideType.FREELANCE;
+                if (row.guideDeclinedAt)
+                    issues.push('Guide declined');
+                if (guideType === client_1.GuideType.FREELANCE &&
+                    !row.guideConfirmedAt &&
+                    !row.guideDeclinedAt) {
+                    issues.push('Freelance guide not confirmed');
+                    summary.freelanceAwaiting += 1;
+                }
+            }
+            if (!row.driverId)
+                issues.push('No driver');
+            if (row.bookings.some((booking) => (0, unpaid_booking_util_1.isUnpaidPayPalBooking)(booking))) {
+                issues.push('Unpaid PayPal booking');
+            }
+            const external = !!row.providerId && row.provider?.isCompany === false;
+            if (external) {
+                if (!row.vehicleId)
+                    issues.push('No vehicle');
+                if (row.providerRequestStatus !== client_1.TransportRequestStatus.ASSIGNED) {
+                    issues.push('Provider request not assigned');
+                }
+            }
+            if (issues.length > 0) {
+                summary.missing.push({
+                    assignmentId: row.id,
+                    code: row.code ?? null,
+                    tourName: row.tourName ?? null,
+                    issues: Array.from(new Set(issues)),
+                });
+            }
+        }
+        await this.audit.log({
+            entityType: 'Assignment',
+            entityId: `PREPARE_${dateKey}`,
+            action: 'PREPARE_DEPARTURE_DAY',
+            afterData: summary,
+            changedBy: actor?.id ?? null,
+        });
+        this.gateway.notifyAll('board:refresh', { action: 'prepare_day' });
+        return summary;
+    }
+    prepareRange(dateInput) {
+        if (dateInput?.trim()) {
+            const date = new Date(dateInput);
+            if (Number.isNaN(date.getTime())) {
+                throw new common_1.BadRequestException('Invalid prepare date');
+            }
+            return this.dispatchPolicy.dayRange(date);
+        }
+        const today = this.dispatchPolicy.todayHcm();
+        return this.dispatchPolicy.dayRange(this.dispatchPolicy.addDays(today.start, 1));
+    }
+    async reloadAssignment(id) {
+        return this.prisma.assignment.findUnique({
+            where: { id },
+            include: this.include,
+        });
+    }
     async pickExternalProvider(assignment) {
         const range = {
             start: this.startOfDay(assignment.startDate),
@@ -902,6 +1139,11 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
                 assignmentId: assignment.id,
                 status: client_1.TransportRequestStatus.REQUESTED,
                 url: '/transport-provider/requests',
+            });
+            await this.sendProviderEmail(assignment.providerId, {
+                title: 'New transport request',
+                message: `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${this.formatDateTime(assignment.startDate)} · ${assignment.totalPax} pax. ${suggestion} Deadline ${this.formatDateTime(deadline)}. Log in to assign a driver and vehicle or decline.`,
+                reference: assignment.code ?? assignment.id,
             });
         }
         this.gateway.notifyAll('transport:refresh', {
@@ -1261,6 +1503,30 @@ let TransportRequestsService = TransportRequestsService_1 = class TransportReque
             providerAssignmentMode: a.provider?.assignmentMode ?? null,
         };
     }
+    async sendProviderEmail(providerId, input) {
+        const users = await this.prisma.user.findMany({
+            where: {
+                role: client_1.RoleType.TRANSPORT_PROVIDER,
+                providerId,
+                isActive: true,
+            },
+            select: { email: true },
+        });
+        const emails = users
+            .map((user) => (user.email ?? '').trim())
+            .filter((email) => email.length > 0);
+        if (emails.length === 0)
+            return;
+        const frontend = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+        await this.mail.sendTransportAlert({
+            to: emails,
+            title: input.title,
+            message: input.message,
+            reference: input.reference ?? null,
+            actionLabel: 'Open transport requests',
+            actionUrl: `${frontend}/transport-provider/requests`,
+        });
+    }
     async notifyProvider(providerId, title, body, data) {
         const users = await this.prisma.user.findMany({
             where: {
@@ -1424,6 +1690,8 @@ exports.TransportRequestsService = TransportRequestsService = TransportRequestsS
         notification_service_1.NotificationService,
         notifications_gateway_1.NotificationsGateway,
         auto_crew_service_1.AutoCrewService,
-        mail_service_1.MailService])
+        mail_service_1.MailService,
+        dispatch_policy_service_1.DispatchPolicyService,
+        guide_confirmation_service_1.GuideConfirmationService])
 ], TransportRequestsService);
 //# sourceMappingURL=transport-requests.service.js.map

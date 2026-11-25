@@ -78,6 +78,15 @@ export class TransportRequestsController {
     return this.service.getCandidates(assignmentId, actor);
   }
 
+  @Post('prepare')
+  @Permissions('assignment.update')
+  prepare(
+    @Body('date') date?: string,
+    @CurrentUser() actor?: AuthenticatedUser,
+  ) {
+    return this.service.prepareTomorrow(date, actor);
+  }
+
   @Post(':id/send')
   @Permissions('assignment.update')
   send(
