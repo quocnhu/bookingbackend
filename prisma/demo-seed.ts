@@ -141,7 +141,6 @@ async function main() {
         email,
         passwordHash: pwd,
         role,
-        userType: 'crew',
         providerId,
         isActive: true,
       },
@@ -207,14 +206,13 @@ async function main() {
   // ─── 5. Office user (closes/verifies trips in the demo) ───────────────────
   const accounting = await prisma.user.upsert({
     where: { id: 'demo-accounting' },
-    update: { name: 'Operations Room', role: RoleType.OFFICE, userType: 'office' },
+    update: { name: 'Operations Room', role: RoleType.OFFICE },
     create: {
       id: 'demo-accounting',
       name: 'Operations Room',
       email: 'operations@demo.local',
       passwordHash: pwd,
       role: RoleType.OFFICE,
-      userType: 'office',
       isActive: true,
     },
   });

@@ -1,5 +1,5 @@
 import { NotificationService } from './notification.service';
-import { RegisterPushDto, SendNotificationDto, NotificationTargetsQueryDto } from './dto/notification.dto';
+import { NotificationTargetsQueryDto, QueryNotificationLogDto, RegisterPushDto, SendNotificationDto } from './dto/notification.dto';
 import type { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
 export declare class NotificationController {
     private readonly notificationService;
@@ -17,6 +17,12 @@ export declare class NotificationController {
             id: string;
             email: string;
         }[];
+    }>;
+    log(query: QueryNotificationLogDto, actor: AuthenticatedUser): Promise<{
+        items: any[];
+        total: number;
+        page: number;
+        limit: number;
     }>;
     unreadCount(actor: AuthenticatedUser): Promise<{
         count: number;

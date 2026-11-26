@@ -22,6 +22,8 @@ export declare class HotelsController {
             revenue: number;
             earned: number;
             pending: number;
+            paid: number;
+            unpaid: number;
         };
         byTour: {
             tourId: string | null;
@@ -31,6 +33,8 @@ export declare class HotelsController {
             revenue: number;
             earned: number;
             pending: number;
+            paid: number;
+            unpaid: number;
         }[];
         recentBookings: {
             id: string;
@@ -49,6 +53,11 @@ export declare class HotelsController {
             commissionPercent: number;
             commissionAmount: number;
             commissionEarned: boolean;
+            commissionPaid: boolean;
+            commissionPaidAt: Date | null;
+            commissionPaidByName: string | null;
+            commissionPaymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+            commissionPaymentReference: string | null;
         }[];
     }>;
     myBookings(actor: AuthenticatedUser, query: QueryHotelBookingsDto, hotelId?: string): Promise<{
@@ -69,6 +78,11 @@ export declare class HotelsController {
             commissionPercent: number;
             commissionAmount: number;
             commissionEarned: boolean;
+            commissionPaid: boolean;
+            commissionPaidAt: Date | null;
+            commissionPaidByName: string | null;
+            commissionPaymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+            commissionPaymentReference: string | null;
         }[];
         total: number;
         page: number;
@@ -79,6 +93,8 @@ export declare class HotelsController {
             revenue: number;
             earned: number;
             pending: number;
+            paid: number;
+            unpaid: number;
         };
     }>;
     list(): Promise<{
@@ -99,9 +115,9 @@ export declare class HotelsController {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
     }[]>;
     create(dto: CreateHotelDto, actor: AuthenticatedUser): Promise<{
         commissionPercent: number;
@@ -121,9 +137,9 @@ export declare class HotelsController {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
     }>;
     update(id: string, dto: UpdateHotelDto, actor: AuthenticatedUser): Promise<{
         commissionPercent: number;
@@ -143,9 +159,9 @@ export declare class HotelsController {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
     }>;
     remove(id: string, actor: AuthenticatedUser): Promise<{
         deactivated: boolean;

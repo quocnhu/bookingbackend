@@ -55,7 +55,6 @@ async function main() {
         email: d.email,
         passwordHash: pwd,
         role: RoleType.DRIVER,
-        userType: 'crew',
         providerId: d.providerKey,
         isActive: true,
       },
@@ -78,7 +77,6 @@ async function main() {
         email: g.email,
         passwordHash: pwd,
         role: RoleType.TOUR_GUIDE,
-        userType: 'crew',
         isActive: true,
       },
     });

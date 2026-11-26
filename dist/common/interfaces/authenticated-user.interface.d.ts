@@ -4,7 +4,6 @@ export interface AuthenticatedUser {
     email: string;
     name?: string | null;
     role: RoleType;
-    userType?: string | null;
     providerId?: string | null;
     permissions: string[];
 }

@@ -58,4 +58,7 @@ export declare class MarkPeriodPaidDto {
     method?: PaymentMethod;
     reference?: string;
 }
+export declare class MarkHotelCommissionPaidDto extends MarkPeriodPaidDto {
+    note?: string;
+}
 export {};

@@ -997,10 +997,27 @@ async function main() {
       isSystem: false,
     },
   });
-  await prisma.rolePermission.deleteMany({
-    where: { roleId: hotelRole.id },
-  });
+  await syncRolePermissions(hotelRole.id, [
+    'booking.read',
+    'dashboard.read',
+  ]);
   console.log(`✅ Seeded HOTEL role`);
+
+  // 3.7 TOURIST role — end customer with limited self-service access.
+  const touristRole = await prisma.role.upsert({
+    where: { name: 'TOURIST' },
+    update: {},
+    create: {
+      name: 'TOURIST',
+      description: 'Tourist — dashboard, own bookings, and own payment records',
+      isSystem: false,
+    },
+  });
+  await syncRolePermissions(touristRole.id, [
+    'dashboard.read',
+    'booking.read',
+  ]);
+  console.log(`✅ Seeded TOURIST role`);
 
   // 4. Default admin user
   const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@booking.local';
@@ -1017,7 +1034,6 @@ async function main() {
       passwordHash,
       authProvider: AuthProvider.LOCAL,
       role: RoleType.ADMIN,
-      userType: 'admin',
     },
   });
   // Assign the ADMIN role to the admin user

@@ -270,17 +270,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -289,7 +290,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -333,14 +333,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -489,17 +489,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -508,7 +509,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -552,14 +552,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -698,17 +698,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -717,7 +718,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -761,14 +761,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -917,17 +917,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -936,7 +937,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -980,14 +980,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -1128,17 +1128,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -1147,7 +1148,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -1191,14 +1191,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -1337,17 +1337,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -1356,7 +1357,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -1400,14 +1400,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -1546,17 +1546,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -1565,7 +1566,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -1609,14 +1609,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -1755,17 +1755,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -1774,7 +1775,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -1818,14 +1818,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -1967,17 +1967,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -1986,7 +1987,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -2030,14 +2030,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -2176,17 +2176,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -2195,7 +2196,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -2239,14 +2239,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -2385,17 +2385,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -2404,7 +2405,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -2448,14 +2448,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -2642,17 +2642,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -2661,7 +2662,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -2705,14 +2705,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;
@@ -2851,17 +2851,18 @@ export declare class AssignmentsService {
             createdWho: string | null;
             assignmentId: string | null;
             notes: string | null;
+            hotelCommissionPercent: Prisma.Decimal | null;
+            phone: string;
+            address: string | null;
             currency: string;
             tourId: string | null;
             bookingRef: string;
             confirmationCode: string | null;
             source: string | null;
             channel: import("@prisma/client").$Enums.BookingProvider;
-            address: string | null;
             startingDate: Date | null;
             customerName: string | null;
             hotelName: string;
-            phone: string;
             mail: string | null;
             paxDetail: string | null;
             payment: import("@prisma/client").$Enums.PaymentStatus | null;
@@ -2870,7 +2871,6 @@ export declare class AssignmentsService {
             extra: Prisma.JsonValue | null;
             departureTime: string | null;
             rawDataId: string | null;
-            hotelCommissionPercent: Prisma.Decimal | null;
             customerUserId: string | null;
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
             payLater: boolean;
@@ -2914,14 +2914,14 @@ export declare class AssignmentsService {
             id: string;
             email: string | null;
             isActive: boolean;
-            phone: string | null;
             contactName: string | null;
+            phone: string | null;
         } | null;
         paymentLines: {
             id: string;
+            tourDate: Date;
             periodId: string;
             payableToId: string;
-            tourDate: Date;
             payableTo: {
                 name: string | null;
                 id: string;

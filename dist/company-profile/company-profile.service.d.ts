@@ -14,8 +14,8 @@ export declare class CompanyProfileService {
         id: string;
         createdAt: Date;
         email: string | null;
-        address: string | null;
         phone: string | null;
+        address: string | null;
         website: string | null;
         rootLatitude: number | null;
         rootLongitude: number | null;
@@ -29,8 +29,8 @@ export declare class CompanyProfileService {
         id: string;
         createdAt: Date;
         email: string | null;
-        address: string | null;
         phone: string | null;
+        address: string | null;
         website: string | null;
         rootLatitude: number | null;
         rootLongitude: number | null;

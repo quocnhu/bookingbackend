@@ -154,7 +154,7 @@ async function main() {
       update: { name: c.name, providerId: c.providerId },
       create: {
         id: c.id, name: c.name, email: c.email, passwordHash: pwd,
-        role: c.role, userType: 'crew', providerId: c.providerId, isActive: true,
+        role: c.role, providerId: c.providerId, isActive: true,
       },
     });
   }

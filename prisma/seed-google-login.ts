@@ -4,10 +4,10 @@ const prisma = new PrismaClient();
 
 /**
  * Seed users the same way auth.service.ts googleLogin() creates them:
- * authProvider=GOOGLE, role=CUSTOMER, userType=customer, no RBAC permissions
+ * authProvider=GOOGLE, role=TOURIST, no RBAC permissions
  * (providerId stays null — it is a TransportationProvider FK, not a Google id).
  *
- * Use to verify: Users table Provider column = Google, Role = CUSTOMER,
+ * Use to verify: Users table Provider column = Google, Role = TOURIST,
  * and the customer only sees public/fundamental pages after login.
  */
 async function main() {
@@ -23,16 +23,14 @@ async function main() {
       where: { email: u.email },
       update: {
         authProvider: AuthProvider.GOOGLE,
-        role: RoleType.CUSTOMER,
-        userType: 'customer',
+        role: RoleType.TOURIST,
         isActive: true,
       },
       create: {
         email: u.email,
         name: u.name,
         authProvider: AuthProvider.GOOGLE,
-        role: RoleType.CUSTOMER,
-        userType: 'customer',
+        role: RoleType.TOURIST,
       },
     });
     console.log(`✅ ${user.email} · role=${user.role} · provider=${user.authProvider}`);

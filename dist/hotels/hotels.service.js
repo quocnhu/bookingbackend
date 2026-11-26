@@ -392,6 +392,15 @@ let HotelsService = class HotelsService {
             hotelCommissionPercent: true,
             tour: { select: { id: true, name: true } },
             assignment: { select: { status: true } },
+            hotelCommissionPayout: {
+                select: {
+                    id: true,
+                    paidAt: true,
+                    paidByName: true,
+                    paymentMethod: true,
+                    paymentReference: true,
+                },
+            },
         };
     }
     async loadBookings(hotelId) {
@@ -409,6 +418,7 @@ let HotelsService = class HotelsService {
         const earned = row.status !== client_1.BookingStatus.CANCELED &&
             row.payment === client_1.PaymentStatus.PAID &&
             row.assignment?.status === client_1.AssignmentStatus.COMPLETED;
+        const payout = row.hotelCommissionPayout;
         return {
             id: row.id,
             bookingRef: row.bookingRef,
@@ -426,6 +436,11 @@ let HotelsService = class HotelsService {
             commissionPercent: rate,
             commissionAmount: commission,
             commissionEarned: earned,
+            commissionPaid: Boolean(payout),
+            commissionPaidAt: payout?.paidAt ?? null,
+            commissionPaidByName: payout?.paidByName ?? null,
+            commissionPaymentMethod: payout?.paymentMethod ?? null,
+            commissionPaymentReference: payout?.paymentReference ?? null,
         };
     }
     sumRows(rows) {
@@ -437,8 +452,12 @@ let HotelsService = class HotelsService {
                 acc.earned += row.commissionAmount;
             else
                 acc.pending += row.commissionAmount;
+            if (row.commissionEarned && row.commissionPaid)
+                acc.paid += row.commissionAmount;
+            if (row.commissionEarned && !row.commissionPaid)
+                acc.unpaid += row.commissionAmount;
             return acc;
-        }, { bookings: 0, pax: 0, revenue: 0, earned: 0, pending: 0 });
+        }, { bookings: 0, pax: 0, revenue: 0, earned: 0, pending: 0, paid: 0, unpaid: 0 });
     }
     summarize(hotel, raw) {
         const rows = raw.map((row) => this.mapBooking(row, hotel));
@@ -456,6 +475,8 @@ let HotelsService = class HotelsService {
                     revenue: 0,
                     earned: 0,
                     pending: 0,
+                    paid: 0,
+                    unpaid: 0,
                 };
             entry.bookings += 1;
             entry.pax += row.totalPax ?? 0;
@@ -464,6 +485,10 @@ let HotelsService = class HotelsService {
                 entry.earned += row.commissionAmount;
             else
                 entry.pending += row.commissionAmount;
+            if (row.commissionEarned && row.commissionPaid)
+                entry.paid += row.commissionAmount;
+            if (row.commissionEarned && !row.commissionPaid)
+                entry.unpaid += row.commissionAmount;
             tourMap.set(key, entry);
         }
         const byTour = [...tourMap.values()].sort((a, b) => b.revenue - a.revenue);

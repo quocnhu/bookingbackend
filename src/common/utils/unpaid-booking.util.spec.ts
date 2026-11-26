@@ -42,8 +42,8 @@ describe('unpaid-booking.util', () => {
       delete process.env.UNPAID_BOOKING_GRACE_HOURS;
     });
 
-    it('defaults to a 24 hour grace window', () => {
-      expect(unpaidGraceHours()).toBe(24);
+    it('defaults to a 30 minute grace window', () => {
+      expect(unpaidGraceHours()).toBe(0.5);
     });
 
     it('honours the configured grace window', () => {

@@ -57,7 +57,6 @@ export declare class AuthService {
         name: string | null;
         avatarUrl: string | null;
         role: import("@prisma/client").$Enums.RoleType;
-        userType: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
         isActive: boolean;
         createdAt: Date;
@@ -93,7 +92,6 @@ export declare class AuthService {
         name: string | null;
         avatarUrl: string | null;
         role: import("@prisma/client").$Enums.RoleType;
-        userType: string | null;
         authProvider: import("@prisma/client").$Enums.AuthProvider;
         isActive: boolean;
         createdAt: Date;

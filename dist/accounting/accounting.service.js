@@ -614,6 +614,11 @@ let AccountingService = class AccountingService {
             title: `✅ Money sheet "${assignment.code}" has been confirmed`,
             body: `Accounting has checked the money for trip ${assignment.tourName ?? ''} and locked the money for ${payeeLabel}.`,
         });
+        await this.notifyAssignmentParticipants(assignmentId, {
+            type: client_2.NotificationType.MONEY_VERIFIED,
+            title: `✅ Money confirmed: ${assignment.code ?? 'Trip'}`,
+            body: `Accounting confirmed the money for ${assignment.tourName ?? 'this trip'}. Payee: ${payeeLabel}.`,
+        });
         await this.audit.log({
             entityType: 'TourReport',
             entityId: updated.id,
@@ -640,6 +645,102 @@ let AccountingService = class AccountingService {
             select: { name: true },
         });
         return u?.name ?? userId;
+    }
+    async notifyUserIds(userIds, msg) {
+        const ids = [...new Set(userIds.filter((id) => !!id))];
+        for (const userId of ids) {
+            try {
+                const notif = await this.notificationService.create(userId, msg.type, msg.title, msg.body, msg.data);
+                this.gateway.notifyUser(userId, 'notification', notif);
+            }
+            catch {
+            }
+        }
+    }
+    async notifyAssignmentParticipants(assignmentId, msg) {
+        const assignment = await this.prisma.assignment.findUnique({
+            where: { id: assignmentId },
+            select: {
+                id: true,
+                guideId: true,
+                driverId: true,
+                providerId: true,
+                provider: { select: { users: { select: { id: true }, where: { isActive: true } } } },
+            },
+        });
+        if (!assignment)
+            return;
+        const providerUserIds = (assignment.provider?.users ?? []).map((u) => u.id);
+        await this.notifyUserIds([assignment.guideId, assignment.driverId, ...providerUserIds], { ...msg, data: { assignmentId: assignment.id, ...(msg.data ?? {}) } });
+    }
+    async notifyPeriodStakeholders(period, msg) {
+        const ids = new Set();
+        if (period.payeeType === client_1.PayeeType.TRANSPORT_PROVIDER) {
+            const provider = await this.prisma.transportationProvider.findUnique({
+                where: { id: period.personId },
+                select: { users: { select: { id: true }, where: { isActive: true } } },
+            });
+            for (const u of provider?.users ?? [])
+                ids.add(u.id);
+        }
+        else {
+            ids.add(period.personId);
+        }
+        const lines = await this.prisma.paymentPeriodLine.findMany({
+            where: { periodId: period.id },
+            select: {
+                assignment: {
+                    select: {
+                        guideId: true,
+                        driverId: true,
+                        providerId: true,
+                        provider: { select: { users: { select: { id: true }, where: { isActive: true } } } },
+                    },
+                },
+            },
+        });
+        for (const line of lines) {
+            const a = line.assignment;
+            if (!a)
+                continue;
+            if (a.guideId)
+                ids.add(a.guideId);
+            if (a.driverId)
+                ids.add(a.driverId);
+            for (const u of a.provider?.users ?? [])
+                ids.add(u.id);
+        }
+        await this.notifyUserIds([...ids], { ...msg, data: { periodId: period.id, ...(msg.data ?? {}) } });
+    }
+    async notifyPartnerPaymentStakeholders(payment, msg) {
+        const [partner, assignment] = await Promise.all([
+            this.prisma.transportationProvider.findUnique({
+                where: { id: payment.partnerId },
+                select: { users: { select: { id: true }, where: { isActive: true } } },
+            }),
+            this.prisma.assignment.findUnique({
+                where: { id: payment.assignmentId },
+                select: {
+                    guideId: true,
+                    driverId: true,
+                    providerId: true,
+                    provider: { select: { users: { select: { id: true }, where: { isActive: true } } } },
+                },
+            }),
+        ]);
+        const ids = new Set();
+        for (const u of partner?.users ?? [])
+            ids.add(u.id);
+        if (assignment?.guideId)
+            ids.add(assignment.guideId);
+        if (assignment?.driverId)
+            ids.add(assignment.driverId);
+        for (const u of assignment?.provider?.users ?? [])
+            ids.add(u.id);
+        await this.notifyUserIds([...ids], {
+            ...msg,
+            data: { partnerPaymentId: payment.id, assignmentId: payment.assignmentId, ...(msg.data ?? {}) },
+        });
     }
     async notifySubmitter(assignment, msg) {
         const to = assignment.tourReport?.submittedById ?? null;
@@ -680,6 +781,11 @@ let AccountingService = class AccountingService {
             type: client_2.NotificationType.MONEY_REJECTED,
             title: `❌ Money sheet "${assignment.code}" was sent back`,
             body: `Accounting sent back the revenue/expense money sheet for trip ${assignment.tourName ?? ''}. Reason: ${dto.reason}`,
+        });
+        await this.notifyAssignmentParticipants(assignmentId, {
+            type: client_2.NotificationType.MONEY_REJECTED,
+            title: `❌ Money sheet sent back: ${assignment.code ?? 'Trip'}`,
+            body: `Accounting sent back the money sheet for ${assignment.tourName ?? 'this trip'}. Reason: ${dto.reason}`,
         });
         await this.audit.log({
             entityType: 'TourReport',
@@ -730,7 +836,6 @@ let AccountingService = class AccountingService {
                 name: p.name,
                 email: null,
                 role: client_1.RoleType.TRANSPORT_PROVIDER,
-                userType: null,
                 providerName: p.name,
                 providerIsCompany: p.isCompany,
                 payeeType: client_1.PayeeType.TRANSPORT_PROVIDER,
@@ -743,7 +848,6 @@ let AccountingService = class AccountingService {
                 name: true,
                 email: true,
                 role: true,
-                userType: true,
                 providerId: true,
                 provider: { select: { id: true, name: true, isCompany: true } },
                 guideProfile: { select: { type: true } },
@@ -771,7 +875,6 @@ let AccountingService = class AccountingService {
             name: u.name ?? '—',
             email: u.email,
             role: u.role,
-            userType: u.userType,
             providerName: u.provider?.name ?? null,
             providerIsCompany: u.provider?.isCompany ?? null,
             payeeType: derived,
@@ -805,7 +908,6 @@ let AccountingService = class AccountingService {
                 name: true,
                 email: true,
                 role: true,
-                userType: true,
                 providerId: true,
                 provider: { select: { id: true, name: true, isCompany: true } },
                 guideProfile: { select: { type: true } },
@@ -822,7 +924,6 @@ let AccountingService = class AccountingService {
             name: u.name ?? '—',
             email: u.email,
             role: u.role,
-            userType: u.userType,
             providerName: u.provider?.name ?? null,
             providerIsCompany: u.provider?.isCompany ?? null,
             payeeType: this.classifyPayee({
@@ -845,7 +946,6 @@ let AccountingService = class AccountingService {
                 name: p.name,
                 email: null,
                 role: client_1.RoleType.TRANSPORT_PROVIDER,
-                userType: null,
                 providerName: p.name,
                 providerIsCompany: false,
                 payeeType: client_1.PayeeType.TRANSPORT_PROVIDER,
@@ -1333,6 +1433,18 @@ let AccountingService = class AccountingService {
             catch {
             }
         }
+        if (payee.kind === 'PROVIDER') {
+            const provider = await this.prisma.transportationProvider.findUnique({
+                where: { id: payee.id },
+                select: { users: { select: { id: true }, where: { isActive: true } } },
+            });
+            await this.notifyUserIds(provider?.users?.map((u) => u.id) ?? [], {
+                type: client_2.NotificationType.GENERAL,
+                title: `Payment exported (${dto.fromDate} → ${dto.toDate})`,
+                body: `${moneyText}. Exported by ${actor.name ?? actor.email}.`,
+                data: { periodId: period.id, payeeId: payee.id },
+            });
+        }
         return {
             periodId: period.id,
             ...preview,
@@ -1383,6 +1495,12 @@ let AccountingService = class AccountingService {
             },
             changedBy: actor.id,
         });
+        await this.notifyPeriodStakeholders(voided, {
+            type: client_2.NotificationType.GENERAL,
+            title: `Payment period voided`,
+            body: `Payment period for ${voided.payeeName ?? 'payee'} was voided by ${actor.name ?? actor.email}. Reason: ${dto.reason}`,
+            data: { periodId: voided.id },
+        });
         return voided;
     }
     async markPeriodPaid(actor, periodId, dto) {
@@ -1429,6 +1547,12 @@ let AccountingService = class AccountingService {
             },
             changedBy: actor.id,
         });
+        await this.notifyPeriodStakeholders(paid, {
+            type: client_2.NotificationType.GENERAL,
+            title: `Payment marked paid`,
+            body: `Payment period for ${paid.payeeName ?? 'payee'} (${paid.fromDate.toISOString().slice(0, 10)} → ${paid.toDate.toISOString().slice(0, 10)}) was marked paid by ${actor.name ?? actor.email}.`,
+            data: { periodId: paid.id },
+        });
         return paid;
     }
     async markPartnerPaymentPaid(actor, paymentId, dto) {
@@ -1472,6 +1596,197 @@ let AccountingService = class AccountingService {
                 paidByName: paid.paidByName,
             },
             changedBy: actor.id,
+        });
+        await this.notifyPartnerPaymentStakeholders(paid, {
+            type: client_2.NotificationType.GENERAL,
+            title: `Partner payment marked paid`,
+            body: `Partner payment for ${paid.tourName ?? 'tour'} was marked paid by ${actor.name ?? actor.email}.`,
+        });
+        return paid;
+    }
+    hotelCommissionEarned(booking) {
+        return (booking.status !== client_1.BookingStatus.CANCELED &&
+            booking.payment === client_1.PaymentStatus.PAID &&
+            booking.assignment?.status === client_1.AssignmentStatus.COMPLETED);
+    }
+    hotelCommissionAmount(totalAmount, bookingRate, hotelRate) {
+        const rate = Number(bookingRate ?? hotelRate ?? 0);
+        const amount = Number(totalAmount ?? 0);
+        return { rate, amount: Math.round((amount * rate) / 100) };
+    }
+    async hotelCommissions(actor, hotelId) {
+        this.assertAccounting(actor);
+        const bookings = await this.prisma.booking.findMany({
+            where: {
+                hotelId: hotelId || undefined,
+                ...(hotelId ? {} : { hotelId: { not: null } }),
+            },
+            orderBy: [{ startingDate: 'desc' }, { createdAt: 'desc' }],
+            take: 5000,
+            select: {
+                id: true,
+                bookingRef: true,
+                customerName: true,
+                hotelName: true,
+                hotelId: true,
+                startingDate: true,
+                totalPax: true,
+                totalAmount: true,
+                currency: true,
+                payment: true,
+                status: true,
+                tourName: true,
+                hotelCommissionPercent: true,
+                hotel: {
+                    select: {
+                        id: true,
+                        name: true,
+                        commissionPercent: true,
+                        users: {
+                            where: { isActive: true },
+                            select: { id: true, name: true, email: true },
+                        },
+                    },
+                },
+                assignment: { select: { status: true } },
+                hotelCommissionPayout: {
+                    select: {
+                        id: true,
+                        paidAt: true,
+                        paidByName: true,
+                        paymentMethod: true,
+                        paymentReference: true,
+                        note: true,
+                    },
+                },
+            },
+        });
+        return bookings
+            .filter((row) => row.hotelId && row.hotel)
+            .map((row) => {
+            const { rate, amount } = this.hotelCommissionAmount(row.totalAmount, row.hotelCommissionPercent, row.hotel.commissionPercent);
+            const earned = this.hotelCommissionEarned(row);
+            const payout = row.hotelCommissionPayout;
+            return {
+                id: row.id,
+                bookingRef: row.bookingRef,
+                customerName: row.customerName,
+                hotelId: row.hotelId,
+                hotelName: row.hotel?.name ?? row.hotelName,
+                startingDate: row.startingDate,
+                totalPax: row.totalPax,
+                totalAmount: Number(row.totalAmount ?? 0),
+                currency: row.currency,
+                payment: row.payment,
+                status: row.status,
+                assignmentStatus: row.assignment?.status ?? null,
+                tourName: row.tourName,
+                commissionPercent: rate,
+                commissionAmount: amount,
+                commissionEarned: earned,
+                commissionPaid: Boolean(payout),
+                payoutId: payout?.id ?? null,
+                paidAt: payout?.paidAt ?? null,
+                paidByName: payout?.paidByName ?? null,
+                paymentMethod: payout?.paymentMethod ?? null,
+                paymentReference: payout?.paymentReference ?? null,
+                payoutNote: payout?.note ?? null,
+            };
+        });
+    }
+    async markHotelCommissionPaid(actor, bookingId, dto) {
+        this.assertAccounting(actor, 'accounting.period.export');
+        const booking = await this.prisma.booking.findUnique({
+            where: { id: bookingId },
+            select: {
+                id: true,
+                bookingRef: true,
+                tourName: true,
+                startingDate: true,
+                totalAmount: true,
+                currency: true,
+                payment: true,
+                status: true,
+                hotelId: true,
+                hotelCommissionPercent: true,
+                hotel: {
+                    select: {
+                        id: true,
+                        name: true,
+                        commissionPercent: true,
+                        users: {
+                            where: { isActive: true },
+                            select: { id: true },
+                        },
+                    },
+                },
+                assignment: { select: { status: true } },
+                hotelCommissionPayout: true,
+            },
+        });
+        if (!booking)
+            throw new common_1.NotFoundException('Booking not found');
+        if (!booking.hotelId || !booking.hotel) {
+            throw new common_1.BadRequestException('Booking is not linked to a hotel');
+        }
+        if (!this.hotelCommissionEarned(booking)) {
+            throw new common_1.ConflictException('Hotel commission is not earned yet. Tour must be completed and booking paid.');
+        }
+        if (booking.hotelCommissionPayout)
+            return booking.hotelCommissionPayout;
+        if (dto.method &&
+            dto.method !== client_1.PaymentMethod.CASH &&
+            dto.method !== client_1.PaymentMethod.BANK_TRANSFER) {
+            throw new common_1.BadRequestException('Hotel commission payouts use cash or bank transfer here');
+        }
+        const { rate, amount } = this.hotelCommissionAmount(booking.totalAmount, booking.hotelCommissionPercent, booking.hotel.commissionPercent);
+        if (amount <= 0) {
+            throw new common_1.BadRequestException('Hotel commission amount must be greater than zero');
+        }
+        const paid = await this.prisma.hotelCommissionPayout.create({
+            data: {
+                bookingId: booking.id,
+                hotelId: booking.hotelId,
+                amount: new client_1.Prisma.Decimal(amount),
+                currency: booking.currency ?? 'VND',
+                commissionPercent: new client_1.Prisma.Decimal(rate),
+                tourName: booking.tourName,
+                tourDate: booking.startingDate,
+                note: dto.note?.trim() || null,
+                status: client_1.HotelCommissionPayoutStatus.PAID,
+                paidAt: new Date(),
+                paidById: actor.id,
+                paidByName: actor.name ?? actor.email,
+                paymentMethod: dto.method ?? client_1.PaymentMethod.BANK_TRANSFER,
+                paymentReference: dto.reference?.trim() || null,
+            },
+        });
+        await this.audit.log({
+            entityType: 'HotelCommissionPayout',
+            entityId: paid.id,
+            action: 'MARK_PAID',
+            beforeData: { status: null },
+            afterData: {
+                bookingId: booking.id,
+                hotelId: booking.hotelId,
+                amount,
+                status: paid.status,
+                paidAt: paid.paidAt,
+                paymentMethod: paid.paymentMethod,
+                paymentReference: paid.paymentReference,
+            },
+            changedBy: actor.id,
+        });
+        const hotelUserIds = booking.hotel.users.map((u) => u.id);
+        await this.notifyUserIds(hotelUserIds, {
+            type: client_2.NotificationType.GENERAL,
+            title: `Hotel commission paid: ${booking.bookingRef}`,
+            body: `Commission ${new Intl.NumberFormat('en-US').format(amount)} VND for ${booking.tourName ?? booking.bookingRef} was marked paid by ${actor.name ?? actor.email}.`,
+            data: {
+                bookingId: booking.id,
+                hotelCommissionPayoutId: paid.id,
+                kind: 'HOTEL_COMMISSION_PAID',
+            },
         });
         return paid;
     }
@@ -1522,6 +1837,15 @@ let AccountingService = class AccountingService {
                 assignment: { select: { code: true } },
             },
             orderBy: { lockedAt: 'desc' },
+            take: 200,
+        });
+        const hotelPayouts = await this.prisma.hotelCommissionPayout.findMany({
+            where: personId ? { hotelId: personId } : {},
+            include: {
+                hotel: { select: { id: true, name: true } },
+                booking: { select: { bookingRef: true } },
+            },
+            orderBy: { paidAt: 'desc' },
             take: 200,
         });
         const crewRows = periods.map((p) => ({
@@ -1618,7 +1942,48 @@ let AccountingService = class AccountingService {
                 ],
             };
         });
-        return [...crewRows, ...partnerRows]
+        const hotelRows = hotelPayouts.map((p) => {
+            const amount = num(p.amount);
+            return {
+                recordType: 'HOTEL',
+                id: p.id,
+                person: { id: p.hotelId, name: p.hotel.name, role: 'HOTEL' },
+                payeeType: 'HOTEL',
+                voidedAt: null,
+                voidedByName: null,
+                voidReason: null,
+                fromDate: p.tourDate ?? p.paidAt,
+                toDate: p.tourDate ?? p.paidAt,
+                tourCount: 1,
+                personReturnsToCompany: 0,
+                companyReturnsToPerson: amount,
+                totalNet: -amount,
+                direction: 'COMPANY_TO_PERSON',
+                note: p.note,
+                createdByName: p.paidByName,
+                createdAt: p.paidAt,
+                paidAt: p.paidAt,
+                paidByName: p.paidByName,
+                paymentMethod: p.paymentMethod,
+                paymentReference: p.paymentReference,
+                lines: [
+                    {
+                        assignmentId: p.bookingId,
+                        code: p.booking?.bookingRef ?? null,
+                        tourName: p.tourName,
+                        tourDate: p.tourDate ?? p.paidAt,
+                        plateNumber: null,
+                        vehicleCapacity: null,
+                        providerName: p.hotel.name,
+                        payableToName: p.hotel.name,
+                        netAmount: amount,
+                        flow: client_1.FeeFlowType.PAY_MONEY,
+                        note: p.note,
+                    },
+                ],
+            };
+        });
+        return [...crewRows, ...partnerRows, ...hotelRows]
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             .slice(0, 200);
     }

@@ -29,6 +29,9 @@ let NotificationController = class NotificationController {
     targets(query) {
         return this.notificationService.getTargets(query?.search);
     }
+    log(query, actor) {
+        return this.notificationService.getLog(query, actor);
+    }
     unreadCount(actor) {
         return this.notificationService.unreadCount(actor.id).then((count) => ({ count }));
     }
@@ -65,6 +68,15 @@ __decorate([
     __metadata("design:paramtypes", [notification_dto_1.NotificationTargetsQueryDto]),
     __metadata("design:returntype", void 0)
 ], NotificationController.prototype, "targets", null);
+__decorate([
+    (0, common_1.Get)('log'),
+    (0, permissions_decorator_1.Permissions)('notification.send'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [notification_dto_1.QueryNotificationLogDto, Object]),
+    __metadata("design:returntype", void 0)
+], NotificationController.prototype, "log", null);
 __decorate([
     (0, common_1.Get)('unread-count'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),

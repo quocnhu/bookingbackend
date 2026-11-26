@@ -231,19 +231,86 @@ let DriveService = DriveService_1 = class DriveService {
                 orderBy: { createdAt: 'desc' },
             }),
         ]);
+        const pendingEvidence = !folderId || current?.kind === 'root' || current?.kind === 'tour'
+            ? await this.listPendingEvidence(userId)
+            : [];
         return {
             current,
             breadcrumb: await this.buildBreadcrumb(userId, folderId),
             folders,
             files: files.map((f) => ({ ...f, url: this.storage.url(f.storageKey) })),
+            pendingEvidence,
             quota: await this.quotaInfo(userId),
         };
     }
     async listDriveUsers() {
         return this.prisma.user.findMany({
-            select: { id: true, name: true, email: true, role: true },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                provider: { select: { isCompany: true } },
+                guideProfile: { select: { type: true } },
+                driverProfile: { select: { type: true } },
+            },
             orderBy: [{ name: 'asc' }, { email: 'asc' }],
         });
+    }
+    async listPendingEvidence(userId) {
+        const reports = await this.prisma.tourReport.findMany({
+            where: {
+                assignment: { OR: [{ guideId: userId }, { driverId: userId }] },
+                status: { in: ['SUBMITTED', 'REJECTED'] },
+            },
+            select: {
+                id: true,
+                status: true,
+                evidenceImages: true,
+                assignment: {
+                    select: {
+                        id: true,
+                        code: true,
+                        tourName: true,
+                        startDate: true,
+                        status: true,
+                    },
+                },
+            },
+            orderBy: { assignment: { startDate: 'desc' } },
+            take: 100,
+        });
+        const userDir = (await this.ensureUserDrive(userId)).root.name;
+        const items = [];
+        for (const report of reports) {
+            const images = Array.isArray(report.evidenceImages)
+                ? report.evidenceImages
+                : [];
+            const prefix = (0, storage_key_util_1.pendingEvidencePrefix)(userDir, report.assignment.id);
+            for (let i = 0; i < images.length; i += 1) {
+                const img = images[i];
+                const key = typeof img.storageKey === 'string' ? img.storageKey : '';
+                if (!key.startsWith(prefix))
+                    continue;
+                const url = typeof img.url === 'string' && img.url ? img.url : this.storage.url(key);
+                items.push({
+                    assignmentId: report.assignment.id,
+                    assignmentCode: report.assignment.code || '',
+                    tourName: report.assignment.tourName || report.assignment.code || '',
+                    startDate: report.assignment.startDate,
+                    assignmentStatus: report.assignment.status,
+                    reportStatus: report.status,
+                    id: `pending:${report.id}:${i}`,
+                    name: typeof img.name === 'string' ? img.name : key.split('/').pop() || 'evidence',
+                    mimeType: typeof img.mimeType === 'string' ? img.mimeType : null,
+                    size: Number(img.size) || 0,
+                    storageKey: key,
+                    createdAt: img.uploadedAt ? new Date(img.uploadedAt) : report.assignment.startDate,
+                    url,
+                });
+            }
+        }
+        return items;
     }
     async createFolder(userId, dto) {
         const targetId = dto.parentId ?? (await this.ensureUserDrive(userId)).root.id;

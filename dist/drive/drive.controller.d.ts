@@ -39,6 +39,21 @@ export declare class DriveController {
             mimeType: string | null;
             folderId: string;
         }[];
+        pendingEvidence: {
+            assignmentId: string;
+            assignmentCode: string;
+            tourName: string;
+            startDate: Date;
+            assignmentStatus: string;
+            reportStatus: string;
+            id: string;
+            name: string;
+            mimeType: string | null;
+            size: number;
+            storageKey: string;
+            createdAt: Date;
+            url: string;
+        }[];
         quota: {
             unlimited: boolean;
             quotaBytes: null;
@@ -57,9 +72,18 @@ export declare class DriveController {
     }>;
     listUsers(): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
+        driverProfile: {
+            type: import("@prisma/client").$Enums.DriverType;
+        } | null;
+        guideProfile: {
+            type: import("@prisma/client").$Enums.GuideType;
+        } | null;
         name: string | null;
         id: string;
         email: string;
+        provider: {
+            isCompany: boolean;
+        } | null;
     }[]>;
     ensureDate(user: AuthenticatedUser, date?: string): Promise<{
         updatedAt: Date;
@@ -112,6 +136,21 @@ export declare class DriveController {
             size: number;
             mimeType: string | null;
             folderId: string;
+        }[];
+        pendingEvidence: {
+            assignmentId: string;
+            assignmentCode: string;
+            tourName: string;
+            startDate: Date;
+            assignmentStatus: string;
+            reportStatus: string;
+            id: string;
+            name: string;
+            mimeType: string | null;
+            size: number;
+            storageKey: string;
+            createdAt: Date;
+            url: string;
         }[];
         quota: {
             unlimited: boolean;

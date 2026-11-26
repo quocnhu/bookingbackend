@@ -1,6 +1,6 @@
 import { BookingProvider, BookingStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 export declare const UNPAID_CANCELLATION_REASON = "PayPal payment not completed";
-export declare const DEFAULT_UNPAID_GRACE_HOURS = 24;
+export declare const DEFAULT_UNPAID_GRACE_HOURS = 0.5;
 export declare const UNPAID_CANCEL_BEFORE_CUTOFF_MINUTES = 30;
 export type UnpaidBookingLike = {
     channel?: BookingProvider | string | null;

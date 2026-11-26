@@ -1,4 +1,5 @@
-import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { NotificationType, RoleType } from '@prisma/client';
 
 export class CreateNotificationDto {
@@ -48,6 +49,33 @@ export class SendNotificationDto {
 }
 
 export class NotificationTargetsQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class QueryNotificationLogDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+
+  @IsOptional()
+  @IsEnum(RoleType)
+  senderRole?: RoleType;
+
+  @IsOptional()
+  @IsEnum(RoleType)
+  recipientRole?: RoleType;
+
   @IsOptional()
   @IsString()
   search?: string;

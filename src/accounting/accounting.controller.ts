@@ -16,12 +16,13 @@ import {
   CreateSettlementDto,
   ExportPeriodDto,
   ListPeopleQueryDto,
+  MarkHotelCommissionPaidDto,
+  MarkPeriodPaidDto,
   PeriodQueryDto,
+  RejectMoneyDto,
   UpdateSettlementDto,
   VerifyTourMoneyDto,
-  RejectMoneyDto,
   VoidPeriodDto,
-  MarkPeriodPaidDto,
 } from './dto/accounting.dto';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
@@ -161,6 +162,24 @@ export class AccountingController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.accountingService.markPartnerPaymentPaid(actor, id, dto);
+  }
+
+  @Get('hotel-commissions')
+  hotelCommissions(
+    @Query('hotelId') hotelId: string | undefined,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.accountingService.hotelCommissions(actor, hotelId);
+  }
+
+  @Post('hotel-commissions/:bookingId/mark-paid')
+  @HttpCode(HttpStatus.OK)
+  markHotelCommissionPaid(
+    @Param('bookingId') bookingId: string,
+    @Body() dto: MarkHotelCommissionPaidDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.accountingService.markHotelCommissionPaid(actor, bookingId, dto);
   }
 
   @Get('period/history')

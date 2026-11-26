@@ -126,14 +126,13 @@ export declare class LeavesService {
         name: any;
         email: any;
         role: any;
-        userType: any;
         isActive: any;
         provider: {
             id: any;
             name: any;
             isCompany: any;
         } | null;
-        group: "ADMIN" | "OFFICE" | "CUSTOMER" | "COMPANY_GUIDE" | "FREELANCE_GUIDE" | "COMPANY_DRIVER" | "FREELANCE_DRIVER" | "PROVIDER_STAFF" | "PROVIDER_ACCOUNT";
+        group: "ADMIN" | "OFFICE" | "TOURIST" | "COMPANY_GUIDE" | "FREELANCE_GUIDE" | "COMPANY_DRIVER" | "FREELANCE_DRIVER" | "PROVIDER_STAFF" | "PROVIDER_ACCOUNT";
         guideType: any;
         driverType: any;
         rating: any;
@@ -148,14 +147,13 @@ export declare class LeavesService {
             name: any;
             email: any;
             role: any;
-            userType: any;
             isActive: any;
             provider: {
                 id: any;
                 name: any;
                 isCompany: any;
             } | null;
-            group: "ADMIN" | "OFFICE" | "CUSTOMER" | "COMPANY_GUIDE" | "FREELANCE_GUIDE" | "COMPANY_DRIVER" | "FREELANCE_DRIVER" | "PROVIDER_STAFF" | "PROVIDER_ACCOUNT";
+            group: "ADMIN" | "OFFICE" | "TOURIST" | "COMPANY_GUIDE" | "FREELANCE_GUIDE" | "COMPANY_DRIVER" | "FREELANCE_DRIVER" | "PROVIDER_STAFF" | "PROVIDER_ACCOUNT";
             guideType: any;
             driverType: any;
             rating: any;

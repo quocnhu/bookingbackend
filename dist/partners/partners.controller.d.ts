@@ -15,10 +15,10 @@ export declare class PartnersController {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
-        note: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
+        note: string | null;
     })[]>;
     findOne(id: string): Promise<{
         _count: {
@@ -32,10 +32,10 @@ export declare class PartnersController {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
-        note: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
+        note: string | null;
     }>;
     create(dto: CreatePartnerDto): Promise<{
         updatedAt: Date;
@@ -44,10 +44,10 @@ export declare class PartnersController {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
-        note: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
+        note: string | null;
     }>;
     update(id: string, dto: UpdatePartnerDto): Promise<{
         updatedAt: Date;
@@ -56,10 +56,10 @@ export declare class PartnersController {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
-        note: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
+        note: string | null;
     }>;
     remove(id: string): Promise<{
         message: string;

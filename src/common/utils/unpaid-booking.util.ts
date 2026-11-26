@@ -6,7 +6,7 @@ import {
 } from '@prisma/client';
 
 export const UNPAID_CANCELLATION_REASON = 'PayPal payment not completed';
-export const DEFAULT_UNPAID_GRACE_HOURS = 24;
+export const DEFAULT_UNPAID_GRACE_HOURS = 0.5;
 export const UNPAID_CANCEL_BEFORE_CUTOFF_MINUTES = 30;
 
 export type UnpaidBookingLike = {
@@ -20,7 +20,7 @@ export type UnpaidBookingLike = {
 export function unpaidGraceHours(): number {
   const value = Number(process.env.UNPAID_BOOKING_GRACE_HOURS ?? NaN);
   if (!Number.isFinite(value) || value <= 0) return DEFAULT_UNPAID_GRACE_HOURS;
-  return Math.min(24 * 30, Math.max(1, value));
+  return Math.min(24 * 30, Math.max(1 / 60, value));
 }
 
 export function isUnpaidPayPalBooking(booking: UnpaidBookingLike): boolean {

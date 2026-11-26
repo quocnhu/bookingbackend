@@ -411,7 +411,7 @@ export class LeavesService {
     name: true,
     email: true,
     role: true,
-    userType: true,
+
     isActive: true,
     provider: { select: { id: true, name: true, isCompany: true } },
     guideProfile: { select: { type: true, rating: true } },
@@ -425,7 +425,7 @@ export class LeavesService {
     [RoleType.DRIVER]: 3,
     [RoleType.TRANSPORT_PROVIDER]: 4,
     [RoleType.HOTEL]: 5,
-    [RoleType.CUSTOMER]: 6,
+    [RoleType.TOURIST]: 6,
   };
 
   private assertLeaveManager(actor: AuthenticatedUser) {
@@ -450,7 +450,7 @@ export class LeavesService {
         : 'COMPANY_DRIVER';
     }
     if (user.role === RoleType.ADMIN) return 'ADMIN';
-    if (user.role === RoleType.CUSTOMER) return 'CUSTOMER';
+    if (user.role === RoleType.TOURIST) return 'TOURIST';
     return 'OFFICE';
   }
 
@@ -460,7 +460,6 @@ export class LeavesService {
       name: user.name ?? user.email,
       email: user.email,
       role: user.role,
-      userType: user.userType,
       isActive: user.isActive,
       provider: user.provider
         ? {
@@ -476,11 +475,11 @@ export class LeavesService {
     };
   }
 
-  /** Every employee (all roles except CUSTOMER) for leave management dropdowns. */
+  /** Every employee (all roles except TOURIST) for leave management dropdowns. */
   async listEmployees(actor: AuthenticatedUser) {
     this.assertLeaveManager(actor);
     const users = await this.prisma.user.findMany({
-      where: { role: { not: RoleType.CUSTOMER } },
+      where: { role: { not: RoleType.TOURIST } },
       select: this.employeeSelect,
       orderBy: { name: 'asc' },
     });
@@ -491,7 +490,7 @@ export class LeavesService {
    * Employee timesheet: one row per employee, one cell per day in the range.
    * Unlike the crew availability calendar (guides/drivers only), this covers
    * every working role — including provider-managed and freelance drivers —
-   * but excludes CUSTOMER and ADMIN accounts.
+   * but excludes TOURIST and ADMIN accounts.
    */
   async getTimesheet(query: QueryTimesheetDto, actor: AuthenticatedUser) {
     this.assertLeaveManager(actor);
@@ -514,7 +513,7 @@ export class LeavesService {
     const effectiveTo = to > maxTo ? maxTo : to;
 
     const where: any = {
-      role: { notIn: [RoleType.CUSTOMER, RoleType.ADMIN] },
+      role: { notIn: [RoleType.TOURIST, RoleType.ADMIN] },
     };
     const requestedRoles = query.roles?.length
       ? query.roles
@@ -523,7 +522,7 @@ export class LeavesService {
         : undefined;
     if (requestedRoles) {
       const allowed = requestedRoles.filter(
-        (role) => role !== RoleType.ADMIN && role !== RoleType.CUSTOMER,
+        (role) => role !== RoleType.ADMIN && role !== RoleType.TOURIST,
       );
       where.role = allowed.length ? { in: allowed } : { in: [] };
     }

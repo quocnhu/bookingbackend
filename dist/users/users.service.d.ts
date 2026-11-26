@@ -11,6 +11,28 @@ export declare class UsersService {
     findAll(query: QueryUserDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     findOne(id: string): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
+        driverProfile: {
+            type: import("@prisma/client").$Enums.DriverType;
+            id: string;
+            rating: number;
+            licenseNumber: string;
+        } | null;
+        guideProfile: {
+            type: import("@prisma/client").$Enums.GuideType;
+            id: string;
+            languages: string[];
+            rating: number;
+        } | null;
+        hotel: {
+            name: string;
+            id: string;
+            email: string | null;
+            isActive: boolean;
+            contactName: string | null;
+            phone: string | null;
+            address: string | null;
+            commissionPercent: import("@prisma/client/runtime/library").Decimal;
+        } | null;
         updatedAt: Date;
         name: string | null;
         id: string;
@@ -20,8 +42,9 @@ export declare class UsersService {
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
-        userType: string | null;
         storageQuotaMb: number;
+        providerId: string | null;
+        hotelId: string | null;
         roles: ({
             role: {
                 updatedAt: Date;
@@ -46,9 +69,37 @@ export declare class UsersService {
             userId: string;
             permissionId: string;
         })[];
+        provider: {
+            name: string;
+            id: string;
+            isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
+        } | null;
     }>;
     create(dto: CreateUserDto): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
+        driverProfile: {
+            type: import("@prisma/client").$Enums.DriverType;
+            id: string;
+            rating: number;
+            licenseNumber: string;
+        } | null;
+        guideProfile: {
+            type: import("@prisma/client").$Enums.GuideType;
+            id: string;
+            languages: string[];
+            rating: number;
+        } | null;
+        hotel: {
+            name: string;
+            id: string;
+            email: string | null;
+            isActive: boolean;
+            contactName: string | null;
+            phone: string | null;
+            address: string | null;
+            commissionPercent: import("@prisma/client/runtime/library").Decimal;
+        } | null;
         updatedAt: Date;
         name: string | null;
         id: string;
@@ -58,8 +109,9 @@ export declare class UsersService {
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
-        userType: string | null;
         storageQuotaMb: number;
+        providerId: string | null;
+        hotelId: string | null;
         roles: ({
             role: {
                 updatedAt: Date;
@@ -84,12 +136,40 @@ export declare class UsersService {
             userId: string;
             permissionId: string;
         })[];
+        provider: {
+            name: string;
+            id: string;
+            isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
+        } | null;
     }>;
     update(id: string, dto: UpdateUserDto, actor: {
         id: string;
         role: RoleType;
     }): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
+        driverProfile: {
+            type: import("@prisma/client").$Enums.DriverType;
+            id: string;
+            rating: number;
+            licenseNumber: string;
+        } | null;
+        guideProfile: {
+            type: import("@prisma/client").$Enums.GuideType;
+            id: string;
+            languages: string[];
+            rating: number;
+        } | null;
+        hotel: {
+            name: string;
+            id: string;
+            email: string | null;
+            isActive: boolean;
+            contactName: string | null;
+            phone: string | null;
+            address: string | null;
+            commissionPercent: import("@prisma/client/runtime/library").Decimal;
+        } | null;
         updatedAt: Date;
         name: string | null;
         id: string;
@@ -99,8 +179,9 @@ export declare class UsersService {
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
-        userType: string | null;
         storageQuotaMb: number;
+        providerId: string | null;
+        hotelId: string | null;
         roles: ({
             role: {
                 updatedAt: Date;
@@ -125,12 +206,40 @@ export declare class UsersService {
             userId: string;
             permissionId: string;
         })[];
+        provider: {
+            name: string;
+            id: string;
+            isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
+        } | null;
     }>;
     updateRoles(id: string, dto: UpdateUserRoleDto, actor: {
         id: string;
         role: RoleType;
     }): Promise<{
         role: import("@prisma/client").$Enums.RoleType;
+        driverProfile: {
+            type: import("@prisma/client").$Enums.DriverType;
+            id: string;
+            rating: number;
+            licenseNumber: string;
+        } | null;
+        guideProfile: {
+            type: import("@prisma/client").$Enums.GuideType;
+            id: string;
+            languages: string[];
+            rating: number;
+        } | null;
+        hotel: {
+            name: string;
+            id: string;
+            email: string | null;
+            isActive: boolean;
+            contactName: string | null;
+            phone: string | null;
+            address: string | null;
+            commissionPercent: import("@prisma/client/runtime/library").Decimal;
+        } | null;
         updatedAt: Date;
         name: string | null;
         id: string;
@@ -140,8 +249,9 @@ export declare class UsersService {
         avatarUrl: string | null;
         isActive: boolean;
         lastLogin: Date | null;
-        userType: string | null;
         storageQuotaMb: number;
+        providerId: string | null;
+        hotelId: string | null;
         roles: ({
             role: {
                 updatedAt: Date;
@@ -166,6 +276,12 @@ export declare class UsersService {
             userId: string;
             permissionId: string;
         })[];
+        provider: {
+            name: string;
+            id: string;
+            isCompany: boolean;
+            assignmentMode: import("@prisma/client").$Enums.ProviderAssignmentMode;
+        } | null;
     }>;
     private getAdminRoleId;
     updatePassword(id: string, dto: UpdateUserPasswordDto, actor: {

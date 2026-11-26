@@ -168,7 +168,6 @@ let TransportationProvidersService = class TransportationProvidersService {
                 name: dto.name,
                 passwordHash,
                 role: client_1.RoleType.DRIVER,
-                userType: 'crew',
                 providerId,
                 isActive: true,
                 driverProfile: { create: { licenseNumber: dto.licenseNumber } },

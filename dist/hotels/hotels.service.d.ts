@@ -24,9 +24,9 @@ export declare class HotelsService {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
     }[]>;
     publicList(): Promise<{
         name: string;
@@ -51,9 +51,9 @@ export declare class HotelsService {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
     }>;
     update(id: string, dto: UpdateHotelDto, actor: AuthenticatedUser): Promise<{
         commissionPercent: number;
@@ -73,9 +73,9 @@ export declare class HotelsService {
         createdAt: Date;
         email: string | null;
         isActive: boolean;
-        address: string | null;
-        phone: string | null;
         contactName: string | null;
+        phone: string | null;
+        address: string | null;
     }>;
     remove(id: string, actor: AuthenticatedUser): Promise<{
         deactivated: boolean;
@@ -97,6 +97,8 @@ export declare class HotelsService {
             revenue: number;
             earned: number;
             pending: number;
+            paid: number;
+            unpaid: number;
         };
         byTour: {
             tourId: string | null;
@@ -106,6 +108,8 @@ export declare class HotelsService {
             revenue: number;
             earned: number;
             pending: number;
+            paid: number;
+            unpaid: number;
         }[];
         recentBookings: {
             id: string;
@@ -124,6 +128,11 @@ export declare class HotelsService {
             commissionPercent: number;
             commissionAmount: number;
             commissionEarned: boolean;
+            commissionPaid: boolean;
+            commissionPaidAt: Date | null;
+            commissionPaidByName: string | null;
+            commissionPaymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+            commissionPaymentReference: string | null;
         }[];
     }>;
     bookings(actor: AuthenticatedUser, query: QueryHotelBookingsDto, requestedHotelId?: string): Promise<{
@@ -144,6 +153,11 @@ export declare class HotelsService {
             commissionPercent: number;
             commissionAmount: number;
             commissionEarned: boolean;
+            commissionPaid: boolean;
+            commissionPaidAt: Date | null;
+            commissionPaidByName: string | null;
+            commissionPaymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+            commissionPaymentReference: string | null;
         }[];
         total: number;
         page: number;
@@ -154,6 +168,8 @@ export declare class HotelsService {
             revenue: number;
             earned: number;
             pending: number;
+            paid: number;
+            unpaid: number;
         };
     }>;
     private findOne;

@@ -28,7 +28,7 @@ export class PermissionsService {
   async toAuthenticatedUser(userId: string): Promise<AuthenticatedUser> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, email: true, name: true, role: true, userType: true, providerId: true },
+      select: { id: true, email: true, name: true, role: true, providerId: true },
     });
     const permissions = await this.resolveUserPermissions(userId);
     return { ...user, permissions };

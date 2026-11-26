@@ -191,3 +191,10 @@ export class MarkPeriodPaidDto {
   @MaxLength(200)
   reference?: string;
 }
+
+export class MarkHotelCommissionPaidDto extends MarkPeriodPaidDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}

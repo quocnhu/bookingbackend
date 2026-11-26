@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MarkPeriodPaidDto = exports.VoidPeriodDto = exports.LimitQueryDto = exports.PeriodIdParamDto = exports.ListPeopleQueryDto = exports.CreateSettlementCategoryDto = exports.UpdateSettlementDto = exports.CreateSettlementDto = exports.RejectMoneyDto = exports.VerifyTourMoneyDto = exports.ExportPeriodDto = exports.PeriodQueryDto = exports.PayeeTypeDto = void 0;
+exports.MarkHotelCommissionPaidDto = exports.MarkPeriodPaidDto = exports.VoidPeriodDto = exports.LimitQueryDto = exports.PeriodIdParamDto = exports.ListPeopleQueryDto = exports.CreateSettlementCategoryDto = exports.UpdateSettlementDto = exports.CreateSettlementDto = exports.RejectMoneyDto = exports.VerifyTourMoneyDto = exports.ExportPeriodDto = exports.PeriodQueryDto = exports.PayeeTypeDto = void 0;
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const PAYABLE_ROLES = ['TOUR_GUIDE', 'DRIVER'];
@@ -246,4 +246,14 @@ __decorate([
     (0, class_validator_1.MaxLength)(200),
     __metadata("design:type", String)
 ], MarkPeriodPaidDto.prototype, "reference", void 0);
+class MarkHotelCommissionPaidDto extends MarkPeriodPaidDto {
+    note;
+}
+exports.MarkHotelCommissionPaidDto = MarkHotelCommissionPaidDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(500),
+    __metadata("design:type", String)
+], MarkHotelCommissionPaidDto.prototype, "note", void 0);
 //# sourceMappingURL=accounting.dto.js.map

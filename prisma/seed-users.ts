@@ -10,7 +10,6 @@ interface SeedUser {
   email: string;
   name: string;
   role: RoleType;
-  userType: string;
   roleName?: string;
   providerId?: string;
   driver?: { licenseNumber: string; type: DriverType; rating?: number };
@@ -22,28 +21,24 @@ const USERS: SeedUser[] = [
     email: 'admin@booking.local',
     name: 'System Admin',
     role: RoleType.ADMIN,
-    userType: 'admin',
     roleName: 'ADMIN',
   },
   {
     email: 'office@booking.local',
     name: 'Nguyen Thi Office',
     role: RoleType.OFFICE,
-    userType: 'office',
     roleName: 'OFFICE',
   },
   {
     email: 'accounting@booking.local',
     name: 'Tran Thi Accounting',
     role: RoleType.OFFICE,
-    userType: 'office',
     roleName: 'ACCOUNTING',
   },
   {
     email: 'huong.guide@booking.local',
     name: 'Tran Thi Huong',
     role: RoleType.TOUR_GUIDE,
-    userType: 'guide',
     roleName: 'TOUR_GUIDE',
     guide: { type: GuideType.OFFICIAL, languages: ['English', 'Vietnamese'], rating: 5 },
   },
@@ -51,7 +46,6 @@ const USERS: SeedUser[] = [
     email: 'anh.guide@booking.local',
     name: 'Pham Van Anh',
     role: RoleType.TOUR_GUIDE,
-    userType: 'guide',
     roleName: 'TOUR_GUIDE',
     guide: { type: GuideType.FREELANCE, languages: ['English', 'French'], rating: 4.8 },
   },
@@ -59,7 +53,6 @@ const USERS: SeedUser[] = [
     email: 'mai.guide@booking.local',
     name: 'Do Thi Mai',
     role: RoleType.TOUR_GUIDE,
-    userType: 'guide',
     roleName: 'TOUR_GUIDE',
     guide: { type: GuideType.OFFICIAL, languages: ['English', 'Chinese'], rating: 4.9 },
   },
@@ -67,7 +60,6 @@ const USERS: SeedUser[] = [
     email: 'tai.driver@booking.local',
     name: 'Nguyen Van Tai',
     role: RoleType.DRIVER,
-    userType: 'driver',
     providerId: 'demo-company-fleet',
     driver: { licenseNumber: 'DL-001', type: DriverType.COMPANY, rating: 5 },
   },
@@ -75,7 +67,6 @@ const USERS: SeedUser[] = [
     email: 'binh.driver@booking.local',
     name: 'Tran Quoc Binh',
     role: RoleType.DRIVER,
-    userType: 'driver',
     providerId: 'demo-company-fleet',
     driver: { licenseNumber: 'DL-002', type: DriverType.COMPANY, rating: 4.8 },
   },
@@ -83,15 +74,13 @@ const USERS: SeedUser[] = [
     email: 'son.driver@booking.local',
     name: 'Le Van Son',
     role: RoleType.DRIVER,
-    userType: 'driver',
     providerId: 'demo-provider',
     driver: { licenseNumber: 'DL-003', type: DriverType.FREELANCE, rating: 4.7 },
   },
   {
     email: 'customer@booking.local',
     name: 'Nguyen Van Customer',
-    role: RoleType.CUSTOMER,
-    userType: 'customer',
+    role: RoleType.TOURIST,
   },
 ];
 
@@ -111,7 +100,6 @@ async function main() {
       update: {
         name: u.name,
         role: u.role,
-        userType: u.userType,
         providerId: u.providerId ?? null,
         isActive: true,
         authProvider: AuthProvider.LOCAL,
@@ -121,7 +109,6 @@ async function main() {
         name: u.name,
         passwordHash,
         role: u.role,
-        userType: u.userType,
         providerId: u.providerId ?? null,
         isActive: true,
         authProvider: AuthProvider.LOCAL,
@@ -173,11 +160,7 @@ async function main() {
     }
   }
 
-  const byType = await prisma.user.groupBy({ by: ['userType'], _count: { _all: true } });
   console.log(`✅ Users seeded: ${created} created, ${updated} updated (password: ${PASSWORD})`);
-  for (const row of byType.sort((a, b) => (a.userType ?? '').localeCompare(b.userType ?? ''))) {
-    console.log(`   ${row.userType ?? '—'}: ${row._count._all}`);
-  }
 }
 
 main()

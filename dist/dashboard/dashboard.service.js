@@ -104,10 +104,10 @@ let DashboardService = class DashboardService {
             this.prisma.user.count({ where: { lockoutUntil: { gt: new Date() } } }),
             this.prisma.user.count({ where: { authProvider: client_1.AuthProvider.LOCAL } }),
             this.prisma.user.count({ where: { authProvider: client_1.AuthProvider.GOOGLE } }),
-            this.prisma.user.count({ where: { role: client_1.RoleType.CUSTOMER } }),
+            this.prisma.user.count({ where: { role: client_1.RoleType.TOURIST } }),
             this.prisma.user.count({
                 where: {
-                    role: client_1.RoleType.CUSTOMER,
+                    role: client_1.RoleType.TOURIST,
                     authProvider: client_1.AuthProvider.GOOGLE,
                 },
             }),

@@ -28,19 +28,56 @@ export class UsersService {
     name: true,
     avatarUrl: true,
     role: true,
-    userType: true,
     isActive: true,
     storageQuotaMb: true,
     authProvider: true,
     lastLogin: true,
     createdAt: true,
     updatedAt: true,
+    hotelId: true,
+    providerId: true,
+    hotel: {
+      select: {
+        id: true,
+        name: true,
+        contactName: true,
+        phone: true,
+        email: true,
+        address: true,
+        commissionPercent: true,
+        isActive: true,
+      },
+    },
+    provider: {
+      select: {
+        id: true,
+        name: true,
+        isCompany: true,
+        assignmentMode: true,
+      },
+    },
+    guideProfile: {
+      select: {
+        id: true,
+        type: true,
+        languages: true,
+        rating: true,
+      },
+    },
+    driverProfile: {
+      select: {
+        id: true,
+        licenseNumber: true,
+        type: true,
+        rating: true,
+      },
+    },
     roles: { include: { role: true } },
     permissions: { include: { permission: true } },
   };
 
   async findAll(query: QueryUserDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>> {
-    const { page, limit, role, userType, isActive } = query;
+    const { page, limit, role, isActive } = query;
     const where: any = {};
     if (actor.role !== RoleType.ADMIN) {
       where.id = actor.id;
@@ -48,9 +85,7 @@ export class UsersService {
     if (role) {
       where.role = role;
     }
-    if (userType) {
-      where.userType = userType;
-    }
+
     if (isActive !== undefined) {
       where.isActive = isActive;
     }
@@ -97,27 +132,64 @@ export class UsersService {
     if (existing) throw new ConflictException('Email already registered');
     const passwordHash = dto.password ? await bcrypt.hash(dto.password, 10) : undefined;
     const role = dto.role ?? RoleType.OFFICE;
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        name: dto.name,
-        avatarUrl: dto.avatarUrl,
-        passwordHash,
-        role,
-        userType: dto.userType,
-        roles: dto.roleIds?.length
-          ? { create: dto.roleIds.map((roleId) => ({ roleId })) }
-          : undefined,
-        permissions: dto.permissionIds?.length
-          ? { create: dto.permissionIds.map((permissionId) => ({ permissionId })) }
-          : undefined,
-      },
-    });
+    const data: any = {
+      email: dto.email,
+      name: dto.name,
+      avatarUrl: dto.avatarUrl,
+      passwordHash,
+      role,
+      roles: dto.roleIds?.length
+        ? { create: dto.roleIds.map((roleId) => ({ roleId })) }
+        : undefined,
+      permissions: dto.permissionIds?.length
+        ? { create: dto.permissionIds.map((permissionId) => ({ permissionId })) }
+        : undefined,
+    };
+
+    if (dto.hotelId) {
+      const hotel = await this.prisma.hotel.findUnique({ where: { id: dto.hotelId }, select: { id: true } });
+      if (!hotel) throw new NotFoundException('Hotel not found');
+      data.hotelId = dto.hotelId;
+    }
+    if (dto.providerId) {
+      const provider = await this.prisma.transportationProvider.findUnique({
+        where: { id: dto.providerId },
+        select: { id: true },
+      });
+      if (!provider) throw new NotFoundException('Transportation provider not found');
+      data.providerId = dto.providerId;
+    }
+    if (role === RoleType.TOUR_GUIDE && dto.guideProfile) {
+      data.guideProfile = {
+        create: {
+          type: dto.guideProfile.type ?? undefined,
+          languages: dto.guideProfile.languages ?? [],
+          rating: dto.guideProfile.rating ?? 5,
+        },
+      };
+    }
+    if (role === RoleType.DRIVER && dto.driverProfile) {
+      data.driverProfile = {
+        create: {
+          licenseNumber: dto.driverProfile.licenseNumber ?? '',
+          type: dto.driverProfile.type ?? undefined,
+          rating: dto.driverProfile.rating ?? 5,
+        },
+      };
+    }
+
+    const user = await this.prisma.user.create({ data });
+    if (role === RoleType.HOTEL && dto.hotelId && dto.hotelCommissionPercent !== undefined) {
+      await this.prisma.hotel.update({
+        where: { id: dto.hotelId },
+        data: { commissionPercent: dto.hotelCommissionPercent },
+      });
+    }
     return this.findOne(user.id);
   }
 
   async update(id: string, dto: UpdateUserDto, actor: { id: string; role: RoleType }) {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
     if (dto.role !== undefined) {
       const target = await this.prisma.user.findUniqueOrThrow({ where: { id } });
       if (target.id === actor.id && dto.role !== target.role) {
@@ -130,14 +202,78 @@ export class UsersService {
         }
       }
     }
+
+    const nextRole = dto.role ?? existing.role;
     const data: any = {
       name: dto.name,
       avatarUrl: dto.avatarUrl,
       role: dto.role,
-      userType: dto.userType,
       isActive: dto.isActive,
       storageQuotaMb: dto.storageQuotaMb,
     };
+
+    if (dto.hotelId !== undefined) {
+      data.hotelId = dto.hotelId || null;
+      if (data.hotelId) {
+        const hotel = await this.prisma.hotel.findUnique({ where: { id: data.hotelId }, select: { id: true } });
+        if (!hotel) throw new NotFoundException('Hotel not found');
+      }
+    }
+    if (dto.providerId !== undefined) {
+      data.providerId = dto.providerId || null;
+      if (data.providerId) {
+        const provider = await this.prisma.transportationProvider.findUnique({
+          where: { id: data.providerId },
+          select: { id: true },
+        });
+        if (!provider) throw new NotFoundException('Transportation provider not found');
+      }
+    }
+
+    if (dto.guideProfile !== undefined) {
+      if (dto.guideProfile === null) {
+        data.guideProfile = { deleteMany: {} };
+      } else if (nextRole === RoleType.TOUR_GUIDE) {
+        data.guideProfile = {
+          upsert: {
+            create: {
+              type: dto.guideProfile.type ?? undefined,
+              languages: dto.guideProfile.languages ?? [],
+              rating: dto.guideProfile.rating ?? 5,
+            },
+            update: {
+              ...(dto.guideProfile.type !== undefined ? { type: dto.guideProfile.type } : {}),
+              ...(dto.guideProfile.languages !== undefined ? { languages: dto.guideProfile.languages } : {}),
+              ...(dto.guideProfile.rating !== undefined ? { rating: dto.guideProfile.rating } : {}),
+            },
+          },
+        };
+      }
+    }
+
+    if (dto.driverProfile !== undefined) {
+      if (dto.driverProfile === null) {
+        data.driverProfile = { deleteMany: {} };
+      } else if (nextRole === RoleType.DRIVER) {
+        const licenseNumber = dto.driverProfile.licenseNumber?.trim();
+        const currentLicense = existing.driverProfile?.licenseNumber;
+        data.driverProfile = {
+          upsert: {
+            create: {
+              licenseNumber: licenseNumber || currentLicense || `DRV-${id.slice(0, 8).toUpperCase()}`,
+              type: dto.driverProfile.type ?? undefined,
+              rating: dto.driverProfile.rating ?? 5,
+            },
+            update: {
+              ...(licenseNumber ? { licenseNumber } : {}),
+              ...(dto.driverProfile.type !== undefined ? { type: dto.driverProfile.type } : {}),
+              ...(dto.driverProfile.rating !== undefined ? { rating: dto.driverProfile.rating } : {}),
+            },
+          },
+        };
+      }
+    }
+
     if (dto.roleIds !== undefined) {
       await this.prisma.userRole.deleteMany({ where: { userId: id } });
       data.roles = { create: dto.roleIds.map((roleId) => ({ roleId })) };
@@ -147,6 +283,13 @@ export class UsersService {
       data.permissions = { create: dto.permissionIds.map((permissionId) => ({ permissionId })) };
     }
     await this.prisma.user.update({ where: { id }, data });
+    const hotelIdForCommission = dto.hotelId !== undefined ? (dto.hotelId || null) : existing.hotelId;
+    if (nextRole === RoleType.HOTEL && hotelIdForCommission && dto.hotelCommissionPercent !== undefined) {
+      await this.prisma.hotel.update({
+        where: { id: hotelIdForCommission },
+        data: { commissionPercent: dto.hotelCommissionPercent },
+      });
+    }
     return this.findOne(id);
   }
 

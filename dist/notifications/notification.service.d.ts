@@ -3,7 +3,7 @@ import { AuditService } from "../audit/audit.service";
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationType, Prisma } from '@prisma/client';
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
-import { SendNotificationDto } from './dto/notification.dto';
+import { QueryNotificationLogDto, SendNotificationDto } from './dto/notification.dto';
 export declare class NotificationService {
     private readonly prisma;
     private readonly auditService;
@@ -62,5 +62,11 @@ export declare class NotificationService {
     send(dto: SendNotificationDto, actor: AuthenticatedUser): Promise<{
         sent: number;
         recipients: string[];
+    }>;
+    getLog(query: QueryNotificationLogDto, actor: AuthenticatedUser): Promise<{
+        items: any[];
+        total: number;
+        page: number;
+        limit: number;
     }>;
 }

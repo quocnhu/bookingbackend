@@ -156,7 +156,6 @@ export class TransportationProvidersService {
         name: dto.name,
         passwordHash,
         role: RoleType.DRIVER,
-        userType: 'crew',
         providerId,
         isActive: true,
         driverProfile: { create: { licenseNumber: dto.licenseNumber } },

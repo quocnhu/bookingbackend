@@ -7,7 +7,7 @@ export const EMPLOYEE_GROUPS = [
   'PROVIDER_ACCOUNT',
   'OFFICE',
   'ADMIN',
-  'CUSTOMER',
+  'TOURIST',
 ] as const;
 
 export type EmployeeGroup = (typeof EMPLOYEE_GROUPS)[number];

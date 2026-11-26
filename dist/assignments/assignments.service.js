@@ -2281,7 +2281,7 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
                 this.logger.warn(`Could not publish evidence for assignment ${id}: ${error.message}`);
             });
         }
-        if (assignment.guideId) {
+        {
             const isVerified = dto.status === 'VERIFIED';
             const notifType = isVerified
                 ? client_1.NotificationType.REPORT_VERIFIED
@@ -2292,11 +2292,30 @@ let AssignmentsService = AssignmentsService_1 = class AssignmentsService {
             const body = isVerified
                 ? `Tour report ${assignment.tourName ?? ''} has been confirmed.`
                 : `Tour report ${assignment.tourName ?? ''} was rejected. ${dto.verificationNotes ?? ''}`;
-            const notif = await this.notificationService.create(assignment.guideId, notifType, title, body, {
-                assignmentId: id,
-                reportStatus: dto.status,
-            });
-            this.gateway.notifyUser(assignment.guideId, 'notification', notif);
+            const ids = new Set();
+            if (assignment.guideId)
+                ids.add(assignment.guideId);
+            if (assignment.driverId)
+                ids.add(assignment.driverId);
+            if (assignment.providerId) {
+                const providerUsers = await this.prisma.user.findMany({
+                    where: { role: client_1.RoleType.TRANSPORT_PROVIDER, providerId: assignment.providerId, isActive: true },
+                    select: { id: true },
+                });
+                for (const u of providerUsers)
+                    ids.add(u.id);
+            }
+            for (const userId of ids) {
+                try {
+                    const notif = await this.notificationService.create(userId, notifType, title, body, {
+                        assignmentId: id,
+                        reportStatus: dto.status,
+                    });
+                    this.gateway.notifyUser(userId, 'notification', notif);
+                }
+                catch {
+                }
+            }
         }
         await this.auditService.log({
             entityType: 'Assignment',

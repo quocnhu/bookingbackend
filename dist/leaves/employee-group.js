@@ -10,6 +10,6 @@ exports.EMPLOYEE_GROUPS = [
     'PROVIDER_ACCOUNT',
     'OFFICE',
     'ADMIN',
-    'CUSTOMER',
+    'TOURIST',
 ];
 //# sourceMappingURL=employee-group.js.map

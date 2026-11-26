@@ -201,7 +201,6 @@ async function main() {
         email: `${c.id}@seed.local`.replace('seed-', ''),
         passwordHash: pwd,
         role: c.role,
-        userType: 'crew',
         providerId: c.providerId,
         isActive: true,
       },
@@ -286,7 +285,6 @@ async function main() {
       email: 'accounting@seed.local',
       passwordHash: pwd,
       role: RoleType.OFFICE,
-      userType: 'office',
       isActive: true,
     },
   });

@@ -200,8 +200,7 @@ let AuthService = class AuthService {
                     email: profile.email,
                     name: profile.name,
                     authProvider: client_1.AuthProvider.GOOGLE,
-                    role: client_1.RoleType.CUSTOMER,
-                    userType: 'customer',
+                    role: client_1.RoleType.TOURIST,
                 },
             });
         }
@@ -318,7 +317,6 @@ let AuthService = class AuthService {
             name: user.name,
             avatarUrl: user.avatarUrl,
             role: user.role,
-            userType: user.userType,
             authProvider: user.authProvider,
             isActive: user.isActive,
             createdAt: user.createdAt,

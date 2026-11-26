@@ -62,7 +62,6 @@ async function main() {
         email: p.contact,
         passwordHash: pwd,
         role: RoleType.TRANSPORT_PROVIDER,
-        userType: 'provider',
         providerId: provider.id,
         isActive: true,
       },

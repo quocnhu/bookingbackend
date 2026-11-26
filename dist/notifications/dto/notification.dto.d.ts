@@ -20,3 +20,10 @@ export declare class SendNotificationDto {
 export declare class NotificationTargetsQueryDto {
     search?: string;
 }
+export declare class QueryNotificationLogDto {
+    page?: number;
+    limit?: number;
+    senderRole?: RoleType;
+    recipientRole?: RoleType;
+    search?: string;
+}

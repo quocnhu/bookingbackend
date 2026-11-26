@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var NotificationService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationService = void 0;
+const crypto_1 = require("crypto");
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
@@ -22,7 +23,7 @@ const ROLE_LABELS = {
     TOUR_GUIDE: 'Tour Guide',
     DRIVER: 'Driver',
     TRANSPORT_PROVIDER: 'Transport Provider',
-    CUSTOMER: 'Customer',
+    TOURIST: 'Tourist',
 };
 let NotificationService = NotificationService_1 = class NotificationService {
     prisma;
@@ -142,13 +143,22 @@ let NotificationService = NotificationService_1 = class NotificationService {
         const type = dto.type ?? client_1.NotificationType.GENERAL;
         const actorInfo = await this.prisma.user.findUnique({
             where: { id: actor.id },
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true, email: true, role: true },
         });
-        const sender = actorInfo ?? { id: actor.id, name: actor.name ?? actor.email ?? 'System', email: actor.email ?? null };
+        const sender = actorInfo ?? {
+            id: actor.id,
+            name: actor.name ?? actor.email ?? 'System',
+            email: actor.email ?? null,
+            role: actor.role,
+        };
+        const batchId = (0, crypto_1.randomUUID)();
         const created = [];
         for (const userId of recipientIds) {
             const notif = await this.create(userId, type, dto.title, dto.body, {
                 fromUserId: actor.id,
+                fromRole: sender.role,
+                toRoleTypes: dto.roleTypes ?? [],
+                batchId,
             });
             const enriched = { ...notif, sender };
             this.gateway.notifyUser(userId, 'notification', enriched);
@@ -168,6 +178,102 @@ let NotificationService = NotificationService_1 = class NotificationService {
         return {
             sent: recipientIds.size,
             recipients: [...recipientIds],
+        };
+    }
+    async getLog(query, actor) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 20;
+        const where = {
+            data: { path: ['fromUserId'], not: client_1.Prisma.DbNull },
+        };
+        if (query.recipientRole) {
+            where.user = { role: query.recipientRole };
+        }
+        if (query.search?.trim()) {
+            const q = query.search.trim();
+            where.OR = [
+                { title: { contains: q, mode: 'insensitive' } },
+                { body: { contains: q, mode: 'insensitive' } },
+                { user: { name: { contains: q, mode: 'insensitive' } } },
+                { user: { email: { contains: q, mode: 'insensitive' } } },
+            ];
+        }
+        const rows = await this.prisma.notification.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: 500,
+            select: {
+                id: true,
+                type: true,
+                title: true,
+                body: true,
+                data: true,
+                createdAt: true,
+                read: true,
+                user: { select: { id: true, name: true, email: true, role: true } },
+            },
+        });
+        const senderIds = [
+            ...new Set(rows.map((r) => r.data?.fromUserId).filter(Boolean)),
+        ];
+        const senders = senderIds.length
+            ? await this.prisma.user.findMany({
+                where: { id: { in: senderIds } },
+                select: { id: true, name: true, email: true, role: true },
+            })
+            : [];
+        const senderById = new Map(senders.map((s) => [s.id, s]));
+        const grouped = new Map();
+        for (const row of rows) {
+            const data = row.data ?? {};
+            const sender = senderById.get(data.fromUserId);
+            const senderRole = sender?.role ?? data.fromRole ?? null;
+            if (query.senderRole && senderRole !== query.senderRole)
+                continue;
+            const key = data.batchId ??
+                [
+                    data.fromUserId ?? 'unknown',
+                    row.createdAt.toISOString(),
+                    row.type,
+                    row.title,
+                    row.body,
+                ].join('|');
+            const existing = grouped.get(key);
+            const recipient = {
+                id: row.user.id,
+                name: row.user.name,
+                email: row.user.email,
+                role: row.user.role,
+                read: row.read,
+            };
+            if (existing) {
+                if (!existing.recipients.some((r) => r.id === recipient.id)) {
+                    existing.recipients.push(recipient);
+                }
+                continue;
+            }
+            grouped.set(key, {
+                id: row.id,
+                createdAt: row.createdAt,
+                type: row.type,
+                title: row.title,
+                body: row.body,
+                sender: sender ?? (data.fromUserId ? { id: data.fromUserId, role: senderRole } : null),
+                recipients: [recipient],
+                toRoleTypes: Array.isArray(data.toRoleTypes) ? data.toRoleTypes : [],
+            });
+        }
+        const items = [...grouped.values()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const total = items.length;
+        const start = (page - 1) * limit;
+        return {
+            items: items.slice(start, start + limit).map((item) => ({
+                ...item,
+                recipientCount: item.recipients.length,
+            })),
+            total,
+            page,
+            limit,
         };
     }
 };

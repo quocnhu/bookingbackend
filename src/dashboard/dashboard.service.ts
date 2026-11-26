@@ -129,10 +129,10 @@ export class DashboardService {
       this.prisma.user.count({ where: { lockoutUntil: { gt: new Date() } } }),
       this.prisma.user.count({ where: { authProvider: AuthProvider.LOCAL } }),
       this.prisma.user.count({ where: { authProvider: AuthProvider.GOOGLE } }),
-      this.prisma.user.count({ where: { role: RoleType.CUSTOMER } }),
+      this.prisma.user.count({ where: { role: RoleType.TOURIST } }),
       this.prisma.user.count({
         where: {
-          role: RoleType.CUSTOMER,
+          role: RoleType.TOURIST,
           authProvider: AuthProvider.GOOGLE,
         },
       }),

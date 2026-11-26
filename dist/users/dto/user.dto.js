@@ -9,7 +9,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QueryUserDto = exports.UpdateUserRoleDto = exports.UpdateUserDto = exports.CreateUserDto = void 0;
+exports.QueryUserDto = exports.UpdateUserRoleDto = exports.UpdateUserDto = exports.UpdateDriverProfileDto = exports.UpdateGuideProfileDto = exports.CreateUserDto = void 0;
+const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const is_safe_url_validator_1 = require("../../common/validators/is-safe-url.validator");
@@ -20,9 +21,13 @@ class CreateUserDto {
     avatarUrl;
     password;
     role;
-    userType;
     roleIds;
     permissionIds;
+    hotelId;
+    hotelCommissionPercent;
+    providerId;
+    guideProfile;
+    driverProfile;
 }
 exports.CreateUserDto = CreateUserDto;
 __decorate([
@@ -52,11 +57,6 @@ __decorate([
 ], CreateUserDto.prototype, "role", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateUserDto.prototype, "userType", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),
     (0, class_validator_1.IsString)({ each: true }),
     __metadata("design:type", Array)
@@ -67,13 +67,94 @@ __decorate([
     (0, class_validator_1.IsString)({ each: true }),
     __metadata("design:type", Array)
 ], CreateUserDto.prototype, "permissionIds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", Object)
+], CreateUserDto.prototype, "hotelId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], CreateUserDto.prototype, "hotelCommissionPercent", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", Object)
+], CreateUserDto.prototype, "providerId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateNested)(),
+    (0, class_transformer_1.Type)(() => UpdateGuideProfileDto),
+    __metadata("design:type", Object)
+], CreateUserDto.prototype, "guideProfile", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateNested)(),
+    (0, class_transformer_1.Type)(() => UpdateDriverProfileDto),
+    __metadata("design:type", Object)
+], CreateUserDto.prototype, "driverProfile", void 0);
+class UpdateGuideProfileDto {
+    type;
+    languages;
+    rating;
+}
+exports.UpdateGuideProfileDto = UpdateGuideProfileDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.GuideType),
+    __metadata("design:type", String)
+], UpdateGuideProfileDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], UpdateGuideProfileDto.prototype, "languages", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(5),
+    __metadata("design:type", Number)
+], UpdateGuideProfileDto.prototype, "rating", void 0);
+class UpdateDriverProfileDto {
+    licenseNumber;
+    type;
+    rating;
+}
+exports.UpdateDriverProfileDto = UpdateDriverProfileDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], UpdateDriverProfileDto.prototype, "licenseNumber", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.DriverType),
+    __metadata("design:type", String)
+], UpdateDriverProfileDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(5),
+    __metadata("design:type", Number)
+], UpdateDriverProfileDto.prototype, "rating", void 0);
 class UpdateUserDto {
     name;
     avatarUrl;
     role;
-    userType;
     isActive;
     storageQuotaMb;
+    hotelId;
+    hotelCommissionPercent;
+    providerId;
+    guideProfile;
+    driverProfile;
     roleIds;
     permissionIds;
 }
@@ -95,11 +176,6 @@ __decorate([
 ], UpdateUserDto.prototype, "role", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdateUserDto.prototype, "userType", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], UpdateUserDto.prototype, "isActive", void 0);
@@ -109,6 +185,36 @@ __decorate([
     (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], UpdateUserDto.prototype, "storageQuotaMb", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", Object)
+], UpdateUserDto.prototype, "hotelId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], UpdateUserDto.prototype, "hotelCommissionPercent", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", Object)
+], UpdateUserDto.prototype, "providerId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateNested)(),
+    (0, class_transformer_1.Type)(() => UpdateGuideProfileDto),
+    __metadata("design:type", Object)
+], UpdateUserDto.prototype, "guideProfile", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateNested)(),
+    (0, class_transformer_1.Type)(() => UpdateDriverProfileDto),
+    __metadata("design:type", Object)
+], UpdateUserDto.prototype, "driverProfile", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),
@@ -138,7 +244,6 @@ __decorate([
 ], UpdateUserRoleDto.prototype, "permissionIds", void 0);
 class QueryUserDto extends pagination_dto_1.PaginationDto {
     role;
-    userType;
     isActive;
 }
 exports.QueryUserDto = QueryUserDto;
@@ -147,11 +252,6 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.RoleType),
     __metadata("design:type", String)
 ], QueryUserDto.prototype, "role", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], QueryUserDto.prototype, "userType", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsBoolean)(),

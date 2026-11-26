@@ -32,7 +32,6 @@ export declare class RolesController {
                 lastLogin: Date | null;
                 failedLoginAttempts: number;
                 lockoutUntil: Date | null;
-                userType: string | null;
                 storageQuotaMb: number;
                 providerId: string | null;
                 hotelId: string | null;
@@ -84,7 +83,6 @@ export declare class RolesController {
                 lastLogin: Date | null;
                 failedLoginAttempts: number;
                 lockoutUntil: Date | null;
-                userType: string | null;
                 storageQuotaMb: number;
                 providerId: string | null;
                 hotelId: string | null;

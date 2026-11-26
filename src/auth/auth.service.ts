@@ -164,7 +164,7 @@ export class AuthService {
     return this.issueTokens(authUser);
   }
 
-  /** Upsert the user after Google login; defaults to the CUSTOMER role. */
+  /** Upsert the user after Google login; defaults to the TOURIST role. */
   async googleLogin(profile: { email: string; name?: string | null; providerId: string }, ip: string, userAgent?: string) {
     let user = await this.prisma.user.findUnique({ where: { email: profile.email } });
     if (!user) {
@@ -175,8 +175,7 @@ export class AuthService {
           authProvider: AuthProvider.GOOGLE,
           // NOTE: providerId is an FK to TransportationProvider (transport crew link),
           // NOT the Google account id — do not store profile.providerId here.
-          role: RoleType.CUSTOMER,
-          userType: 'customer',
+          role: RoleType.TOURIST,
         },
       });
     } else {
@@ -297,7 +296,6 @@ export class AuthService {
       name: user.name,
       avatarUrl: user.avatarUrl,
       role: user.role,
-      userType: user.userType,
       authProvider: user.authProvider,
       isActive: user.isActive,
       createdAt: user.createdAt,

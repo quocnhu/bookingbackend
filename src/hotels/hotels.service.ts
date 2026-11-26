@@ -39,6 +39,15 @@ type HotelBookingRow = Prisma.BookingGetPayload<{
     hotelCommissionPercent: true;
     tour: { select: { id: true; name: true } };
     assignment: { select: { status: true } };
+    hotelCommissionPayout: {
+      select: {
+        id: true;
+        paidAt: true;
+        paidByName: true;
+        paymentMethod: true;
+        paymentReference: true;
+      };
+    };
   };
 }>;
 
@@ -414,6 +423,15 @@ export class HotelsService {
       hotelCommissionPercent: true,
       tour: { select: { id: true, name: true } },
       assignment: { select: { status: true } },
+      hotelCommissionPayout: {
+        select: {
+          id: true,
+          paidAt: true,
+          paidByName: true,
+          paymentMethod: true,
+          paymentReference: true,
+        },
+      },
     } satisfies Prisma.BookingSelect;
   }
 
@@ -436,6 +454,7 @@ export class HotelsService {
       row.status !== BookingStatus.CANCELED &&
       row.payment === PaymentStatus.PAID &&
       row.assignment?.status === AssignmentStatus.COMPLETED;
+    const payout = row.hotelCommissionPayout;
     return {
       id: row.id,
       bookingRef: row.bookingRef,
@@ -453,6 +472,11 @@ export class HotelsService {
       commissionPercent: rate,
       commissionAmount: commission,
       commissionEarned: earned,
+      commissionPaid: Boolean(payout),
+      commissionPaidAt: payout?.paidAt ?? null,
+      commissionPaidByName: payout?.paidByName ?? null,
+      commissionPaymentMethod: payout?.paymentMethod ?? null,
+      commissionPaymentReference: payout?.paymentReference ?? null,
     };
   }
 
@@ -462,6 +486,7 @@ export class HotelsService {
       totalAmount: number | null;
       commissionAmount: number;
       commissionEarned: boolean;
+      commissionPaid: boolean;
       tourId: string | null;
     }>,
   ) {
@@ -472,9 +497,11 @@ export class HotelsService {
         acc.revenue += Number(row.totalAmount ?? 0);
         if (row.commissionEarned) acc.earned += row.commissionAmount;
         else acc.pending += row.commissionAmount;
+        if (row.commissionEarned && row.commissionPaid) acc.paid += row.commissionAmount;
+        if (row.commissionEarned && !row.commissionPaid) acc.unpaid += row.commissionAmount;
         return acc;
       },
-      { bookings: 0, pax: 0, revenue: 0, earned: 0, pending: 0 },
+      { bookings: 0, pax: 0, revenue: 0, earned: 0, pending: 0, paid: 0, unpaid: 0 },
     );
   }
 
@@ -495,6 +522,8 @@ export class HotelsService {
         revenue: number;
         earned: number;
         pending: number;
+        paid: number;
+        unpaid: number;
       }
     >();
     for (const row of active) {
@@ -509,12 +538,16 @@ export class HotelsService {
           revenue: 0,
           earned: 0,
           pending: 0,
+          paid: 0,
+          unpaid: 0,
         };
       entry.bookings += 1;
       entry.pax += row.totalPax ?? 0;
       entry.revenue += row.totalAmount;
       if (row.commissionEarned) entry.earned += row.commissionAmount;
       else entry.pending += row.commissionAmount;
+      if (row.commissionEarned && row.commissionPaid) entry.paid += row.commissionAmount;
+      if (row.commissionEarned && !row.commissionPaid) entry.unpaid += row.commissionAmount;
       tourMap.set(key, entry);
     }
     const byTour = [...tourMap.values()].sort((a, b) => b.revenue - a.revenue);

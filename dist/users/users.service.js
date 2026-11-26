@@ -58,27 +58,61 @@ let UsersService = class UsersService {
         name: true,
         avatarUrl: true,
         role: true,
-        userType: true,
         isActive: true,
         storageQuotaMb: true,
         authProvider: true,
         lastLogin: true,
         createdAt: true,
         updatedAt: true,
+        hotelId: true,
+        providerId: true,
+        hotel: {
+            select: {
+                id: true,
+                name: true,
+                contactName: true,
+                phone: true,
+                email: true,
+                address: true,
+                commissionPercent: true,
+                isActive: true,
+            },
+        },
+        provider: {
+            select: {
+                id: true,
+                name: true,
+                isCompany: true,
+                assignmentMode: true,
+            },
+        },
+        guideProfile: {
+            select: {
+                id: true,
+                type: true,
+                languages: true,
+                rating: true,
+            },
+        },
+        driverProfile: {
+            select: {
+                id: true,
+                licenseNumber: true,
+                type: true,
+                rating: true,
+            },
+        },
         roles: { include: { role: true } },
         permissions: { include: { permission: true } },
     };
     async findAll(query, actor) {
-        const { page, limit, role, userType, isActive } = query;
+        const { page, limit, role, isActive } = query;
         const where = {};
         if (actor.role !== client_1.RoleType.ADMIN) {
             where.id = actor.id;
         }
         if (role) {
             where.role = role;
-        }
-        if (userType) {
-            where.userType = userType;
         }
         if (isActive !== undefined) {
             where.isActive = isActive;
@@ -127,26 +161,63 @@ let UsersService = class UsersService {
             throw new common_1.ConflictException('Email already registered');
         const passwordHash = dto.password ? await bcrypt.hash(dto.password, 10) : undefined;
         const role = dto.role ?? client_1.RoleType.OFFICE;
-        const user = await this.prisma.user.create({
-            data: {
-                email: dto.email,
-                name: dto.name,
-                avatarUrl: dto.avatarUrl,
-                passwordHash,
-                role,
-                userType: dto.userType,
-                roles: dto.roleIds?.length
-                    ? { create: dto.roleIds.map((roleId) => ({ roleId })) }
-                    : undefined,
-                permissions: dto.permissionIds?.length
-                    ? { create: dto.permissionIds.map((permissionId) => ({ permissionId })) }
-                    : undefined,
-            },
-        });
+        const data = {
+            email: dto.email,
+            name: dto.name,
+            avatarUrl: dto.avatarUrl,
+            passwordHash,
+            role,
+            roles: dto.roleIds?.length
+                ? { create: dto.roleIds.map((roleId) => ({ roleId })) }
+                : undefined,
+            permissions: dto.permissionIds?.length
+                ? { create: dto.permissionIds.map((permissionId) => ({ permissionId })) }
+                : undefined,
+        };
+        if (dto.hotelId) {
+            const hotel = await this.prisma.hotel.findUnique({ where: { id: dto.hotelId }, select: { id: true } });
+            if (!hotel)
+                throw new common_1.NotFoundException('Hotel not found');
+            data.hotelId = dto.hotelId;
+        }
+        if (dto.providerId) {
+            const provider = await this.prisma.transportationProvider.findUnique({
+                where: { id: dto.providerId },
+                select: { id: true },
+            });
+            if (!provider)
+                throw new common_1.NotFoundException('Transportation provider not found');
+            data.providerId = dto.providerId;
+        }
+        if (role === client_1.RoleType.TOUR_GUIDE && dto.guideProfile) {
+            data.guideProfile = {
+                create: {
+                    type: dto.guideProfile.type ?? undefined,
+                    languages: dto.guideProfile.languages ?? [],
+                    rating: dto.guideProfile.rating ?? 5,
+                },
+            };
+        }
+        if (role === client_1.RoleType.DRIVER && dto.driverProfile) {
+            data.driverProfile = {
+                create: {
+                    licenseNumber: dto.driverProfile.licenseNumber ?? '',
+                    type: dto.driverProfile.type ?? undefined,
+                    rating: dto.driverProfile.rating ?? 5,
+                },
+            };
+        }
+        const user = await this.prisma.user.create({ data });
+        if (role === client_1.RoleType.HOTEL && dto.hotelId && dto.hotelCommissionPercent !== undefined) {
+            await this.prisma.hotel.update({
+                where: { id: dto.hotelId },
+                data: { commissionPercent: dto.hotelCommissionPercent },
+            });
+        }
         return this.findOne(user.id);
     }
     async update(id, dto, actor) {
-        await this.findOne(id);
+        const existing = await this.findOne(id);
         if (dto.role !== undefined) {
             const target = await this.prisma.user.findUniqueOrThrow({ where: { id } });
             if (target.id === actor.id && dto.role !== target.role) {
@@ -159,14 +230,77 @@ let UsersService = class UsersService {
                 }
             }
         }
+        const nextRole = dto.role ?? existing.role;
         const data = {
             name: dto.name,
             avatarUrl: dto.avatarUrl,
             role: dto.role,
-            userType: dto.userType,
             isActive: dto.isActive,
             storageQuotaMb: dto.storageQuotaMb,
         };
+        if (dto.hotelId !== undefined) {
+            data.hotelId = dto.hotelId || null;
+            if (data.hotelId) {
+                const hotel = await this.prisma.hotel.findUnique({ where: { id: data.hotelId }, select: { id: true } });
+                if (!hotel)
+                    throw new common_1.NotFoundException('Hotel not found');
+            }
+        }
+        if (dto.providerId !== undefined) {
+            data.providerId = dto.providerId || null;
+            if (data.providerId) {
+                const provider = await this.prisma.transportationProvider.findUnique({
+                    where: { id: data.providerId },
+                    select: { id: true },
+                });
+                if (!provider)
+                    throw new common_1.NotFoundException('Transportation provider not found');
+            }
+        }
+        if (dto.guideProfile !== undefined) {
+            if (dto.guideProfile === null) {
+                data.guideProfile = { deleteMany: {} };
+            }
+            else if (nextRole === client_1.RoleType.TOUR_GUIDE) {
+                data.guideProfile = {
+                    upsert: {
+                        create: {
+                            type: dto.guideProfile.type ?? undefined,
+                            languages: dto.guideProfile.languages ?? [],
+                            rating: dto.guideProfile.rating ?? 5,
+                        },
+                        update: {
+                            ...(dto.guideProfile.type !== undefined ? { type: dto.guideProfile.type } : {}),
+                            ...(dto.guideProfile.languages !== undefined ? { languages: dto.guideProfile.languages } : {}),
+                            ...(dto.guideProfile.rating !== undefined ? { rating: dto.guideProfile.rating } : {}),
+                        },
+                    },
+                };
+            }
+        }
+        if (dto.driverProfile !== undefined) {
+            if (dto.driverProfile === null) {
+                data.driverProfile = { deleteMany: {} };
+            }
+            else if (nextRole === client_1.RoleType.DRIVER) {
+                const licenseNumber = dto.driverProfile.licenseNumber?.trim();
+                const currentLicense = existing.driverProfile?.licenseNumber;
+                data.driverProfile = {
+                    upsert: {
+                        create: {
+                            licenseNumber: licenseNumber || currentLicense || `DRV-${id.slice(0, 8).toUpperCase()}`,
+                            type: dto.driverProfile.type ?? undefined,
+                            rating: dto.driverProfile.rating ?? 5,
+                        },
+                        update: {
+                            ...(licenseNumber ? { licenseNumber } : {}),
+                            ...(dto.driverProfile.type !== undefined ? { type: dto.driverProfile.type } : {}),
+                            ...(dto.driverProfile.rating !== undefined ? { rating: dto.driverProfile.rating } : {}),
+                        },
+                    },
+                };
+            }
+        }
         if (dto.roleIds !== undefined) {
             await this.prisma.userRole.deleteMany({ where: { userId: id } });
             data.roles = { create: dto.roleIds.map((roleId) => ({ roleId })) };
@@ -176,6 +310,13 @@ let UsersService = class UsersService {
             data.permissions = { create: dto.permissionIds.map((permissionId) => ({ permissionId })) };
         }
         await this.prisma.user.update({ where: { id }, data });
+        const hotelIdForCommission = dto.hotelId !== undefined ? (dto.hotelId || null) : existing.hotelId;
+        if (nextRole === client_1.RoleType.HOTEL && hotelIdForCommission && dto.hotelCommissionPercent !== undefined) {
+            await this.prisma.hotel.update({
+                where: { id: hotelIdForCommission },
+                data: { commissionPercent: dto.hotelCommissionPercent },
+            });
+        }
         return this.findOne(id);
     }
     async updateRoles(id, dto, actor) {

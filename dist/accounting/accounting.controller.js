@@ -70,6 +70,12 @@ let AccountingController = class AccountingController {
     markPartnerPaymentPaid(id, dto, actor) {
         return this.accountingService.markPartnerPaymentPaid(actor, id, dto);
     }
+    hotelCommissions(hotelId, actor) {
+        return this.accountingService.hotelCommissions(actor, hotelId);
+    }
+    markHotelCommissionPaid(bookingId, dto, actor) {
+        return this.accountingService.markHotelCommissionPaid(actor, bookingId, dto);
+    }
     periodHistory(personId, actor) {
         return this.accountingService.periodHistory(actor, personId);
     }
@@ -209,6 +215,24 @@ __decorate([
     __metadata("design:paramtypes", [String, accounting_dto_1.MarkPeriodPaidDto, Object]),
     __metadata("design:returntype", void 0)
 ], AccountingController.prototype, "markPartnerPaymentPaid", null);
+__decorate([
+    (0, common_1.Get)('hotel-commissions'),
+    __param(0, (0, common_1.Query)('hotelId')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "hotelCommissions", null);
+__decorate([
+    (0, common_1.Post)('hotel-commissions/:bookingId/mark-paid'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Param)('bookingId')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, accounting_dto_1.MarkHotelCommissionPaidDto, Object]),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "markHotelCommissionPaid", null);
 __decorate([
     (0, common_1.Get)('period/history'),
     __param(0, (0, common_1.Query)('personId')),

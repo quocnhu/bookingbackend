@@ -20,7 +20,7 @@ enum RoleType {
   DRIVER
   TRANSPORT_PROVIDER
   HOTEL
-  CUSTOMER
+  TOURIST
 }
 
 enum TourType {
@@ -247,10 +247,9 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockoutUntil        DateTime?
 
-  // RBAC (section 2.3): separate roles + permissions, plus extra classification
+  // RBAC (section 2.3): separate roles + permissions
   roles       UserRole[]
   permissions UserPermission[]
-  userType    String?
 
   // Drive: storage quota in MB. ADMIN = unlimited.
   storageQuotaMb Int @default(3072)
@@ -383,18 +382,19 @@ model GuideProfile {
 }
 
 model Hotel {
-  id                String   @id @default(uuid())
-  name              String   @unique
+  id                String                  @id @default(uuid())
+  name              String                  @unique
   contactName       String?
   phone             String?
   email             String?
   address           String?
-  commissionPercent Decimal  @default(0) @db.Decimal(5, 2)
-  isActive          Boolean  @default(true)
+  commissionPercent Decimal                 @default(0) @db.Decimal(5, 2)
+  isActive          Boolean                 @default(true)
   users             User[]
   bookings          Booking[]
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  commissionPayouts HotelCommissionPayout[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 }
 
 // ─── COMPANY PROFILE (digital signature / annual settlement printing) ──────────
@@ -673,6 +673,7 @@ model Booking {
   paymentConfirmedById   String?
   paymentConfirmedByName String?
   payments               BookingPayment[]
+  hotelCommissionPayout  HotelCommissionPayout?
 
   // Booking-confirmation "template" email sent to the tourist through the
   // dedicated TEMPLATE_MAIL_* SMTP mailbox (not the TripAdvisor ingest mailbox).
@@ -995,6 +996,35 @@ model PartnerPayment {
   updatedAt        DateTime             @updatedAt
 
   @@index([partnerId, paidAt])
+  @@index([status])
+}
+
+enum HotelCommissionPayoutStatus {
+  PAID
+}
+
+model HotelCommissionPayout {
+  id               String                      @id @default(uuid())
+  bookingId        String                      @unique
+  booking          Booking                     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  hotelId          String
+  hotel            Hotel                       @relation(fields: [hotelId], references: [id])
+  amount           Decimal                     @db.Decimal(14, 2)
+  currency         String                      @default("VND")
+  commissionPercent Decimal                    @db.Decimal(5, 2)
+  tourName         String?
+  tourDate         DateTime?
+  note             String?                     @db.Text
+  status           HotelCommissionPayoutStatus @default(PAID)
+  paidAt           DateTime                    @default(now())
+  paidById         String?
+  paidByName       String?
+  paymentMethod    PaymentMethod?
+  paymentReference String?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  @@index([hotelId, paidAt])
   @@index([status])
 }
 

@@ -301,7 +301,6 @@ let LeavesService = LeavesService_1 = class LeavesService {
         name: true,
         email: true,
         role: true,
-        userType: true,
         isActive: true,
         provider: { select: { id: true, name: true, isCompany: true } },
         guideProfile: { select: { type: true, rating: true } },
@@ -314,7 +313,7 @@ let LeavesService = LeavesService_1 = class LeavesService {
         [client_1.RoleType.DRIVER]: 3,
         [client_1.RoleType.TRANSPORT_PROVIDER]: 4,
         [client_1.RoleType.HOTEL]: 5,
-        [client_1.RoleType.CUSTOMER]: 6,
+        [client_1.RoleType.TOURIST]: 6,
     };
     assertLeaveManager(actor) {
         if (actor.role !== client_1.RoleType.ADMIN && actor.role !== client_1.RoleType.OFFICE) {
@@ -338,8 +337,8 @@ let LeavesService = LeavesService_1 = class LeavesService {
         }
         if (user.role === client_1.RoleType.ADMIN)
             return 'ADMIN';
-        if (user.role === client_1.RoleType.CUSTOMER)
-            return 'CUSTOMER';
+        if (user.role === client_1.RoleType.TOURIST)
+            return 'TOURIST';
         return 'OFFICE';
     }
     toEmployee(user) {
@@ -348,7 +347,6 @@ let LeavesService = LeavesService_1 = class LeavesService {
             name: user.name ?? user.email,
             email: user.email,
             role: user.role,
-            userType: user.userType,
             isActive: user.isActive,
             provider: user.provider
                 ? {
@@ -366,7 +364,7 @@ let LeavesService = LeavesService_1 = class LeavesService {
     async listEmployees(actor) {
         this.assertLeaveManager(actor);
         const users = await this.prisma.user.findMany({
-            where: { role: { not: client_1.RoleType.CUSTOMER } },
+            where: { role: { not: client_1.RoleType.TOURIST } },
             select: this.employeeSelect,
             orderBy: { name: 'asc' },
         });
@@ -389,7 +387,7 @@ let LeavesService = LeavesService_1 = class LeavesService {
         maxTo.setHours(23, 59, 59, 999);
         const effectiveTo = to > maxTo ? maxTo : to;
         const where = {
-            role: { notIn: [client_1.RoleType.CUSTOMER, client_1.RoleType.ADMIN] },
+            role: { notIn: [client_1.RoleType.TOURIST, client_1.RoleType.ADMIN] },
         };
         const requestedRoles = query.roles?.length
             ? query.roles
@@ -397,7 +395,7 @@ let LeavesService = LeavesService_1 = class LeavesService {
                 ? [query.role]
                 : undefined;
         if (requestedRoles) {
-            const allowed = requestedRoles.filter((role) => role !== client_1.RoleType.ADMIN && role !== client_1.RoleType.CUSTOMER);
+            const allowed = requestedRoles.filter((role) => role !== client_1.RoleType.ADMIN && role !== client_1.RoleType.TOURIST);
             where.role = allowed.length ? { in: allowed } : { in: [] };
         }
         if (query.providerIds?.length) {

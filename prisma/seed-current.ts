@@ -40,7 +40,6 @@ type SeedUser = {
   email: string;
   name: string | null;
   role: RoleType;
-  userType: string | null;
   providerId: string | null;
   roleNames: string[];
   password: string;
@@ -499,7 +498,19 @@ const ROLES: SeedRole[] = [
     "name": "HOTEL",
     "description": "Hotel partner — own bookings and commission",
     "isSystem": false,
-    "permissions": []
+    "permissions": [
+      "booking.read",
+      "dashboard.read"
+    ]
+  },
+  {
+    "name": "TOURIST",
+    "description": "Tourist — dashboard, own bookings, and own payment records",
+    "isSystem": false,
+    "permissions": [
+      "dashboard.read",
+      "booking.read"
+    ]
   }
 ];
 
@@ -731,7 +742,6 @@ const USERS: SeedUser[] = [
     "email": "accounting@booking.local",
     "name": "Tran Thi Accounting",
     "role": "OFFICE",
-    "userType": "office",
     "providerId": null,
     "roleNames": [
       "ACCOUNTING"
@@ -744,7 +754,6 @@ const USERS: SeedUser[] = [
     "email": "admin@booking.local",
     "name": "System Admin",
     "role": "ADMIN",
-    "userType": "admin",
     "providerId": null,
     "roleNames": [
       "ADMIN"
@@ -757,7 +766,6 @@ const USERS: SeedUser[] = [
     "email": "anh.guide@booking.local",
     "name": "Pham Van Anh",
     "role": "TOUR_GUIDE",
-    "userType": "guide",
     "providerId": null,
     "roleNames": [
       "TOUR_GUIDE"
@@ -777,7 +785,6 @@ const USERS: SeedUser[] = [
     "email": "anphu@demo.local",
     "name": "An Phu Transport",
     "role": "TRANSPORT_PROVIDER",
-    "userType": "provider",
     "providerId": "demo-provider",
     "roleNames": [
       "TRANSPORT_PROVIDER"
@@ -790,7 +797,6 @@ const USERS: SeedUser[] = [
     "email": "binh.driver@booking.local",
     "name": "Tran Quoc Binh",
     "role": "DRIVER",
-    "userType": "driver",
     "providerId": "demo-company-fleet",
     "roleNames": [],
     "password": "demo123",
@@ -805,7 +811,6 @@ const USERS: SeedUser[] = [
     "email": "company.fleet@demo.local",
     "name": "Company Fleet",
     "role": "TRANSPORT_PROVIDER",
-    "userType": "provider",
     "providerId": "demo-company-fleet",
     "roleNames": [
       "TRANSPORT_PROVIDER"
@@ -817,8 +822,7 @@ const USERS: SeedUser[] = [
   {
     "email": "customer@booking.local",
     "name": "Nguyen Van Customer",
-    "role": "CUSTOMER",
-    "userType": "customer",
+    "role": "TOURIST",
     "providerId": null,
     "roleNames": [],
     "password": "demo123",
@@ -829,7 +833,6 @@ const USERS: SeedUser[] = [
     "email": "hanoi.travel@demo.local",
     "name": "Hanoi Travel Co.",
     "role": "TRANSPORT_PROVIDER",
-    "userType": "provider",
     "providerId": "prov-hanoi-travel",
     "roleNames": [
       "TRANSPORT_PROVIDER"
@@ -842,7 +845,6 @@ const USERS: SeedUser[] = [
     "email": "huong.guide@booking.local",
     "name": "Tran Thi Huong",
     "role": "TOUR_GUIDE",
-    "userType": "guide",
     "providerId": null,
     "roleNames": [
       "TOUR_GUIDE"
@@ -862,7 +864,6 @@ const USERS: SeedUser[] = [
     "email": "mai.guide@booking.local",
     "name": "Do Thi Mai",
     "role": "TOUR_GUIDE",
-    "userType": "guide",
     "providerId": null,
     "roleNames": [
       "TOUR_GUIDE"
@@ -882,7 +883,6 @@ const USERS: SeedUser[] = [
     "email": "mekong@demo.local",
     "name": "Mekong Express",
     "role": "TRANSPORT_PROVIDER",
-    "userType": "provider",
     "providerId": "prov-mekong-v2",
     "roleNames": [
       "TRANSPORT_PROVIDER"
@@ -895,7 +895,6 @@ const USERS: SeedUser[] = [
     "email": "office@booking.local",
     "name": "Nguyen Thi Office",
     "role": "OFFICE",
-    "userType": "office",
     "providerId": null,
     "roleNames": [
       "OFFICE"
@@ -908,7 +907,6 @@ const USERS: SeedUser[] = [
     "email": "son.driver@booking.local",
     "name": "Le Van Son",
     "role": "DRIVER",
-    "userType": "driver",
     "providerId": "demo-provider",
     "roleNames": [],
     "password": "demo123",
@@ -923,7 +921,6 @@ const USERS: SeedUser[] = [
     "email": "tai.driver@booking.local",
     "name": "Nguyen Van Tai",
     "role": "DRIVER",
-    "userType": "driver",
     "providerId": "demo-company-fleet",
     "roleNames": [],
     "password": "demo123",
@@ -2365,7 +2362,6 @@ async function main() {
       update: {
         name: user.name,
         role: user.role,
-        userType: user.userType,
         providerId: user.providerId,
         isActive: true,
         authProvider: AuthProvider.LOCAL,
@@ -2375,7 +2371,6 @@ async function main() {
         name: user.name,
         passwordHash,
         role: user.role,
-        userType: user.userType,
         providerId: user.providerId,
         isActive: true,
         authProvider: AuthProvider.LOCAL,

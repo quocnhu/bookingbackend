@@ -9,7 +9,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NotificationTargetsQueryDto = exports.SendNotificationDto = exports.RegisterPushDto = exports.CreateNotificationDto = void 0;
+exports.QueryNotificationLogDto = exports.NotificationTargetsQueryDto = exports.SendNotificationDto = exports.RegisterPushDto = exports.CreateNotificationDto = void 0;
+const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
 class CreateNotificationDto {
@@ -94,4 +95,42 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], NotificationTargetsQueryDto.prototype, "search", void 0);
+class QueryNotificationLogDto {
+    page = 1;
+    limit = 20;
+    senderRole;
+    recipientRole;
+    search;
+}
+exports.QueryNotificationLogDto = QueryNotificationLogDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], QueryNotificationLogDto.prototype, "page", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], QueryNotificationLogDto.prototype, "limit", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.RoleType),
+    __metadata("design:type", String)
+], QueryNotificationLogDto.prototype, "senderRole", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.RoleType),
+    __metadata("design:type", String)
+], QueryNotificationLogDto.prototype, "recipientRole", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], QueryNotificationLogDto.prototype, "search", void 0);
 //# sourceMappingURL=notification.dto.js.map
