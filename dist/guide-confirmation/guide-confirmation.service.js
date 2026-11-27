@@ -16,8 +16,10 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const mail_service_1 = require("../mail/mail.service");
+const transport_alert_template_1 = require("../mail/transport-alert.template");
 const notification_service_1 = require("../notifications/notification.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
+const query_guide_confirmation_dto_1 = require("./dto/query-guide-confirmation.dto");
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 let GuideConfirmationService = GuideConfirmationService_1 = class GuideConfirmationService {
     prisma;
@@ -32,6 +34,106 @@ let GuideConfirmationService = GuideConfirmationService_1 = class GuideConfirmat
         this.mail = mail;
         this.notificationService = notificationService;
         this.gateway = gateway;
+    }
+    async list(query) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 20;
+        const where = {
+            guideId: { not: null },
+            executionMode: { not: client_1.AssignmentExecutionMode.OUTSOURCED_PARTNER },
+            status: {
+                in: [
+                    client_1.AssignmentStatus.DRAFT_ASSIGNED,
+                    client_1.AssignmentStatus.PENDING,
+                    client_1.AssignmentStatus.TRANSFERRED,
+                    client_1.AssignmentStatus.DISPATCHED,
+                ],
+            },
+        };
+        if (query.guideType) {
+            where.guide = { guideProfile: { is: { type: query.guideType } } };
+        }
+        if (query.status === query_guide_confirmation_dto_1.GuideConfirmationStatus.AWAITING) {
+            where.guideConfirmedAt = null;
+            where.guideDeclinedAt = null;
+        }
+        else if (query.status === query_guide_confirmation_dto_1.GuideConfirmationStatus.CONFIRMED) {
+            where.guideConfirmedAt = { not: null };
+        }
+        else if (query.status === query_guide_confirmation_dto_1.GuideConfirmationStatus.DECLINED) {
+            where.guideDeclinedAt = { not: null };
+        }
+        if (query.from || query.to) {
+            where.startDate = {};
+            if (query.from)
+                where.startDate.gte = new Date(`${query.from}T00:00:00+07:00`);
+            if (query.to)
+                where.startDate.lte = new Date(`${query.to}T23:59:59.999+07:00`);
+        }
+        if (query.search?.trim()) {
+            const q = query.search.trim();
+            where.OR = [
+                { code: { contains: q, mode: 'insensitive' } },
+                { tourName: { contains: q, mode: 'insensitive' } },
+                { guide: { name: { contains: q, mode: 'insensitive' } } },
+                { guide: { email: { contains: q, mode: 'insensitive' } } },
+                { driver: { name: { contains: q, mode: 'insensitive' } } },
+                { provider: { name: { contains: q, mode: 'insensitive' } } },
+            ];
+        }
+        const [total, items] = await this.prisma.$transaction([
+            this.prisma.assignment.count({ where }),
+            this.prisma.assignment.findMany({
+                where,
+                orderBy: [{ startDate: 'asc' }, { createdAt: 'desc' }],
+                skip: (page - 1) * limit,
+                take: limit,
+                include: {
+                    guide: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            guideProfile: { select: { type: true } },
+                        },
+                    },
+                    driver: { select: { id: true, name: true } },
+                    provider: { select: { id: true, name: true, isCompany: true } },
+                    vehicle: { select: { id: true, plateNumber: true } },
+                },
+            }),
+        ]);
+        return {
+            items: items.map((a) => {
+                const status = a.guideDeclinedAt
+                    ? query_guide_confirmation_dto_1.GuideConfirmationStatus.DECLINED
+                    : a.guideConfirmedAt
+                        ? query_guide_confirmation_dto_1.GuideConfirmationStatus.CONFIRMED
+                        : query_guide_confirmation_dto_1.GuideConfirmationStatus.AWAITING;
+                return {
+                    id: a.id,
+                    code: a.code,
+                    tourName: a.tourName,
+                    startDate: a.startDate,
+                    endDate: a.endDate,
+                    totalPax: a.totalPax,
+                    status: a.status,
+                    guide: a.guide,
+                    driver: a.driver,
+                    provider: a.provider,
+                    vehicle: a.vehicle,
+                    confirmationStatus: status,
+                    guideConfirmationRequestedAt: a.guideConfirmationRequestedAt,
+                    guideConfirmationEmailSentAt: a.guideConfirmationEmailSentAt,
+                    guideConfirmedAt: a.guideConfirmedAt,
+                    guideDeclinedAt: a.guideDeclinedAt,
+                    guideDeclineReason: a.guideDeclineReason,
+                };
+            }),
+            total,
+            page,
+            limit,
+        };
     }
     async request(assignmentId, options) {
         const assignment = await this.prisma.assignment.findUnique({
@@ -111,6 +213,7 @@ let GuideConfirmationService = GuideConfirmationService_1 = class GuideConfirmat
                 to: [to],
                 title,
                 message: `${body}\n\n${details}`,
+                note: companyGuide ? transport_alert_template_1.MAIL_LOGIN_DETAIL_NOTE : transport_alert_template_1.MAIL_LOGIN_CONFIRM_NOTE,
                 reference: assignment.code ?? assignment.id,
                 actionLabel: 'Open my trips',
                 actionUrl: `${frontend}/tour-guide/my-trips`,

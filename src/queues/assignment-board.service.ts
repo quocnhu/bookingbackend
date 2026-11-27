@@ -10,6 +10,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { rootFromProfile, sortByRootDistance } from '@/geo/distance';
 import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
+import { assertCrewAvailableForDates } from '@/common/utils/crew-availability.util';
 
 /** A trip (bus) carrying at most 12 passengers — per bookingflow.md step 3. */
 const BUS_MAX_PAX = 12;
@@ -379,7 +380,7 @@ export class AssignmentBoardService {
   async syncDatesFromBookings(assignmentId: string) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
-      select: { durationDays: true },
+      select: { durationDays: true, guideId: true, driverId: true },
     });
     if (!assignment) return { skipped: true };
 
@@ -407,6 +408,14 @@ export class AssignmentBoardService {
       assignment.durationDays ?? bookings[0]?.tour?.durationDays ?? 1;
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + durationDays - 1);
+    await assertCrewAvailableForDates(
+      this.prisma,
+      assignment.guideId,
+      assignment.driverId,
+      startDate,
+      endDate,
+      assignmentId,
+    );
 
     await this.prisma.assignment.update({
       where: { id: assignmentId },

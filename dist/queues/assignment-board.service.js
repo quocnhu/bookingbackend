@@ -17,6 +17,7 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const audit_service_1 = require("../audit/audit.service");
 const distance_1 = require("../geo/distance");
 const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
+const crew_availability_util_1 = require("../common/utils/crew-availability.util");
 const BUS_MAX_PAX = 12;
 let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardService {
     prisma;
@@ -305,7 +306,7 @@ let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardSer
     async syncDatesFromBookings(assignmentId) {
         const assignment = await this.prisma.assignment.findUnique({
             where: { id: assignmentId },
-            select: { durationDays: true },
+            select: { durationDays: true, guideId: true, driverId: true },
         });
         if (!assignment)
             return { skipped: true };
@@ -331,6 +332,7 @@ let AssignmentBoardService = AssignmentBoardService_1 = class AssignmentBoardSer
         const durationDays = assignment.durationDays ?? bookings[0]?.tour?.durationDays ?? 1;
         const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + durationDays - 1);
+        await (0, crew_availability_util_1.assertCrewAvailableForDates)(this.prisma, assignment.guideId, assignment.driverId, startDate, endDate, assignmentId);
         await this.prisma.assignment.update({
             where: { id: assignmentId },
             data: { startDate, endDate, durationDays },

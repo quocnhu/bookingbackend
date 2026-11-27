@@ -41,6 +41,23 @@ describe('renderBookingConfirmation', () => {
     expect(mail.html).toContain('123 Street &amp; Lane');
   });
 
+  it('lists Phone, Email, Website one per line in the footer with the pickup note', () => {
+    const mail = renderBookingConfirmation(base, {
+      name: 'Hana Tourist',
+      phone: '0123',
+      email: 'hello@example.com',
+      website: 'https://example.com',
+    });
+    expect(mail.text).toContain(
+      'Our tour guide will contact you soon to pick you up.',
+    );
+    expect(mail.text).toMatch(/Phone: 0123\nEmail: hello@example.com\nWebsite: https:\/\/example.com/);
+    expect(mail.html).toContain('<em style="color:#40566b;font-size:13px">Our tour guide will contact you soon to pick you up.</em>');
+    expect(mail.html).toMatch(
+      /Phone: 0123<br\/>Email: hello@example.com<br\/>Website: https:\/\/example.com<br\/>/,
+    );
+  });
+
   it('marks a pay-later booking as due at the end of the tour', () => {
     const mail = renderBookingConfirmation({
       ...base,

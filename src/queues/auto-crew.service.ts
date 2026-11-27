@@ -2,14 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   AssignmentExecutionMode,
   AssignmentStatus,
-  GuideHoldStatus,
   GuideType,
   RoleType,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { LeavesService } from '@/leaves/leaves.service';
 import { AuditService } from '@/audit/audit.service';
 import { GuideConfirmationService } from '@/guide-confirmation/guide-confirmation.service';
+import {
+  tripDayRange,
+  unavailableCrewIds,
+} from '@/common/utils/crew-availability.util';
 
 /**
  * Auto-crew (the "assign guide + driver" step in bookingflow.md):
@@ -25,7 +27,6 @@ export class AutoCrewService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly leaves: LeavesService,
     private readonly audit: AuditService,
     private readonly guideConfirmation: GuideConfirmationService,
   ) {}
@@ -54,8 +55,10 @@ export class AutoCrewService {
     if ((!needsGuide || assignment.guideId) && assignment.driverId)
       return { assigned: false };
 
-    const start = this.normalizeStart(assignment.startDate);
-    const end = this.normalizeEnd(assignment.endDate);
+    const { start, end } = tripDayRange(
+      assignment.startDate,
+      assignment.endDate,
+    );
 
     const updates: {
       guideId?: string;
@@ -165,20 +168,7 @@ export class AutoCrewService {
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
-  private normalizeStart(d: Date) {
-    const s = new Date(d);
-    s.setHours(0, 0, 0, 0);
-    return s;
-  }
-
-  private normalizeEnd(d: Date) {
-    const e = new Date(d);
-    e.setHours(0, 0, 0, 0);
-    e.setHours(23, 59, 59, 999);
-    return e;
-  }
-
-  /** Pick an available user: guide / driver, not on leave, not double-booked. */
+  /** Pick an available user: guide / driver, not on leave/hold or double-booked. */
   private async pickUser(
     role: RoleType,
     excludeAssignmentId: string,
@@ -191,7 +181,6 @@ export class AutoCrewService {
     providerId: string | null;
     isCompany: boolean;
   } | null> {
-    const busy = await this.busyUserIds(role, start, end, excludeAssignmentId);
     const users = await this.prisma.user.findMany({
       where: { isActive: true, role },
       select: {
@@ -203,6 +192,14 @@ export class AutoCrewService {
         provider: { select: { isCompany: true } },
       },
     });
+    const unavailable = await unavailableCrewIds(
+      this.prisma,
+      role === RoleType.TOUR_GUIDE ? 'guide' : 'driver',
+      users.map((u) => u.id),
+      start,
+      end,
+      excludeAssignmentId,
+    );
 
     const candidates: Array<{
       id: string;
@@ -213,20 +210,7 @@ export class AutoCrewService {
       name: string;
     }> = [];
     for (const u of users) {
-      if (busy.has(u.id)) continue;
-      const onLeave = await this.leaves.hasLeaveConflict(u.id, start, end);
-      if (onLeave) continue;
-      if (role === RoleType.TOUR_GUIDE) {
-        const onHold = await this.prisma.guideHold.count({
-          where: {
-            guideId: u.id,
-            status: GuideHoldStatus.ACTIVE,
-            startDate: { lte: end },
-            endDate: { gte: start },
-          },
-        });
-        if (onHold > 0) continue;
-      }
+      if (unavailable.has(u.id)) continue;
 
       const isCompany = !!u.provider?.isCompany;
       if (role === RoleType.DRIVER) {
@@ -269,33 +253,5 @@ export class AutoCrewService {
           isCompany: best.isCompany,
         }
       : null;
-  }
-
-  private async busyUserIds(
-    role: RoleType,
-    start: Date,
-    end: Date,
-    excludeAssignmentId: string,
-  ): Promise<Set<string>> {
-    const field = role === RoleType.DRIVER ? 'driverId' : 'guideId';
-    const rows = await this.prisma.assignment.findMany({
-      where: {
-        status: {
-          notIn: [AssignmentStatus.CANCELED, AssignmentStatus.COMPLETED],
-        },
-        id: { not: excludeAssignmentId },
-        [field]: { not: null },
-        startDate: { lte: end },
-        endDate: { gte: start },
-      },
-      select: {
-        driverId: true,
-        guideId: true,
-      } as any,
-    });
-    const ids = rows
-      .map((r) => (r as any)[field] as string | null)
-      .filter((x): x is string => Boolean(x));
-    return new Set(ids);
   }
 }

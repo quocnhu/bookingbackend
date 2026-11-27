@@ -18,14 +18,25 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
-import { LeavesService } from '@/leaves/leaves.service';
 import { NotificationService } from '@/notifications/notification.service';
 import { NotificationsGateway } from '@/notifications/notifications.gateway';
 import { AutoCrewService } from '@/queues/auto-crew.service';
 import { MailService } from '@/mail/mail.service';
+import {
+  MAIL_LOGIN_CONFIRM_NOTE,
+  MAIL_LOGIN_DETAIL_NOTE,
+} from '@/mail/transport-alert.template';
 import { DispatchPolicyService } from '@/dispatch-policy/dispatch-policy.service';
 import { GuideConfirmationService } from '@/guide-confirmation/guide-confirmation.service';
 import { isUnpaidPayPalBooking } from '@/common/utils/unpaid-booking.util';
+import {
+  assertCrewAvailableForDates as assertDriverAvailable,
+  busyCrewIds,
+  hcmEndOfDay,
+  hcmStartOfDay,
+  leaveConflictIds,
+  findCrewConflict,
+} from '@/common/utils/crew-availability.util';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 import {
   AssignTransportRequestDto,
@@ -102,7 +113,6 @@ export class TransportRequestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly leaves: LeavesService,
     private readonly notificationService: NotificationService,
     private readonly gateway: NotificationsGateway,
     private readonly autoCrew: AutoCrewService,
@@ -422,6 +432,7 @@ export class TransportRequestsService {
     await this.sendProviderEmail(providerId, {
       title: 'New transport request',
       message: `${updated.tourName ?? updated.code ?? 'Tour'} · ${this.formatDateTime(updated.startDate)} · ${updated.totalPax} pax. ${suggestion} Deadline ${this.formatDateTime(deadline)}. Log in to assign a driver and vehicle or decline.`,
+      note: MAIL_LOGIN_CONFIRM_NOTE,
       reference: updated.code ?? updated.id,
     });
     this.gateway.notifyAll('transport:refresh', { assignmentId: updated.id });
@@ -1178,6 +1189,29 @@ export class TransportRequestsService {
         }
       }
       if (!row.driverId) issues.push('No driver');
+      for (const [kind, userId] of [
+        ['guide', row.guideId],
+        ['driver', row.driverId],
+      ] as const) {
+        if (!userId) continue;
+        const conflict = await findCrewConflict(
+          this.prisma,
+          kind,
+          userId,
+          row.startDate,
+          row.endDate,
+          row.id,
+        );
+        if (conflict?.type === 'ASSIGNMENT') {
+          issues.push(
+            `${kind} ${conflict.name} is already on ${conflict.assignment?.code ?? 'another trip'}`,
+          );
+        } else if (conflict?.type === 'LEAVE') {
+          issues.push(`${kind} ${conflict.name} is on leave`);
+        } else if (conflict?.type === 'HOLD') {
+          issues.push(`${kind} ${conflict.name} is on hold`);
+        }
+      }
       if (row.bookings.some((booking) => isUnpaidPayPalBooking(booking))) {
         issues.push('Unpaid PayPal booking');
       }
@@ -1379,6 +1413,7 @@ export class TransportRequestsService {
         to: providerEmails,
         title: input.title,
         message: input.message,
+        note: MAIL_LOGIN_DETAIL_NOTE,
         reference: assignment.code ?? assignment.id,
         actionLabel: 'Open my transport requests',
         actionUrl: `${frontend}/transport-provider/requests`,
@@ -1431,6 +1466,7 @@ export class TransportRequestsService {
       await this.sendProviderEmail(assignment.providerId, {
         title: 'New transport request',
         message: `${assignment.tourName ?? assignment.code ?? 'Tour'} · ${this.formatDateTime(assignment.startDate)} · ${assignment.totalPax} pax. ${suggestion} Deadline ${this.formatDateTime(deadline)}. Log in to assign a driver and vehicle or decline.`,
+        note: MAIL_LOGIN_CONFIRM_NOTE,
         reference: assignment.code ?? assignment.id,
       });
     }
@@ -1614,22 +1650,14 @@ export class TransportRequestsService {
 
     const start = this.startOfDay(assignment.startDate);
     const end = this.endOfDay(assignment.endDate);
-    if (await this.leaves.hasLeaveConflict(driver.id, start, end)) {
-      throw new BadRequestException(
-        'This driver is on leave during the trip dates',
-      );
-    }
-    const busyDrivers = await this.busyDriverIds(
-      [driver.id],
-      start,
-      end,
+    await assertDriverAvailable(
+      this.prisma,
+      null,
+      driver.id,
+      assignment.startDate,
+      assignment.endDate,
       assignment.id,
     );
-    if (busyDrivers.has(driver.id)) {
-      throw new BadRequestException(
-        'This driver is already assigned to another trip on these dates',
-      );
-    }
 
     const vehicle = await this.prisma.vehicle.findUnique({
       where: { id: input.vehicleId },
@@ -1931,7 +1959,12 @@ export class TransportRequestsService {
   /** Email the provider accounts for their own routes (they log in to respond). */
   private async sendProviderEmail(
     providerId: string,
-    input: { title: string; message: string; reference?: string | null },
+    input: {
+      title: string;
+      message: string;
+      note?: string;
+      reference?: string | null;
+    },
   ) {
     const users = await this.prisma.user.findMany({
       where: {
@@ -1953,6 +1986,7 @@ export class TransportRequestsService {
       to: emails,
       title: input.title,
       message: input.message,
+      note: input.note ?? MAIL_LOGIN_DETAIL_NOTE,
       reference: input.reference ?? null,
       actionLabel: 'Open transport requests',
       actionUrl: `${frontend}/transport-provider/requests`,
@@ -2015,18 +2049,14 @@ export class TransportRequestsService {
     end: Date,
     excludeAssignmentId: string,
   ) {
-    if (!driverIds.length) return new Set<string>();
-    const rows = await this.prisma.assignment.findMany({
-      where: {
-        id: { not: excludeAssignmentId },
-        status: { not: AssignmentStatus.CANCELED },
-        driverId: { in: driverIds },
-        startDate: { lte: end },
-        endDate: { gte: start },
-      },
-      select: { driverId: true },
-    });
-    return new Set(rows.map((r) => r.driverId).filter((x): x is string => !!x));
+    return busyCrewIds(
+      this.prisma,
+      'driver',
+      driverIds,
+      start,
+      end,
+      excludeAssignmentId,
+    );
   }
 
   private async busyVehicleIds(
@@ -2088,11 +2118,7 @@ export class TransportRequestsService {
   }
 
   private async leaveMap(driverIds: string[], start: Date, end: Date) {
-    const result = new Set<string>();
-    for (const id of driverIds) {
-      if (await this.leaves.hasLeaveConflict(id, start, end)) result.add(id);
-    }
-    return result;
+    return leaveConflictIds(this.prisma, driverIds, start, end);
   }
 
   private computeSendAt(startDate: Date, settings: TransportSettings) {
@@ -2124,15 +2150,11 @@ export class TransportRequestsService {
   }
 
   private startOfDay(date: Date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d;
+    return hcmStartOfDay(date);
   }
 
   private endOfDay(date: Date) {
-    const d = new Date(date);
-    d.setHours(23, 59, 59, 999);
-    return d;
+    return hcmEndOfDay(date);
   }
 
   private daysAgo(days: number) {

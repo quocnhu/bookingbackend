@@ -313,6 +313,7 @@ export class MailService {
     to: string[];
     title: string;
     message: string;
+    note?: string | null;
     reference?: string | null;
     actionLabel?: string | null;
     actionUrl?: string | null;
@@ -338,6 +339,7 @@ export class MailService {
       const rendered = renderTransportAlert({
         title: input.title,
         message: input.message,
+        note: input.note,
         reference: input.reference,
         actionLabel: input.actionLabel,
         actionUrl: input.actionUrl,

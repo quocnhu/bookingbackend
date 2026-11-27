@@ -1,7 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
-import { LeavesService } from "../leaves/leaves.service";
 import { NotificationService } from "../notifications/notification.service";
 import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { AutoCrewService } from "../queues/auto-crew.service";
@@ -21,7 +20,6 @@ type TransportSettings = typeof DEFAULT_SETTINGS;
 export declare class TransportRequestsService {
     private readonly prisma;
     private readonly audit;
-    private readonly leaves;
     private readonly notificationService;
     private readonly gateway;
     private readonly autoCrew;
@@ -30,7 +28,7 @@ export declare class TransportRequestsService {
     private readonly guideConfirmation;
     private readonly logger;
     private runningScheduledTick;
-    constructor(prisma: PrismaService, audit: AuditService, leaves: LeavesService, notificationService: NotificationService, gateway: NotificationsGateway, autoCrew: AutoCrewService, mail: MailService, dispatchPolicy: DispatchPolicyService, guideConfirmation: GuideConfirmationService);
+    constructor(prisma: PrismaService, audit: AuditService, notificationService: NotificationService, gateway: NotificationsGateway, autoCrew: AutoCrewService, mail: MailService, dispatchPolicy: DispatchPolicyService, guideConfirmation: GuideConfirmationService);
     private include;
     list(query: QueryTransportRequestDto, actor: AuthenticatedUser): Promise<{
         id: string;

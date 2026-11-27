@@ -22,8 +22,9 @@ export declare class DashboardController {
         pendingRevenue: number | null;
         localUsers: number;
         googleUsers: number;
-        customerUsers: number;
-        googleCustomers: number;
+        touristUsers: number;
+        localTourists: number;
+        googleTourists: number;
         settledToCompany: number | null;
         settledToGuide: number | null;
         revenueFrom: string | null;

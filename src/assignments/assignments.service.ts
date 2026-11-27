@@ -32,6 +32,7 @@ import {
   AssignmentStatus,
   BookingProvider,
   BookingStatus,
+  DriverType,
   FeeFlowType,
   GuideHoldStatus,
   GuideType,
@@ -52,7 +53,6 @@ import { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interf
 import { AssignmentBoardService } from '@/queues/assignment-board.service';
 import { NotificationService } from '@/notifications/notification.service';
 import { NotificationsGateway } from '@/notifications/notifications.gateway';
-import { LeavesService } from '@/leaves/leaves.service';
 import { STORAGE } from '@/storage';
 import type { FileStorage } from '@/storage';
 import { DriveService } from '@/drive/drive.service';
@@ -68,6 +68,11 @@ import {
   userStorageDir,
 } from '@/common/utils/storage-key.util';
 import { isUnpaidPayPalBooking } from '@/common/utils/unpaid-booking.util';
+import {
+  assertCrewAvailableForDates as assertCrewAvailable,
+  hcmEndOfDay,
+  hcmStartOfDay,
+} from '@/common/utils/crew-availability.util';
 
 /** Dispatch Board: allows looking back N days. Must match
  *  isOutsideLoadedWindow in frontend/components/dispatch-board/index.tsx. */
@@ -88,7 +93,6 @@ export class AssignmentsService {
     private readonly board: AssignmentBoardService,
     private readonly notificationService: NotificationService,
     private readonly gateway: NotificationsGateway,
-    private readonly leavesService: LeavesService,
     @Inject(STORAGE) private readonly storage: FileStorage,
     private readonly drive: DriveService,
     private readonly mail: MailService,
@@ -111,7 +115,15 @@ export class AssignmentsService {
     },
     vehicle: true,
     provider: true,
-    driver: { select: { id: true, name: true, email: true } },
+    driver: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        driverProfile: { select: { type: true } },
+        provider: { select: { id: true, name: true, isCompany: true } },
+      },
+    },
     guide: {
       select: {
         id: true,
@@ -201,24 +213,18 @@ export class AssignmentsService {
   }
 
   /** List of guides + drivers (User table) so the admin can swap crew on the Dispatch Board.
-   *  isBusy = currently on a trip that has not ended as of today → but the
-   *  person assigned to that very trip can still be selected.
-   *  leaves = the leave periods (PENDING/APPROVED) → frontend colours them differently & blocks selection. */
+   *  `assignments` includes every non-canceled trip (COMPLETED included) so the
+   *  card can apply the same one-person-per-HCM-day rule as the backend.
+   *  `isBusy` is the same rule for today only; the crew on the current card is
+   *  still selectable because the frontend ignores that card's own trip.
+   *  leaves/holds are returned so the UI can show and block them. */
   async getBoardCrew() {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const startOfToday = hcmStartOfDay(new Date());
+    const endOfToday = hcmEndOfDay(new Date());
 
     const active = await this.prisma.assignment.findMany({
       where: {
-        status: {
-          in: [
-            AssignmentStatus.PENDING,
-            AssignmentStatus.DRAFT_ASSIGNED,
-            AssignmentStatus.TRANSFERRED,
-            AssignmentStatus.DISPATCHED,
-            AssignmentStatus.VERIFYING,
-          ],
-        },
+        status: { not: AssignmentStatus.CANCELED },
         endDate: { gte: startOfToday },
       },
       select: {
@@ -231,11 +237,14 @@ export class AssignmentsService {
         driverId: true,
       },
     });
+    const onToday = active.filter(
+      (a) => a.startDate <= endOfToday && a.endDate >= startOfToday,
+    );
     const busyGuides = new Set(
-      active.map((a) => a.guideId).filter((x): x is string => !!x),
+      onToday.map((a) => a.guideId).filter((x): x is string => !!x),
     );
     const busyDrivers = new Set(
-      active.map((a) => a.driverId).filter((x): x is string => !!x),
+      onToday.map((a) => a.driverId).filter((x): x is string => !!x),
     );
     const guideTrips = new Map<string, typeof active>();
     const driverTrips = new Map<string, typeof active>();
@@ -285,8 +294,8 @@ export class AssignmentsService {
         email: true,
         role: true,
         guideProfile: { select: { type: true, languages: true, rating: true } },
-        driverProfile: { select: { rating: true } },
-        provider: { select: { id: true, name: true } },
+        driverProfile: { select: { type: true, rating: true } },
+        provider: { select: { id: true, name: true, isCompany: true } },
       },
       orderBy: { name: 'asc' },
     });
@@ -311,9 +320,14 @@ export class AssignmentsService {
         id: u.id,
         name: u.name,
         email: u.email,
+        driverType: u.driverProfile?.type ?? DriverType.COMPANY,
         rating: u.driverProfile?.rating ?? null,
         provider: u.provider
-          ? { id: u.provider.id, name: u.provider.name }
+          ? {
+              id: u.provider.id,
+              name: u.provider.name,
+              isCompany: u.provider.isCompany,
+            }
           : null,
         isBusy: busyDrivers.has(u.id),
         assignments: driverTrips.get(u.id) ?? [],
@@ -413,8 +427,8 @@ export class AssignmentsService {
         email: true,
         role: true,
         guideProfile: { select: { type: true, rating: true } },
-        driverProfile: { select: { rating: true } },
-        provider: { select: { id: true, name: true } },
+        driverProfile: { select: { type: true, rating: true } },
+        provider: { select: { id: true, name: true, isCompany: true } },
       },
       orderBy: { name: 'asc' },
     });
@@ -476,9 +490,14 @@ export class AssignmentsService {
         id: u.id,
         name: u.name,
         email: u.email,
+        driverType: u.driverProfile?.type ?? DriverType.COMPANY,
         rating: u.driverProfile?.rating ?? null,
         provider: u.provider
-          ? { id: u.provider.id, name: u.provider.name }
+          ? {
+              id: u.provider.id,
+              name: u.provider.name,
+              isCompany: u.provider.isCompany,
+            }
           : null,
         assignments: (byDriver.get(u.id) ?? []).map(toMember),
         leaves: leaveMap.get(u.id) ?? [],
@@ -894,9 +913,8 @@ export class AssignmentsService {
   }
 
   /**
-   * Prevents assigning a guide/driver on leave (PENDING/APPROVED) that clashes
-   * with the trip schedule — "users with days off will not be put in assignment"
-   * (applies to every role).
+   * One guide/driver per overlapping HCM tour date, plus leave and guide-hold
+   * checks. All assignment write paths call this same helper.
    */
   private async assertCrewAvailableForDates(
     guideId: string | null | undefined,
@@ -905,108 +923,14 @@ export class AssignmentsService {
     endDate: Date,
     excludeAssignmentId?: string,
   ) {
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
-    for (const [label, userId] of [
-      ['guide', guideId],
-      ['driver', driverId],
-    ] as const) {
-      if (!userId) continue;
-      const onLeave = await this.leavesService.hasLeaveConflict(
-        userId,
-        start,
-        end,
-      );
-      if (onLeave) {
-        const user = await this.prisma.user.findUnique({
-          where: { id: userId },
-          select: { name: true, email: true },
-        });
-        const who = user?.name ?? user?.email ?? userId;
-        throw new BadRequestException(
-          `${who} is on leave during this date range and cannot be assigned as ${label}.`,
-        );
-      }
-      if (label === 'guide') {
-        const hold = await this.prisma.guideHold.findFirst({
-          where: {
-            guideId: userId,
-            status: GuideHoldStatus.ACTIVE,
-            startDate: { lte: end },
-            endDate: { gte: start },
-          },
-          select: { id: true, startDate: true, endDate: true, note: true },
-        });
-        if (hold) {
-          const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-            select: { name: true, email: true },
-          });
-          const who = user?.name ?? user?.email ?? userId;
-          const fmt = (d: Date) => new Date(d).toLocaleDateString('en-GB');
-          throw new BadRequestException(
-            `${who} is on hold from ${fmt(hold.startDate)} to ${fmt(hold.endDate)}${hold.note ? ` (${hold.note})` : ''} and cannot be assigned as ${label}. Release the hold first.`,
-          );
-        }
-      }
-    }
-    await this.assertCrewNoOverlap(
+    await assertCrewAvailable(
+      this.prisma,
       guideId,
       driverId,
-      start,
-      end,
+      startDate,
+      endDate,
       excludeAssignmentId,
     );
-  }
-
-  /**
-   * A guide/driver still running a multi-day tour cannot take another bus
-   * overlapping those dates. Checked on every assign (create/update/dispatch),
-   * alongside the leave check above.
-   */
-  private async assertCrewNoOverlap(
-    guideId: string | null | undefined,
-    driverId: string | null | undefined,
-    startDate: Date,
-    endDate: Date,
-    excludeAssignmentId?: string,
-  ) {
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
-    for (const [label, userId] of [
-      ['guide', guideId],
-      ['driver', driverId],
-    ] as const) {
-      if (!userId) continue;
-      const clash = await this.prisma.assignment.findFirst({
-        where: {
-          status: { not: AssignmentStatus.CANCELED },
-          ...(excludeAssignmentId ? { id: { not: excludeAssignmentId } } : {}),
-          startDate: { lte: end },
-          endDate: { gte: start },
-          OR:
-            label === 'guide' ? [{ guideId: userId }] : [{ driverId: userId }],
-        },
-        select: { id: true, code: true, startDate: true, endDate: true },
-      });
-      if (clash) {
-        const user = await this.prisma.user.findUnique({
-          where: { id: userId },
-          select: { name: true, email: true },
-        });
-        const who = user?.name ?? user?.email ?? userId;
-        const fmt = (d: Date) => new Date(d).toLocaleDateString('en-GB');
-        throw new BadRequestException(
-          `${who} is already on ${clash.code ?? 'another tour'} (${fmt(clash.startDate)} → ${fmt(clash.endDate)}) and cannot be assigned as ${label} for overlapping dates.`,
-        );
-      }
-    }
   }
 
   /** A provider may only create assignments for their own transport provider, vehicles and drivers. */
@@ -1610,6 +1534,33 @@ export class AssignmentsService {
     }
   }
 
+  /**
+   * A guide cannot close a trip they never accepted. Dispatch already checks
+   * this, but legacy/override/demo rows can still reach the report stage while
+   * awaiting confirmation, so enforce the same rule when finishing.
+   */
+  private assertGuideConfirmedForReport(assignment: any) {
+    if (
+      this.isOutsourced(assignment) ||
+      assignment.executionMode === AssignmentExecutionMode.COMPANY_DRIVER_ONLY ||
+      !assignment.guideId
+    ) {
+      return;
+    }
+    if (assignment.guideDeclinedAt) {
+      throw new BadRequestException(
+        `Cannot finish "${assignment.code ?? 'Bus'}" — the tour guide is not available. Reassign the guide or confirm on their behalf first.`,
+      );
+    }
+    const type =
+      assignment.guide?.guideProfile?.type ?? GuideType.FREELANCE;
+    if (type === GuideType.FREELANCE && !assignment.guideConfirmedAt) {
+      throw new BadRequestException(
+        `Cannot finish "${assignment.code ?? 'Bus'}" — the freelance tour guide has not confirmed this assignment. Confirm it in Guide confirmations (or reassign) first.`,
+      );
+    }
+  }
+
   /** Company/OFFICIAL guides are auto-confirmed; only freelance guides need a reply. */
   private assertFreelanceGuideConfirmed(
     assignment: any,
@@ -2145,6 +2096,13 @@ export class AssignmentsService {
       const durationDays = bookingsToAssign[0]?.tour?.durationDays ?? 1;
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + durationDays - 1);
+      await this.assertCrewAvailableForDates(
+        assignment.guideId,
+        assignment.driverId,
+        startDate,
+        endDate,
+        id,
+      );
       await this.prisma.assignment.update({
         where: { id },
         data: {
@@ -2742,6 +2700,7 @@ export class AssignmentsService {
         'Canceled assignment cannot submit a report',
       );
     }
+    this.assertGuideConfirmedForReport(assignment);
     if (
       actor.role !== RoleType.ADMIN &&
       actor.role !== RoleType.OFFICE &&
@@ -3164,6 +3123,7 @@ export class AssignmentsService {
     if (assignment.status === AssignmentStatus.CANCELED) {
       throw new BadRequestException('Canceled assignment cannot be closed');
     }
+    this.assertGuideConfirmedForReport(assignment);
 
     const report = await this.prisma.tourReport.findUnique({
       where: { assignmentId: id },
@@ -3272,7 +3232,14 @@ export class AssignmentsService {
         vehicle: true,
         provider: true,
         driver: { select: { id: true, name: true, email: true } },
-        guide: { select: { id: true, name: true, email: true } },
+        guide: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            guideProfile: { select: { type: true } },
+          },
+        },
         tourReport: true,
       },
       orderBy: [{ startDate: 'asc' }],

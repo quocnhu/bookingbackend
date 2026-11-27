@@ -226,7 +226,9 @@ __decorate([
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(12),
+    (0, class_validator_1.Max)(12, {
+        message: 'Online booking supports up to 12 people. Please contact the admin/office for a larger group.',
+    }),
     __metadata("design:type", Number)
 ], WebsiteQuoteDto.prototype, "totalPax", void 0);
 __decorate([
@@ -305,7 +307,9 @@ __decorate([
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(12),
+    (0, class_validator_1.Max)(12, {
+        message: 'Online booking supports up to 12 people. Please contact the admin/office for a larger group.',
+    }),
     __metadata("design:type", Number)
 ], CreateWebsiteBookingDto.prototype, "totalPax", void 0);
 __decorate([

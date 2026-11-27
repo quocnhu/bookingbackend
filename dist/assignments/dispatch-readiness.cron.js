@@ -22,6 +22,7 @@ const mail_format_util_1 = require("../mail/mail-format.util");
 const unpaid_booking_util_1 = require("../common/utils/unpaid-booking.util");
 const notification_service_1 = require("../notifications/notification.service");
 const notifications_gateway_1 = require("../notifications/notifications.gateway");
+const crew_availability_util_1 = require("../common/utils/crew-availability.util");
 const HCM_TIMEZONE = 'Asia/Ho_Chi_Minh';
 let DispatchReadinessCron = DispatchReadinessCron_1 = class DispatchReadinessCron {
     prisma;
@@ -75,9 +76,12 @@ let DispatchReadinessCron = DispatchReadinessCron_1 = class DispatchReadinessCro
                 code: true,
                 tourName: true,
                 startDate: true,
+                endDate: true,
                 totalPax: true,
                 status: true,
                 executionMode: true,
+                guideId: true,
+                driverId: true,
                 guideConfirmedAt: true,
                 guideDeclinedAt: true,
                 providerRequestStatus: true,
@@ -106,6 +110,33 @@ let DispatchReadinessCron = DispatchReadinessCron_1 = class DispatchReadinessCro
             },
             orderBy: [{ startDate: 'asc' }, { code: 'asc' }],
         });
+        const crewIssues = new Map();
+        for (const assignment of assignments) {
+            if (assignment.status === client_1.AssignmentStatus.WAITING_LIST)
+                continue;
+            const issues = [];
+            for (const [kind, userId] of [
+                ['guide', assignment.guideId],
+                ['driver', assignment.driverId],
+            ]) {
+                if (!userId)
+                    continue;
+                const conflict = await (0, crew_availability_util_1.findCrewConflict)(this.prisma, kind, userId, assignment.startDate, assignment.endDate, assignment.id);
+                if (!conflict)
+                    continue;
+                if (conflict.type === 'ASSIGNMENT') {
+                    issues.push(`${kind} ${conflict.name} is already on ${conflict.assignment?.code ?? 'another trip'}`);
+                }
+                else if (conflict.type === 'LEAVE') {
+                    issues.push(`${kind} ${conflict.name} is on leave`);
+                }
+                else {
+                    issues.push(`${kind} ${conflict.name} is on hold`);
+                }
+            }
+            if (issues.length)
+                crewIssues.set(assignment.id, issues);
+        }
         const now = Date.now();
         const rows = assignments.map((assignment) => {
             const issues = [];
@@ -119,6 +150,7 @@ let DispatchReadinessCron = DispatchReadinessCron_1 = class DispatchReadinessCro
             const unpaid = assignment.bookings.filter((booking) => (0, unpaid_booking_util_1.isUnpaidPayPalBooking)(booking));
             if (waiting)
                 issues.push('Waiting list — place after 05:00');
+            issues.push(...(crewIssues.get(assignment.id) ?? []));
             if (unpaid.length > 0) {
                 const refs = unpaid
                     .map((booking) => booking.bookingRef)

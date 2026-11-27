@@ -29,6 +29,7 @@ export declare class MailService {
         to: string[];
         title: string;
         message: string;
+        note?: string | null;
         reference?: string | null;
         actionLabel?: string | null;
         actionUrl?: string | null;

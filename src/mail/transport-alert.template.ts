@@ -1,6 +1,10 @@
 /** Operational transport-request alert mail (provider assignment warnings). */
 import { escapeHtml } from './mail-format.util';
 
+export const MAIL_LOGIN_DETAIL_NOTE =
+  'Please login the system to check in detail.';
+export const MAIL_LOGIN_CONFIRM_NOTE = 'Please login the system to confirm.';
+
 export interface TransportAlertCompany {
   name?: string | null;
   phone?: string | null;
@@ -11,6 +15,7 @@ export interface TransportAlertCompany {
 export interface TransportAlertData {
   title: string;
   message: string;
+  note?: string | null;
   reference?: string | null;
   actionLabel?: string | null;
   actionUrl?: string | null;
@@ -29,6 +34,7 @@ export function renderTransportAlert(
   const title = data.title.trim() || 'Transport request update';
   const message = data.message.trim();
   const reference = (data.reference ?? '').trim();
+  const note = data.note?.trim() ?? '';
   const companyName = data.company?.name?.trim() || 'Hana Tourist';
   const subject = reference ? `[${reference}] ${title}` : title;
 
@@ -40,6 +46,7 @@ export function renderTransportAlert(
     title,
     '',
     message,
+    note ? `*${note}*` : '',
     reference ? `Reference: ${reference}` : '',
     action,
     '',
@@ -56,6 +63,11 @@ export function renderTransportAlert(
     </div>
     <div style="border:1px solid #e2e8f0;border-top:0;border-radius:0 0 14px 14px;padding:20px 22px">
       <p style="margin:0 0 14px;font-size:14px;line-height:1.55;white-space:pre-line">${escapeHtml(message)}</p>
+      ${
+        note
+          ? `<p style="margin:0 0 14px;font-size:14px;line-height:1.55;font-style:italic;color:#475569">${escapeHtml(note)}</p>`
+          : ''
+      }
       ${
         data.actionLabel && data.actionUrl
           ? `<p style="margin:18px 0 0"><a href="${escapeHtml(data.actionUrl)}" style="display:inline-block;background:#1677ff;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px">${escapeHtml(data.actionLabel)}</a></p>`

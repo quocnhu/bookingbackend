@@ -79,7 +79,7 @@ let DashboardService = class DashboardService {
         const moneyLockedWhere = hasRange
             ? { gte: revenueFrom, lte: revenueTo }
             : { not: null };
-        const [totalBookings, todayBookings, pendingBookings, todayDispatched, totalTours, totalUsers, totalRoles, totalPermissions, totalAssignments, todayLogins, lockedAccounts, localUsers, googleUsers, customerUsers, googleCustomers,] = await Promise.all([
+        const [totalBookings, todayBookings, pendingBookings, todayDispatched, totalTours, totalUsers, totalRoles, totalPermissions, totalAssignments, todayLogins, lockedAccounts, localUsers, googleUsers, touristUsers, localTourists, googleTourists,] = await Promise.all([
             this.prisma.booking.count(),
             this.prisma.booking.count({ where: { createdAt: { gte: todayStart, lte: todayEnd } } }),
             this.prisma.booking.count({ where: { status: client_1.BookingStatus.PENDING } }),
@@ -105,6 +105,12 @@ let DashboardService = class DashboardService {
             this.prisma.user.count({ where: { authProvider: client_1.AuthProvider.LOCAL } }),
             this.prisma.user.count({ where: { authProvider: client_1.AuthProvider.GOOGLE } }),
             this.prisma.user.count({ where: { role: client_1.RoleType.TOURIST } }),
+            this.prisma.user.count({
+                where: {
+                    role: client_1.RoleType.TOURIST,
+                    authProvider: client_1.AuthProvider.LOCAL,
+                },
+            }),
             this.prisma.user.count({
                 where: {
                     role: client_1.RoleType.TOURIST,
@@ -168,8 +174,9 @@ let DashboardService = class DashboardService {
             pendingRevenue: finance ? Number(finance[2]._sum.totalAmount ?? 0) : null,
             localUsers,
             googleUsers,
-            customerUsers,
-            googleCustomers,
+            touristUsers,
+            localTourists,
+            googleTourists,
             settledToCompany: finance ? Number(finance[3]._sum.netAmount ?? 0) : null,
             settledToGuide: finance
                 ? Math.abs(Number(finance[4]._sum.netAmount ?? 0))

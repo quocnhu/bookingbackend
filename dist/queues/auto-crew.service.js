@@ -14,18 +14,16 @@ exports.AutoCrewService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
-const leaves_service_1 = require("../leaves/leaves.service");
 const audit_service_1 = require("../audit/audit.service");
 const guide_confirmation_service_1 = require("../guide-confirmation/guide-confirmation.service");
+const crew_availability_util_1 = require("../common/utils/crew-availability.util");
 let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
     prisma;
-    leaves;
     audit;
     guideConfirmation;
     logger = new common_1.Logger(AutoCrewService_1.name);
-    constructor(prisma, leaves, audit, guideConfirmation) {
+    constructor(prisma, audit, guideConfirmation) {
         this.prisma = prisma;
-        this.leaves = leaves;
         this.audit = audit;
         this.guideConfirmation = guideConfirmation;
     }
@@ -51,8 +49,7 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
         const needsGuide = assignment.executionMode !== client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY;
         if ((!needsGuide || assignment.guideId) && assignment.driverId)
             return { assigned: false };
-        const start = this.normalizeStart(assignment.startDate);
-        const end = this.normalizeEnd(assignment.endDate);
+        const { start, end } = (0, crew_availability_util_1.tripDayRange)(assignment.startDate, assignment.endDate);
         const updates = {};
         if (needsGuide && !assignment.guideId) {
             const guide = await this.pickUser(client_1.RoleType.TOUR_GUIDE, assignment.id, start, end, assignment.providerId);
@@ -130,19 +127,7 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
         }
         return { scanned: assignments.length, guideAssigned, driverAssigned };
     }
-    normalizeStart(d) {
-        const s = new Date(d);
-        s.setHours(0, 0, 0, 0);
-        return s;
-    }
-    normalizeEnd(d) {
-        const e = new Date(d);
-        e.setHours(0, 0, 0, 0);
-        e.setHours(23, 59, 59, 999);
-        return e;
-    }
     async pickUser(role, excludeAssignmentId, start, end, providerId, onlyCompany = false) {
-        const busy = await this.busyUserIds(role, start, end, excludeAssignmentId);
         const users = await this.prisma.user.findMany({
             where: { isActive: true, role },
             select: {
@@ -154,25 +139,11 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
                 provider: { select: { isCompany: true } },
             },
         });
+        const unavailable = await (0, crew_availability_util_1.unavailableCrewIds)(this.prisma, role === client_1.RoleType.TOUR_GUIDE ? 'guide' : 'driver', users.map((u) => u.id), start, end, excludeAssignmentId);
         const candidates = [];
         for (const u of users) {
-            if (busy.has(u.id))
+            if (unavailable.has(u.id))
                 continue;
-            const onLeave = await this.leaves.hasLeaveConflict(u.id, start, end);
-            if (onLeave)
-                continue;
-            if (role === client_1.RoleType.TOUR_GUIDE) {
-                const onHold = await this.prisma.guideHold.count({
-                    where: {
-                        guideId: u.id,
-                        status: client_1.GuideHoldStatus.ACTIVE,
-                        startDate: { lte: end },
-                        endDate: { gte: start },
-                    },
-                });
-                if (onHold > 0)
-                    continue;
-            }
             const isCompany = !!u.provider?.isCompany;
             if (role === client_1.RoleType.DRIVER) {
                 if (onlyCompany && !isCompany)
@@ -214,34 +185,11 @@ let AutoCrewService = AutoCrewService_1 = class AutoCrewService {
             }
             : null;
     }
-    async busyUserIds(role, start, end, excludeAssignmentId) {
-        const field = role === client_1.RoleType.DRIVER ? 'driverId' : 'guideId';
-        const rows = await this.prisma.assignment.findMany({
-            where: {
-                status: {
-                    notIn: [client_1.AssignmentStatus.CANCELED, client_1.AssignmentStatus.COMPLETED],
-                },
-                id: { not: excludeAssignmentId },
-                [field]: { not: null },
-                startDate: { lte: end },
-                endDate: { gte: start },
-            },
-            select: {
-                driverId: true,
-                guideId: true,
-            },
-        });
-        const ids = rows
-            .map((r) => r[field])
-            .filter((x) => Boolean(x));
-        return new Set(ids);
-    }
 };
 exports.AutoCrewService = AutoCrewService;
 exports.AutoCrewService = AutoCrewService = AutoCrewService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        leaves_service_1.LeavesService,
         audit_service_1.AuditService,
         guide_confirmation_service_1.GuideConfirmationService])
 ], AutoCrewService);

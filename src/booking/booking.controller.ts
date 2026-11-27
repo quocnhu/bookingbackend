@@ -84,6 +84,15 @@ export class BookingController {
     return this.bookingService.confirmBookingPayment(id, dto, actor);
   }
 
+  @Post(':id/resend-confirmation')
+  @Permissions('booking.update')
+  resendConfirmation(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.bookingService.resendBookingConfirmation(id, actor);
+  }
+
   @Get('next-ref')
   @Permissions('booking.create')
   nextRef(@Query('tourType') tourType?: string) {

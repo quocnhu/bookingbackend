@@ -102,8 +102,9 @@ export class DashboardService {
       lockedAccounts,
       localUsers,
       googleUsers,
-      customerUsers,
-      googleCustomers,
+      touristUsers,
+      localTourists,
+      googleTourists,
     ] = await Promise.all([
       this.prisma.booking.count(),
       this.prisma.booking.count({ where: { createdAt: { gte: todayStart, lte: todayEnd } } }),
@@ -130,6 +131,12 @@ export class DashboardService {
       this.prisma.user.count({ where: { authProvider: AuthProvider.LOCAL } }),
       this.prisma.user.count({ where: { authProvider: AuthProvider.GOOGLE } }),
       this.prisma.user.count({ where: { role: RoleType.TOURIST } }),
+      this.prisma.user.count({
+        where: {
+          role: RoleType.TOURIST,
+          authProvider: AuthProvider.LOCAL,
+        },
+      }),
       this.prisma.user.count({
         where: {
           role: RoleType.TOURIST,
@@ -195,8 +202,9 @@ export class DashboardService {
       pendingRevenue: finance ? Number(finance[2]._sum.totalAmount ?? 0) : null,
       localUsers,
       googleUsers,
-      customerUsers,
-      googleCustomers,
+      touristUsers,
+      localTourists,
+      googleTourists,
       settledToCompany: finance ? Number(finance[3]._sum.netAmount ?? 0) : null,
       settledToGuide: finance
         ? Math.abs(Number(finance[4]._sum.netAmount ?? 0))

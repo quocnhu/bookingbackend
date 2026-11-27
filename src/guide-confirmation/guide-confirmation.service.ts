@@ -10,14 +10,23 @@ import {
   AssignmentStatus,
   GuideType,
   NotificationType,
+  Prisma,
   RoleType,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { MailService } from '@/mail/mail.service';
+import {
+  MAIL_LOGIN_CONFIRM_NOTE,
+  MAIL_LOGIN_DETAIL_NOTE,
+} from '@/mail/transport-alert.template';
 import { NotificationService } from '@/notifications/notification.service';
 import { NotificationsGateway } from '@/notifications/notifications.gateway';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
+import {
+  GuideConfirmationStatus,
+  QueryGuideConfirmationDto,
+} from './dto/query-guide-confirmation.dto';
 
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
@@ -40,6 +49,106 @@ export class GuideConfirmationService {
     private readonly notificationService: NotificationService,
     private readonly gateway: NotificationsGateway,
   ) {}
+
+  async list(query: QueryGuideConfirmationDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where: Prisma.AssignmentWhereInput = {
+      guideId: { not: null },
+      executionMode: { not: AssignmentExecutionMode.OUTSOURCED_PARTNER },
+      status: {
+        in: [
+          AssignmentStatus.DRAFT_ASSIGNED,
+          AssignmentStatus.PENDING,
+          AssignmentStatus.TRANSFERRED,
+          AssignmentStatus.DISPATCHED,
+        ],
+      },
+    };
+
+    if (query.guideType) {
+      where.guide = { guideProfile: { is: { type: query.guideType } } };
+    }
+    if (query.status === GuideConfirmationStatus.AWAITING) {
+      where.guideConfirmedAt = null;
+      where.guideDeclinedAt = null;
+    } else if (query.status === GuideConfirmationStatus.CONFIRMED) {
+      where.guideConfirmedAt = { not: null };
+    } else if (query.status === GuideConfirmationStatus.DECLINED) {
+      where.guideDeclinedAt = { not: null };
+    }
+    if (query.from || query.to) {
+      where.startDate = {};
+      if (query.from) where.startDate.gte = new Date(`${query.from}T00:00:00+07:00`);
+      if (query.to) where.startDate.lte = new Date(`${query.to}T23:59:59.999+07:00`);
+    }
+    if (query.search?.trim()) {
+      const q = query.search.trim();
+      where.OR = [
+        { code: { contains: q, mode: 'insensitive' } },
+        { tourName: { contains: q, mode: 'insensitive' } },
+        { guide: { name: { contains: q, mode: 'insensitive' } } },
+        { guide: { email: { contains: q, mode: 'insensitive' } } },
+        { driver: { name: { contains: q, mode: 'insensitive' } } },
+        { provider: { name: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.assignment.count({ where }),
+      this.prisma.assignment.findMany({
+        where,
+        orderBy: [{ startDate: 'asc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          guide: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              guideProfile: { select: { type: true } },
+            },
+          },
+          driver: { select: { id: true, name: true } },
+          provider: { select: { id: true, name: true, isCompany: true } },
+          vehicle: { select: { id: true, plateNumber: true } },
+        },
+      }),
+    ]);
+
+    return {
+      items: items.map((a) => {
+        const status = a.guideDeclinedAt
+          ? GuideConfirmationStatus.DECLINED
+          : a.guideConfirmedAt
+            ? GuideConfirmationStatus.CONFIRMED
+            : GuideConfirmationStatus.AWAITING;
+        return {
+          id: a.id,
+          code: a.code,
+          tourName: a.tourName,
+          startDate: a.startDate,
+          endDate: a.endDate,
+          totalPax: a.totalPax,
+          status: a.status,
+          guide: a.guide,
+          driver: a.driver,
+          provider: a.provider,
+          vehicle: a.vehicle,
+          confirmationStatus: status,
+          guideConfirmationRequestedAt: a.guideConfirmationRequestedAt,
+          guideConfirmationEmailSentAt: a.guideConfirmationEmailSentAt,
+          guideConfirmedAt: a.guideConfirmedAt,
+          guideDeclinedAt: a.guideDeclinedAt,
+          guideDeclineReason: a.guideDeclineReason,
+        };
+      }),
+      total,
+      page,
+      limit,
+    };
+  }
 
   async request(
     assignmentId: string,
@@ -139,6 +248,7 @@ export class GuideConfirmationService {
         to: [to],
         title,
         message: `${body}\n\n${details}`,
+        note: companyGuide ? MAIL_LOGIN_DETAIL_NOTE : MAIL_LOGIN_CONFIRM_NOTE,
         reference: assignment.code ?? assignment.id,
         actionLabel: 'Open my trips',
         actionUrl: `${frontend}/tour-guide/my-trips`,

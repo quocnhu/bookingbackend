@@ -73,13 +73,13 @@ export function renderBookingConfirmation(
   const payment = paymentLabel(data);
   const companyName = (company?.name ?? '').trim() || 'Hana Tourist';
   const companyNameSentence = asSentence(companyName);
-  const contactLine = [
+  const contactLines = [
     company?.phone ? `Phone: ${company.phone}` : null,
     company?.email ? `Email: ${company.email}` : null,
     company?.website ? `Website: ${company.website}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  ].filter((line): line is string => Boolean(line));
+
+  const pickupNote = 'Our tour guide will contact you soon to pick you up.';
 
   const subject = `Booking ${bookingRef} confirmed — ${tourName}`;
 
@@ -101,9 +101,11 @@ export function renderBookingConfirmation(
     data.notes?.trim() ? '' : null,
     'Please keep this email for your records. Reply to this message if you need any help.',
     '',
+    pickupNote,
+    '',
     companyName,
     company?.address?.trim() || null,
-    contactLine || null,
+    ...contactLines,
   ]
     .filter((line): line is string => line !== null)
     .join('\n');
@@ -170,9 +172,11 @@ export function renderBookingConfirmation(
             </tr>
             <tr>
               <td style="padding:18px 28px 28px;border-top:1px solid #e8eef3;font-size:12px;color:#7a8b9a;line-height:1.7">
+                <em style="color:#40566b;font-size:13px">${escapeHtml(pickupNote)}</em><br/>
+                <br/>
                 <strong style="color:#0f2740;font-size:13px">${escapeHtml(companyName)}</strong><br/>
                 ${company?.address?.trim() ? `${escapeHtml(company.address.trim())}<br/>` : ''}
-                ${contactLine ? escapeHtml(contactLine) : ''}
+                ${contactLines.map((line) => `${escapeHtml(line)}<br/>`).join('')}
               </td>
             </tr>
           </table>

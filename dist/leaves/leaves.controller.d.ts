@@ -108,8 +108,8 @@ export declare class LeavesController {
         status: import("@prisma/client").$Enums.LeaveStatus;
         reason: string | null;
         isEmergency: boolean;
-        reviewedAt: Date | null;
         reviewedById: string | null;
+        reviewedAt: Date | null;
     }>;
     updateStatus(id: string, dto: UpdateLeaveStatusDto, actor: AuthenticatedUser): Promise<{
         user: {
@@ -134,8 +134,8 @@ export declare class LeavesController {
         status: import("@prisma/client").$Enums.LeaveStatus;
         reason: string | null;
         isEmergency: boolean;
-        reviewedAt: Date | null;
         reviewedById: string | null;
+        reviewedAt: Date | null;
     }>;
     remove(id: string, actor: AuthenticatedUser): Promise<{
         message: string;

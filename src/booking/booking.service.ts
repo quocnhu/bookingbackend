@@ -53,6 +53,7 @@ import {
   isUnpaidPayPalBooking,
   unpaidCancelAt,
 } from '@/common/utils/unpaid-booking.util';
+import { assertCrewAvailableForDates } from '@/common/utils/crew-availability.util';
 import {
   buildEmailUpdateData,
   EmailFields,
@@ -835,6 +836,40 @@ export class BookingService {
     return updated;
   }
 
+  /** Re-send the tourist confirmation template after SMTP was fixed or a send failed. */
+  async resendBookingConfirmation(id: string, actor: AuthenticatedUser) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        bookingRef: true,
+        mail: true,
+        confirmationEmailSentAt: true,
+        channel: true,
+      },
+    });
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    const result = await this.mail.sendBookingConfirmation(id);
+    await this.auditService.log({
+      entityType: 'Booking',
+      entityId: id,
+      action: 'RESEND_CONFIRMATION',
+      afterData: {
+        bookingRef: booking.bookingRef,
+        to: booking.mail,
+        result,
+      },
+      changedBy: actor.id,
+    });
+    return {
+      bookingRef: booking.bookingRef,
+      recipient: booking.mail,
+      ...result,
+    };
+  }
+
   async findOne(id: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
@@ -1376,6 +1411,34 @@ export class BookingService {
     const startDate = new Date(parent.startingDate);
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + Math.max(0, durationDays - 1));
+
+    const selectedGuides = new Set<string>();
+    const selectedDrivers = new Set<string>();
+    for (const bus of buses) {
+      const guideId = bus.guideId ?? null;
+      const driverId = bus.driverId ?? null;
+      if (guideId && selectedGuides.has(guideId)) {
+        throw new BadRequestException(
+          'The same guide cannot take two buses on the same tour date',
+        );
+      }
+      if (driverId && selectedDrivers.has(driverId)) {
+        throw new BadRequestException(
+          'The same driver cannot take two buses on the same tour date',
+        );
+      }
+      if (guideId) selectedGuides.add(guideId);
+      if (driverId) selectedDrivers.add(driverId);
+      await assertCrewAvailableForDates(
+        this.prisma,
+        guideId,
+        driverId,
+        startDate,
+        endDate,
+        detachAssignmentId ?? undefined,
+      );
+    }
+
     const executionMode =
       parent.tour?.requiresGuide === false
         ? AssignmentExecutionMode.COMPANY_DRIVER_ONLY

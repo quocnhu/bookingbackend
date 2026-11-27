@@ -235,6 +235,12 @@ export declare class BookingService {
         movedFromBusId: string | null;
         emailDate: Date | null;
     }>;
+    resendBookingConfirmation(id: string, actor: AuthenticatedUser): Promise<{
+        sent: boolean;
+        reason?: string;
+        bookingRef: string;
+        recipient: string | null;
+    }>;
     findOne(id: string): Promise<{
         tour: {
             name: string;
@@ -294,8 +300,9 @@ export declare class BookingService {
             provider: string | null;
             status: import("@prisma/client").$Enums.PaymentRecordStatus;
             currency: string;
-            method: import("@prisma/client").$Enums.PaymentMethod;
             note: string | null;
+            createdById: string | null;
+            method: import("@prisma/client").$Enums.PaymentMethod;
             amount: Prisma.Decimal;
             payerType: import("@prisma/client").$Enums.PayerType;
             providerOrderId: string | null;
@@ -309,7 +316,6 @@ export declare class BookingService {
             confirmedById: string | null;
             confirmedByName: string | null;
             rawPayload: Prisma.JsonValue | null;
-            createdById: string | null;
             bookingId: string;
         }[];
         parentBooking: {
@@ -589,8 +595,9 @@ export declare class BookingService {
             provider: string | null;
             status: import("@prisma/client").$Enums.PaymentRecordStatus;
             currency: string;
-            method: import("@prisma/client").$Enums.PaymentMethod;
             note: string | null;
+            createdById: string | null;
+            method: import("@prisma/client").$Enums.PaymentMethod;
             amount: Prisma.Decimal;
             payerType: import("@prisma/client").$Enums.PayerType;
             providerOrderId: string | null;
@@ -604,7 +611,6 @@ export declare class BookingService {
             confirmedById: string | null;
             confirmedByName: string | null;
             rawPayload: Prisma.JsonValue | null;
-            createdById: string | null;
             bookingId: string;
         }[];
         parentBooking: {

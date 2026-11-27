@@ -23,6 +23,7 @@ const mail_service_1 = require("../mail/mail.service");
 const dispatch_policy_service_1 = require("../dispatch-policy/dispatch-policy.service");
 const cancellation_1 = require("../common/constants/cancellation");
 const unpaid_booking_util_1 = require("../common/utils/unpaid-booking.util");
+const crew_availability_util_1 = require("../common/utils/crew-availability.util");
 const email_merge_util_1 = require("./email-merge.util");
 const raw_data_entity_1 = require("../raw-data/raw-data.entity");
 const TOUR_MATCH_MIN_SCORE = 0.5;
@@ -568,6 +569,38 @@ let BookingService = class BookingService {
         void this.mail.sendBookingConfirmation(id);
         return updated;
     }
+    async resendBookingConfirmation(id, actor) {
+        const booking = await this.prisma.booking.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                bookingRef: true,
+                mail: true,
+                confirmationEmailSentAt: true,
+                channel: true,
+            },
+        });
+        if (!booking) {
+            throw new common_1.NotFoundException('Booking not found');
+        }
+        const result = await this.mail.sendBookingConfirmation(id);
+        await this.auditService.log({
+            entityType: 'Booking',
+            entityId: id,
+            action: 'RESEND_CONFIRMATION',
+            afterData: {
+                bookingRef: booking.bookingRef,
+                to: booking.mail,
+                result,
+            },
+            changedBy: actor.id,
+        });
+        return {
+            bookingRef: booking.bookingRef,
+            recipient: booking.mail,
+            ...result,
+        };
+    }
     async findOne(id) {
         const booking = await this.prisma.booking.findUnique({
             where: { id },
@@ -973,6 +1006,23 @@ let BookingService = class BookingService {
         const startDate = new Date(parent.startingDate);
         const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + Math.max(0, durationDays - 1));
+        const selectedGuides = new Set();
+        const selectedDrivers = new Set();
+        for (const bus of buses) {
+            const guideId = bus.guideId ?? null;
+            const driverId = bus.driverId ?? null;
+            if (guideId && selectedGuides.has(guideId)) {
+                throw new common_1.BadRequestException('The same guide cannot take two buses on the same tour date');
+            }
+            if (driverId && selectedDrivers.has(driverId)) {
+                throw new common_1.BadRequestException('The same driver cannot take two buses on the same tour date');
+            }
+            if (guideId)
+                selectedGuides.add(guideId);
+            if (driverId)
+                selectedDrivers.add(driverId);
+            await (0, crew_availability_util_1.assertCrewAvailableForDates)(this.prisma, guideId, driverId, startDate, endDate, detachAssignmentId ?? undefined);
+        }
         const executionMode = parent.tour?.requiresGuide === false
             ? client_1.AssignmentExecutionMode.COMPANY_DRIVER_ONLY
             : client_1.AssignmentExecutionMode.COMPANY_GUIDED;

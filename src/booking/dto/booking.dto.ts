@@ -190,7 +190,10 @@ export class WebsiteQuoteDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(12)
+  @Max(12, {
+    message:
+      'Online booking supports up to 12 people. Please contact the admin/office for a larger group.',
+  })
   totalPax: number;
 
   @IsOptional()
@@ -240,7 +243,10 @@ export class CreateWebsiteBookingDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(12)
+  @Max(12, {
+    message:
+      'Online booking supports up to 12 people. Please contact the admin/office for a larger group.',
+  })
   totalPax: number;
 
   @IsNotEmpty()

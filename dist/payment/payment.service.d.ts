@@ -55,8 +55,9 @@ export declare class PaymentService {
                 provider: string | null;
                 status: import("@prisma/client").$Enums.PaymentRecordStatus;
                 currency: string;
-                method: import("@prisma/client").$Enums.PaymentMethod;
                 note: string | null;
+                createdById: string | null;
+                method: import("@prisma/client").$Enums.PaymentMethod;
                 amount: Prisma.Decimal;
                 payerType: import("@prisma/client").$Enums.PayerType;
                 providerOrderId: string | null;
@@ -70,7 +71,6 @@ export declare class PaymentService {
                 confirmedById: string | null;
                 confirmedByName: string | null;
                 rawPayload: Prisma.JsonValue | null;
-                createdById: string | null;
                 bookingId: string;
             }[];
         } & {
@@ -189,8 +189,9 @@ export declare class PaymentService {
         provider: string | null;
         status: import("@prisma/client").$Enums.PaymentRecordStatus;
         currency: string;
-        method: import("@prisma/client").$Enums.PaymentMethod;
         note: string | null;
+        createdById: string | null;
+        method: import("@prisma/client").$Enums.PaymentMethod;
         amount: Prisma.Decimal;
         payerType: import("@prisma/client").$Enums.PayerType;
         providerOrderId: string | null;
@@ -204,7 +205,6 @@ export declare class PaymentService {
         confirmedById: string | null;
         confirmedByName: string | null;
         rawPayload: Prisma.JsonValue | null;
-        createdById: string | null;
         bookingId: string;
     }>;
     verifyWebhook(headers: Record<string, string | string[] | undefined>, rawBody: string, event: any): Promise<{

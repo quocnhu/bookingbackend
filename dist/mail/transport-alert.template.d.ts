@@ -1,3 +1,5 @@
+export declare const MAIL_LOGIN_DETAIL_NOTE = "Please login the system to check in detail.";
+export declare const MAIL_LOGIN_CONFIRM_NOTE = "Please login the system to confirm.";
 export interface TransportAlertCompany {
     name?: string | null;
     phone?: string | null;
@@ -7,6 +9,7 @@ export interface TransportAlertCompany {
 export interface TransportAlertData {
     title: string;
     message: string;
+    note?: string | null;
     reference?: string | null;
     actionLabel?: string | null;
     actionUrl?: string | null;

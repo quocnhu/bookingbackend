@@ -84,10 +84,12 @@ export declare class AssignmentsController {
             id: string;
             name: string | null;
             email: string;
+            driverType: import("@prisma/client").$Enums.DriverType;
             rating: number | null;
             provider: {
                 id: string;
                 name: string;
+                isCompany: boolean;
             } | null;
             isBusy: boolean;
             assignments: {
@@ -148,10 +150,12 @@ export declare class AssignmentsController {
             id: string;
             name: string | null;
             email: string;
+            driverType: import("@prisma/client").$Enums.DriverType;
             rating: number | null;
             provider: {
                 id: string;
                 name: string;
+                isCompany: boolean;
             } | null;
             assignments: {
                 id: string;
@@ -331,9 +335,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -540,9 +552,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -749,9 +769,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -963,9 +991,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -1172,9 +1208,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -1381,9 +1425,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -1590,9 +1642,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -1799,9 +1859,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2008,9 +2076,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2217,9 +2293,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2426,9 +2510,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2686,9 +2778,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2807,8 +2907,8 @@ export declare class AssignmentsController {
             assignmentId: string | null;
             categoryId: string | null;
             note: string | null;
-            amount: import("@prisma/client/runtime/library").Decimal;
             createdById: string;
+            amount: import("@prisma/client/runtime/library").Decimal;
             bookingId: string | null;
             createdByName: string | null;
             reversesId: string | null;
@@ -2837,8 +2937,8 @@ export declare class AssignmentsController {
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
-        amount: import("@prisma/client/runtime/library").Decimal;
         createdById: string;
+        amount: import("@prisma/client/runtime/library").Decimal;
         bookingId: string | null;
         createdByName: string | null;
         reversesId: string | null;
@@ -2850,8 +2950,8 @@ export declare class AssignmentsController {
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
-        amount: import("@prisma/client/runtime/library").Decimal;
         createdById: string;
+        amount: import("@prisma/client/runtime/library").Decimal;
         bookingId: string | null;
         createdByName: string | null;
         reversesId: string | null;
@@ -2973,9 +3073,17 @@ export declare class AssignmentsController {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {

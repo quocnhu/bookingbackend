@@ -248,6 +248,7 @@ let MailService = MailService_1 = class MailService {
             const rendered = (0, transport_alert_template_1.renderTransportAlert)({
                 title: input.title,
                 message: input.message,
+                note: input.note,
                 reference: input.reference,
                 actionLabel: input.actionLabel,
                 actionUrl: input.actionUrl,

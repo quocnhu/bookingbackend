@@ -25,8 +25,9 @@ export declare class PaymentController {
                 provider: string | null;
                 status: import("@prisma/client").$Enums.PaymentRecordStatus;
                 currency: string;
-                method: import("@prisma/client").$Enums.PaymentMethod;
                 note: string | null;
+                createdById: string | null;
+                method: import("@prisma/client").$Enums.PaymentMethod;
                 amount: import("@prisma/client/runtime/library").Decimal;
                 payerType: import("@prisma/client").$Enums.PayerType;
                 providerOrderId: string | null;
@@ -40,7 +41,6 @@ export declare class PaymentController {
                 confirmedById: string | null;
                 confirmedByName: string | null;
                 rawPayload: import("@prisma/client/runtime/library").JsonValue | null;
-                createdById: string | null;
                 bookingId: string;
             }[];
         } & {
@@ -149,8 +149,9 @@ export declare class PaymentController {
         provider: string | null;
         status: import("@prisma/client").$Enums.PaymentRecordStatus;
         currency: string;
-        method: import("@prisma/client").$Enums.PaymentMethod;
         note: string | null;
+        createdById: string | null;
+        method: import("@prisma/client").$Enums.PaymentMethod;
         amount: import("@prisma/client/runtime/library").Decimal;
         payerType: import("@prisma/client").$Enums.PayerType;
         providerOrderId: string | null;
@@ -164,7 +165,6 @@ export declare class PaymentController {
         confirmedById: string | null;
         confirmedByName: string | null;
         rawPayload: import("@prisma/client/runtime/library").JsonValue | null;
-        createdById: string | null;
         bookingId: string;
     }>;
     webhook(req: RawBodyRequest<Request>, headers: Record<string, string | string[] | undefined>): Promise<{

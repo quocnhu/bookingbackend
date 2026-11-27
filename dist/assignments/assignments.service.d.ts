@@ -7,7 +7,6 @@ import { AuthenticatedUser } from "../common/interfaces/authenticated-user.inter
 import { AssignmentBoardService } from "../queues/assignment-board.service";
 import { NotificationService } from "../notifications/notification.service";
 import { NotificationsGateway } from "../notifications/notifications.gateway";
-import { LeavesService } from "../leaves/leaves.service";
 import type { FileStorage } from "../storage";
 import { DriveService } from "../drive/drive.service";
 import { MailService } from "../mail/mail.service";
@@ -19,14 +18,13 @@ export declare class AssignmentsService {
     private readonly board;
     private readonly notificationService;
     private readonly gateway;
-    private readonly leavesService;
     private readonly storage;
     private readonly drive;
     private readonly mail;
     private readonly dispatchPolicy;
     private readonly guideConfirmation;
     private readonly logger;
-    constructor(prisma: PrismaService, auditService: AuditService, board: AssignmentBoardService, notificationService: NotificationService, gateway: NotificationsGateway, leavesService: LeavesService, storage: FileStorage, drive: DriveService, mail: MailService, dispatchPolicy: DispatchPolicyService, guideConfirmation: GuideConfirmationService);
+    constructor(prisma: PrismaService, auditService: AuditService, board: AssignmentBoardService, notificationService: NotificationService, gateway: NotificationsGateway, storage: FileStorage, drive: DriveService, mail: MailService, dispatchPolicy: DispatchPolicyService, guideConfirmation: GuideConfirmationService);
     private include;
     findBoard(actor: AuthenticatedUser): Promise<any[]>;
     getBoardCrew(): Promise<{
@@ -66,10 +64,12 @@ export declare class AssignmentsService {
             id: string;
             name: string | null;
             email: string;
+            driverType: import("@prisma/client").$Enums.DriverType;
             rating: number | null;
             provider: {
                 id: string;
                 name: string;
+                isCompany: boolean;
             } | null;
             isBusy: boolean;
             assignments: {
@@ -131,10 +131,12 @@ export declare class AssignmentsService {
             id: string;
             name: string | null;
             email: string;
+            driverType: import("@prisma/client").$Enums.DriverType;
             rating: number | null;
             provider: {
                 id: string;
                 name: string;
+                isCompany: boolean;
             } | null;
             assignments: {
                 id: string;
@@ -189,7 +191,6 @@ export declare class AssignmentsService {
         mode: import("@prisma/client").$Enums.AssignmentOrigin;
     }>;
     private assertCrewAvailableForDates;
-    private assertCrewNoOverlap;
     private assertProviderOwnsAssignment;
     private resolvePriceOverride;
     private decorateBoardCard;
@@ -311,9 +312,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -530,9 +539,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -739,9 +756,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -835,6 +860,7 @@ export declare class AssignmentsService {
     private assertNotSealed;
     getSealInfo(date: string): Promise<import("@/dispatch-policy/dispatch-policy.service").SealInfo>;
     private assertCrewAssigned;
+    private assertGuideConfirmedForReport;
     private assertFreelanceGuideConfirmed;
     private assertRecallAllowed;
     private assertDispatchedUpdateAllowed;
@@ -958,9 +984,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -1169,9 +1203,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -1378,9 +1420,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -1587,9 +1637,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -1796,9 +1854,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2008,9 +2074,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2217,9 +2291,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2426,9 +2508,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2683,9 +2773,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {
@@ -2892,9 +2990,17 @@ export declare class AssignmentsService {
             emailDate: Date | null;
         })[];
         driver: {
+            driverProfile: {
+                type: import("@prisma/client").$Enums.DriverType;
+            } | null;
             name: string | null;
             id: string;
             email: string;
+            provider: {
+                name: string;
+                id: string;
+                isCompany: boolean;
+            } | null;
         } | null;
         guide: {
             guideProfile: {

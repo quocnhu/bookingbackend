@@ -203,6 +203,12 @@ export declare class BookingController {
         movedFromBusId: string | null;
         emailDate: Date | null;
     }>;
+    resendConfirmation(id: string, actor: AuthenticatedUser): Promise<{
+        sent: boolean;
+        reason?: string;
+        bookingRef: string;
+        recipient: string | null;
+    }>;
     nextRef(tourType?: string): Promise<string>;
     createPrivateGroup(id: string, dto: CreatePrivateGroupDto, actor: AuthenticatedUser): Promise<{
         tour: {
@@ -263,8 +269,9 @@ export declare class BookingController {
             provider: string | null;
             status: import("@prisma/client").$Enums.PaymentRecordStatus;
             currency: string;
-            method: import("@prisma/client").$Enums.PaymentMethod;
             note: string | null;
+            createdById: string | null;
+            method: import("@prisma/client").$Enums.PaymentMethod;
             amount: import("@prisma/client/runtime/library").Decimal;
             payerType: import("@prisma/client").$Enums.PayerType;
             providerOrderId: string | null;
@@ -278,7 +285,6 @@ export declare class BookingController {
             confirmedById: string | null;
             confirmedByName: string | null;
             rawPayload: import("@prisma/client/runtime/library").JsonValue | null;
-            createdById: string | null;
             bookingId: string;
         }[];
         parentBooking: {
@@ -498,8 +504,9 @@ export declare class BookingController {
             provider: string | null;
             status: import("@prisma/client").$Enums.PaymentRecordStatus;
             currency: string;
-            method: import("@prisma/client").$Enums.PaymentMethod;
             note: string | null;
+            createdById: string | null;
+            method: import("@prisma/client").$Enums.PaymentMethod;
             amount: import("@prisma/client/runtime/library").Decimal;
             payerType: import("@prisma/client").$Enums.PayerType;
             providerOrderId: string | null;
@@ -513,7 +520,6 @@ export declare class BookingController {
             confirmedById: string | null;
             confirmedByName: string | null;
             rawPayload: import("@prisma/client/runtime/library").JsonValue | null;
-            createdById: string | null;
             bookingId: string;
         }[];
         parentBooking: {

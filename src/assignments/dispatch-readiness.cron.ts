@@ -20,6 +20,7 @@ import { formatMailDate } from '@/mail/mail-format.util';
 import { isUnpaidPayPalBooking } from '@/common/utils/unpaid-booking.util';
 import { NotificationService } from '@/notifications/notification.service';
 import { NotificationsGateway } from '@/notifications/notifications.gateway';
+import { findCrewConflict } from '@/common/utils/crew-availability.util';
 
 const HCM_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
@@ -94,9 +95,12 @@ export class DispatchReadinessCron {
         code: true,
         tourName: true,
         startDate: true,
+        endDate: true,
         totalPax: true,
         status: true,
         executionMode: true,
+        guideId: true,
+        driverId: true,
         guideConfirmedAt: true,
         guideDeclinedAt: true,
         providerRequestStatus: true,
@@ -126,6 +130,37 @@ export class DispatchReadinessCron {
       orderBy: [{ startDate: 'asc' }, { code: 'asc' }],
     });
 
+    const crewIssues = new Map<string, string[]>();
+    for (const assignment of assignments) {
+      if (assignment.status === AssignmentStatus.WAITING_LIST) continue;
+      const issues: string[] = [];
+      for (const [kind, userId] of [
+        ['guide', assignment.guideId],
+        ['driver', assignment.driverId],
+      ] as const) {
+        if (!userId) continue;
+        const conflict = await findCrewConflict(
+          this.prisma,
+          kind,
+          userId,
+          assignment.startDate,
+          assignment.endDate,
+          assignment.id,
+        );
+        if (!conflict) continue;
+        if (conflict.type === 'ASSIGNMENT') {
+          issues.push(
+            `${kind} ${conflict.name} is already on ${conflict.assignment?.code ?? 'another trip'}`,
+          );
+        } else if (conflict.type === 'LEAVE') {
+          issues.push(`${kind} ${conflict.name} is on leave`);
+        } else {
+          issues.push(`${kind} ${conflict.name} is on hold`);
+        }
+      }
+      if (issues.length) crewIssues.set(assignment.id, issues);
+    }
+
     const now = Date.now();
     const rows = assignments.map((assignment): DispatchReadinessRow => {
       const issues: string[] = [];
@@ -143,6 +178,7 @@ export class DispatchReadinessCron {
       );
 
       if (waiting) issues.push('Waiting list — place after 05:00');
+      issues.push(...(crewIssues.get(assignment.id) ?? []));
       if (unpaid.length > 0) {
         const refs = unpaid
           .map((booking) => booking.bookingRef)

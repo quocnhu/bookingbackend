@@ -77,8 +77,8 @@ export declare class AccountingService {
             assignmentId: string | null;
             categoryId: string | null;
             note: string | null;
-            amount: Prisma.Decimal;
             createdById: string;
+            amount: Prisma.Decimal;
             bookingId: string | null;
             createdByName: string | null;
             reversesId: string | null;
@@ -107,8 +107,8 @@ export declare class AccountingService {
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
         createdById: string;
+        amount: Prisma.Decimal;
         bookingId: string | null;
         createdByName: string | null;
         reversesId: string | null;
@@ -134,8 +134,8 @@ export declare class AccountingService {
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
         createdById: string;
+        amount: Prisma.Decimal;
         bookingId: string | null;
         createdByName: string | null;
         reversesId: string | null;
@@ -157,8 +157,8 @@ export declare class AccountingService {
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
         createdById: string;
+        amount: Prisma.Decimal;
         bookingId: string | null;
         createdByName: string | null;
         reversesId: string | null;
@@ -175,8 +175,8 @@ export declare class AccountingService {
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
         createdById: string;
+        amount: Prisma.Decimal;
         bookingId: string | null;
         createdByName: string | null;
         reversesId: string | null;
@@ -188,8 +188,8 @@ export declare class AccountingService {
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
         createdById: string;
+        amount: Prisma.Decimal;
         bookingId: string | null;
         createdByName: string | null;
         reversesId: string | null;
@@ -201,8 +201,8 @@ export declare class AccountingService {
         assignmentId: string | null;
         categoryId: string | null;
         note: string | null;
-        amount: Prisma.Decimal;
         createdById: string;
+        amount: Prisma.Decimal;
         bookingId: string | null;
         createdByName: string | null;
         reversesId: string | null;
@@ -763,10 +763,10 @@ export declare class AccountingService {
     voidPeriod(actor: AuthenticatedUser, periodId: string, dto: VoidPeriodDto): Promise<{
         id: string;
         createdAt: Date;
-        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         note: string | null;
-        paidAt: Date | null;
         createdById: string;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+        paidAt: Date | null;
         paidById: string | null;
         paidByName: string | null;
         paymentReference: string | null;
@@ -788,10 +788,10 @@ export declare class AccountingService {
     markPeriodPaid(actor: AuthenticatedUser, periodId: string, dto: MarkPeriodPaidDto): Promise<{
         id: string;
         createdAt: Date;
-        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         note: string | null;
-        paidAt: Date | null;
         createdById: string;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
+        paidAt: Date | null;
         paidById: string | null;
         paidByName: string | null;
         paymentReference: string | null;
@@ -819,8 +819,8 @@ export declare class AccountingService {
         status: import("@prisma/client").$Enums.PartnerPaymentStatus;
         assignmentId: string;
         currency: string;
-        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         note: string | null;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         amount: Prisma.Decimal;
         paidAt: Date | null;
         tourDate: Date;
@@ -868,8 +868,8 @@ export declare class AccountingService {
         status: import("@prisma/client").$Enums.HotelCommissionPayoutStatus;
         commissionPercent: Prisma.Decimal;
         currency: string;
-        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         note: string | null;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod | null;
         amount: Prisma.Decimal;
         paidAt: Date;
         bookingId: string;

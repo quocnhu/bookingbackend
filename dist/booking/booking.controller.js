@@ -39,6 +39,9 @@ let BookingController = class BookingController {
     confirmPayment(id, dto, actor) {
         return this.bookingService.confirmBookingPayment(id, dto, actor);
     }
+    resendConfirmation(id, actor) {
+        return this.bookingService.resendBookingConfirmation(id, actor);
+    }
     nextRef(tourType) {
         const type = tourType === 'PRIVATE_TOUR'
             ? client_1.TourType.PRIVATE_TOUR
@@ -120,6 +123,15 @@ __decorate([
     __metadata("design:paramtypes", [String, booking_dto_1.ConfirmBookingPaymentDto, Object]),
     __metadata("design:returntype", void 0)
 ], BookingController.prototype, "confirmPayment", null);
+__decorate([
+    (0, common_1.Post)(':id/resend-confirmation'),
+    (0, permissions_decorator_1.Permissions)('booking.update'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], BookingController.prototype, "resendConfirmation", null);
 __decorate([
     (0, common_1.Get)('next-ref'),
     (0, permissions_decorator_1.Permissions)('booking.create'),

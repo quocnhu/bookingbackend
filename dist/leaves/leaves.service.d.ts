@@ -41,8 +41,8 @@ export declare class LeavesService {
         status: import("@prisma/client").$Enums.LeaveStatus;
         reason: string | null;
         isEmergency: boolean;
-        reviewedAt: Date | null;
         reviewedById: string | null;
+        reviewedAt: Date | null;
     }>;
     findAll(query: QueryLeaveDto, actor: AuthenticatedUser): Promise<PaginatedResult<any>>;
     findMy(actor: AuthenticatedUser): Promise<{
@@ -110,8 +110,8 @@ export declare class LeavesService {
         status: import("@prisma/client").$Enums.LeaveStatus;
         reason: string | null;
         isEmergency: boolean;
-        reviewedAt: Date | null;
         reviewedById: string | null;
+        reviewedAt: Date | null;
     }>;
     remove(id: string, actor: AuthenticatedUser): Promise<{
         message: string;

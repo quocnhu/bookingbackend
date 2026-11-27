@@ -22,13 +22,12 @@ function renderBookingConfirmation(data, company) {
     const payment = paymentLabel(data);
     const companyName = (company?.name ?? '').trim() || 'Hana Tourist';
     const companyNameSentence = (0, mail_format_util_1.asSentence)(companyName);
-    const contactLine = [
+    const contactLines = [
         company?.phone ? `Phone: ${company.phone}` : null,
         company?.email ? `Email: ${company.email}` : null,
         company?.website ? `Website: ${company.website}` : null,
-    ]
-        .filter(Boolean)
-        .join(' · ');
+    ].filter((line) => Boolean(line));
+    const pickupNote = 'Our tour guide will contact you soon to pick you up.';
     const subject = `Booking ${bookingRef} confirmed — ${tourName}`;
     const text = [
         `Hello ${data.customerName?.trim() || 'there'},`,
@@ -48,9 +47,11 @@ function renderBookingConfirmation(data, company) {
         data.notes?.trim() ? '' : null,
         'Please keep this email for your records. Reply to this message if you need any help.',
         '',
+        pickupNote,
+        '',
         companyName,
         company?.address?.trim() || null,
-        contactLine || null,
+        ...contactLines,
     ]
         .filter((line) => line !== null)
         .join('\n');
@@ -113,9 +114,11 @@ function renderBookingConfirmation(data, company) {
             </tr>
             <tr>
               <td style="padding:18px 28px 28px;border-top:1px solid #e8eef3;font-size:12px;color:#7a8b9a;line-height:1.7">
+                <em style="color:#40566b;font-size:13px">${(0, mail_format_util_1.escapeHtml)(pickupNote)}</em><br/>
+                <br/>
                 <strong style="color:#0f2740;font-size:13px">${(0, mail_format_util_1.escapeHtml)(companyName)}</strong><br/>
                 ${company?.address?.trim() ? `${(0, mail_format_util_1.escapeHtml)(company.address.trim())}<br/>` : ''}
-                ${contactLine ? (0, mail_format_util_1.escapeHtml)(contactLine) : ''}
+                ${contactLines.map((line) => `${(0, mail_format_util_1.escapeHtml)(line)}<br/>`).join('')}
               </td>
             </tr>
           </table>
